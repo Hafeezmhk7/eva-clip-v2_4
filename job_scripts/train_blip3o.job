@@ -1,27 +1,28 @@
 #!/bin/bash
-#SBATCH --job-name=eva_repro_fixed
+#SBATCH --job-name=blip3o_clip_clean
 #SBATCH --partition=gpu_h100
 #SBATCH --nodes=1
-#SBATCH --gpus=3
+#SBATCH --gpus=1
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=18
-#SBATCH --time=15:00:00
+#SBATCH --cpus-per-task=8
+#SBATCH --time=12:00:00
 #SBATCH --mem=64G
-#SBATCH --output=./slurm_out/eva_repro_fixed_%j.out
-#SBATCH --error=./slurm_out/eva_repro_fixed_%j.err
+#SBATCH --output=./slurm_out/blip3o_5shards_%j.out
+#SBATCH --error=./slurm_out/blip3o_5shards_%j.err
 
 # =============================================================================
-# Fixed EVA-CLIP Reproduction Training with BLIP3-o DiT
-# Uses fixed implementation with proper gradient flow and architecture
+# Clean BLIP3-o CLIP Reproduction Training
+# Task: Reproduce CLIP embeddings [B, N, 1024] from EVA embeddings [B, N, 4096]
+# Method: Rectified Flow Matching with BLIP3-o DiT
 # =============================================================================
 
-echo "🚀 Fixed EVA-CLIP Reproduction Training with BLIP3-o DiT"
-echo "=========================================================="
+echo "🚀 Clean BLIP3-o CLIP Reproduction Training"
+echo "=========================================="
 echo "Job ID: ${SLURM_JOB_ID}"
 echo "Node: $(hostname)"
 echo "Time: $(date)"
 echo "GPUs: $(nvidia-smi --query-gpu=name --format=csv,noheader,nounits | tr '\n' ', ')"
-echo "=========================================================="
+echo "=========================================="
 
 cd $SLURM_SUBMIT_DIR
 
@@ -32,44 +33,39 @@ module load Miniconda3/24.7.1-0
 module load CUDA/12.6.0
 source activate eva_clip_env
 
-# Optional: WandB login (uncomment if using WandB)
-# wandb login 0d9895af249ee18e4fa141e8a2350e0f4adb920f --relogin
-
 # Configuration
 EMBEDDINGS_DIR="/scratch-shared/azadaianchuk1/blip3o_workspace/embeddings/patch_only_256_tokens"
-OUTPUT_DIR="./checkpoints/eva_repro_fixed_$(date +%Y%m%d_%H%M%S)"
+OUTPUT_DIR="./checkpoints/blip3o_clean_$(date +%Y%m%d_%H%M%S)"
 TRAINING_MODE="patch_only"
 MODEL_SIZE="base"
 
-# Fixed hyperparameters optimized for stable training
-NUM_EPOCHS=10                    # Conservative epochs for initial testing
-BATCH_SIZE=8                     # Smaller batch size for stability
-LEARNING_RATE=5e-4              # Conservative learning rate
-WEIGHT_DECAY=0.01               # Standard regularization
-WARMUP_STEPS=100                # Shorter warmup for testing
-MAX_GRAD_NORM=1.0               # Gradient clipping for stability
+# Training hyperparameters
+NUM_EPOCHS=10
+BATCH_SIZE=128
+LEARNING_RATE=5e-4
+WEIGHT_DECAY=0.01
+WARMUP_STEPS=500
+MAX_GRAD_NORM=1.0
 
 # Evaluation parameters
 EVAL_EVERY_N_STEPS=100
-EVAL_NUM_SAMPLES=500
+EVAL_NUM_SAMPLES=100
 EVAL_INFERENCE_STEPS=50
 
-# Testing configuration
-OVERFIT_TEST_SIZE=20            # Enable overfitting test to verify architecture
-DEBUG_MODE="--debug_mode"      # Enable debug logging
-MAX_SHARDS=2                    # Start with fewer shards for testing
+# Data configuration
+MAX_SHARDS=5
 
 # Create output directory
 mkdir -p "${OUTPUT_DIR}"
 mkdir -p ./slurm_out
 
 echo ""
-echo "⚙️ Fixed EVA Reproduction Configuration:"
-echo "========================================"
-echo "Task: Reproduce clean EVA embeddings from noisy EVA embeddings"
-echo "Conditioning: CLIP embeddings [B, N, 1024]"
-echo "Target: EVA embeddings [B, N, 4096]"
-echo "Method: Rectified Flow Matching with BLIP3-o DiT"
+echo "⚙️ Clean BLIP3-o Configuration:"
+echo "============================="
+echo "Task: Reproduce CLIP embeddings from EVA embeddings"
+echo "Method: BLIP3-o DiT with Rectified Flow Matching"
+echo "Target: CLIP embeddings [B, N, 1024]"
+echo "Conditioning: EVA embeddings [B, N, 4096]"
 echo ""
 echo "Embeddings: $EMBEDDINGS_DIR"
 echo "Output: $OUTPUT_DIR"
@@ -84,12 +80,19 @@ echo "  Learning rate: $LEARNING_RATE"
 echo "  Weight decay: $WEIGHT_DECAY"
 echo "  Warmup steps: $WARMUP_STEPS"
 echo "  Max grad norm: $MAX_GRAD_NORM"
-echo "  Overfitting test: $OVERFIT_TEST_SIZE samples"
 echo ""
 echo "🔍 Evaluation Configuration:"
 echo "  Eval every: $EVAL_EVERY_N_STEPS steps"
 echo "  Eval samples: $EVAL_NUM_SAMPLES"
 echo "  Inference steps: $EVAL_INFERENCE_STEPS"
+echo ""
+echo "🏗️ Architecture Features:"
+echo "  • 3D Rotary Position Embedding"
+echo "  • Sandwich Normalization (RMSNorm)"
+echo "  • Grouped-Query Attention"
+echo "  • Rectified Flow Matching"
+echo "  • Simple Linear Timestep Schedule"
+echo "  • Clean Euler Integration"
 echo ""
 
 # Verify embeddings exist
@@ -117,36 +120,28 @@ if [ $SHARD_COUNT -lt $MAX_SHARDS ]; then
     echo "   Adjusted to use $MAX_SHARDS shards"
 fi
 
-# Verify fixed training script exists
-if [ ! -f "train_eva_repro.py" ]; then
-    echo "❌ Fixed training script not found: train_eva_reproduction.py"
-    echo "Available Python files:"
-    ls -la *.py 2>/dev/null || echo "No Python files found"
-    exit 1
-fi
-
-echo "✅ Fixed training script found"
+echo "✅ Training script ready"
 
 echo ""
-echo "🚀 Starting Fixed EVA Reproduction Training..."
-echo "=============================================="
-echo "🧪 EXPECTED BEHAVIOR WITH FIXES:"
+echo "🚀 Starting Clean BLIP3-o Training..."
+echo "===================================="
+echo "🎯 Expected Behavior:"
 echo "  ✅ Non-zero gradients from first step"
 echo "  ✅ Decreasing loss within first few epochs"
 echo "  ✅ Velocity similarity increasing from ~0.01 to >0.1"
-echo "  ✅ EVA similarity during evaluation >0.1 (good), >0.4 (excellent)"
-echo "  ✅ Overfitting test should achieve >0.8 similarity"
+echo "  ✅ CLIP similarity during evaluation >0.1 (good), >0.4 (excellent)"
 echo "  ✅ No NaN/Inf issues or tensor shape mismatches"
 echo ""
-echo "🏗️ ARCHITECTURE VALIDATION:"
-echo "  • BLIP3-o DiT with 3D RoPE and Grouped-Query Attention"
-echo "  • Sandwich Normalization (RMSNorm)"
+echo "🏗️ Architecture:"
+echo "  • BLIP3-o DiT with 3D RoPE and Sandwich Normalization"
 echo "  • Rectified Flow Matching"
-echo "  • Proper gradient flow and initialization"
+echo "  • Simple Linear Timestep Schedule"
+echo "  • Clean Euler Integration"
+echo "  • EVA [4096] → CLIP [1024] mapping"
 echo ""
 
-# Launch fixed EVA reproduction training
-python train_eva_repro.py \
+# Launch clean BLIP3-o training
+python train_dit.py \
     --chunked_embeddings_dir "$EMBEDDINGS_DIR" \
     --output_dir "$OUTPUT_DIR" \
     --model_size "$MODEL_SIZE" \
@@ -159,24 +154,23 @@ python train_eva_repro.py \
     --max_grad_norm $MAX_GRAD_NORM \
     --eval_every_n_steps $EVAL_EVERY_N_STEPS \
     --eval_num_samples $EVAL_NUM_SAMPLES \
-    --overfit_test_size $OVERFIT_TEST_SIZE \
+    --eval_inference_steps $EVAL_INFERENCE_STEPS \
     --max_shards $MAX_SHARDS \
-    --fp16 \
-    $DEBUG_MODE
+    --fp16
 
 TRAINING_EXIT_CODE=$?
 
 echo ""
-echo "========================================"
-echo "📊 Fixed EVA Reproduction Results"
-echo "========================================"
+echo "======================================"
+echo "📊 Clean BLIP3-o Training Results"
+echo "======================================"
 
 if [ $TRAINING_EXIT_CODE -eq 0 ]; then
-    echo "✅ Fixed EVA reproduction training completed successfully!"
+    echo "✅ Clean BLIP3-o training completed successfully!"
     
     echo ""
     echo "📋 Training Summary:"
-    echo "==================="
+    echo "=================="
     
     # Check for training results
     SUMMARY_FILE="$OUTPUT_DIR/training_summary.json"
@@ -185,7 +179,7 @@ if [ $TRAINING_EXIT_CODE -eq 0 ]; then
     if [ -f "$SUMMARY_FILE" ]; then
         echo ""
         echo "📊 Training Results:"
-        echo "==================="
+        echo "=================="
         
         # Extract key metrics using Python
         python -c "
@@ -196,42 +190,35 @@ try:
         data = json.load(f)
     
     print(f'🎯 Best Loss: {data.get(\"best_loss\", float(\"inf\")):.6f}')
-    print(f'🎯 Best EVA Similarity: {data.get(\"best_eval_similarity\", 0):.4f}')
+    print(f'🎯 Best CLIP Similarity: {data.get(\"best_eval_similarity\", 0):.4f}')
     print(f'📊 Total Steps: {data.get(\"total_steps\", 0):,}')
     print(f'⏱️ Training Time: {data.get(\"total_time_seconds\", 0):.1f} seconds')
-    
-    # Overfitting test results
-    if data.get('overfit_test', False):
-        overfit_success = data.get('overfit_success', False)
-        print(f'🧪 Overfitting Test: {\"✅ PASSED\" if overfit_success else \"❌ FAILED\"}')
-        if overfit_success:
-            print(f'   ✅ Architecture can learn - implementation is correct!')
-        else:
-            print(f'   ⚠️  Architecture struggles to overfit - check implementation')
     
     # Final evaluation
     final_eval = data.get('final_eval', {})
     if final_eval:
         print(f'')
         print(f'🔍 Final Evaluation:')
-        eva_sim = final_eval.get('eval_eva_similarity', 0)
+        clip_sim = final_eval.get('eval_clip_similarity', 0)
         high_qual = final_eval.get('eval_high_quality', 0) * 100
         very_high_qual = final_eval.get('eval_very_high_quality', 0) * 100
         
-        print(f'   Overall EVA Similarity: {eva_sim:.4f}')
+        print(f'   Overall CLIP Similarity: {clip_sim:.4f}')
         print(f'   High Quality (>0.7): {high_qual:.1f}%')
         print(f'   Very High Quality (>0.8): {very_high_qual:.1f}%')
         print(f'   Samples Evaluated: {final_eval.get(\"eval_samples\", 0):,}')
         
         # Assessment
-        if eva_sim > 0.7:
-            print(f'   🎉 EXCELLENT: Outstanding EVA reproduction!')
-        elif eva_sim > 0.4:
-            print(f'   ✅ GOOD: Strong EVA reproduction capability!')
-        elif eva_sim > 0.1:
+        if clip_sim > 0.8:
+            print(f'   🎉 EXCELLENT: Outstanding CLIP reproduction!')
+        elif clip_sim > 0.6:
+            print(f'   ✅ VERY GOOD: Strong CLIP reproduction!')
+        elif clip_sim > 0.4:
+            print(f'   ✅ GOOD: Solid CLIP reproduction!')
+        elif clip_sim > 0.2:
             print(f'   📈 FAIR: Decent reproduction, shows learning!')
         else:
-            print(f'   ⚠️  NEEDS WORK: Low similarity, check hyperparameters')
+            print(f'   ⚠️ NEEDS WORK: Low similarity, check hyperparameters')
     
 except Exception as e:
     print(f'Could not parse training summary: {e}')
@@ -254,45 +241,37 @@ except Exception as e:
     
     echo ""
     echo "🎯 Next Steps:"
-    echo "=============="
+    echo "============"
     echo "1. Review training logs above for success indicators"
-    echo "2. If overfitting test passed, run full-scale training:"
-    echo "   • Increase MAX_SHARDS to use more data" 
+    echo "2. If results are good, run with more data:"
+    echo "   • Increase MAX_SHARDS to use more training data" 
     echo "   • Increase NUM_EPOCHS for longer training"
     echo "   • Adjust BATCH_SIZE based on memory usage"
-    echo "3. Run comprehensive evaluation:"
-    echo "   python evaluate_model.py --model_path $OUTPUT_DIR --embeddings_dir $EMBEDDINGS_DIR --output_dir ./evaluation"
+    echo "3. Run comprehensive evaluation on test set"
     echo ""
     echo "🔍 SUCCESS INDICATORS:"
     echo "  ✅ Non-zero gradients throughout training"
     echo "  ✅ Decreasing loss trend"
     echo "  ✅ Increasing similarity metrics"
-    echo "  ✅ Overfitting test achieves >0.8 similarity"
-    echo "  ✅ Final EVA similarity >0.1 (good), >0.4 (excellent)"
+    echo "  ✅ Final CLIP similarity >0.2 (fair), >0.4 (good), >0.6 (excellent)"
     
     echo ""
-    echo "✅ SUCCESS: Fixed EVA reproduction training completed!"
+    echo "✅ SUCCESS: Clean BLIP3-o training completed!"
     
 else
     echo "❌ FAILED: Training exit code $TRAINING_EXIT_CODE"
     echo ""
-    echo "💡 Troubleshooting the Fixed Implementation:"
+    echo "💡 Troubleshooting:"
     echo "  • Check log files in ./slurm_out/ for detailed error messages"
-    echo "  • Verify all fixed Python files are present:"
-    echo "    - train_eva_reproduction.py (main script)"
-    echo "    - fixed_model.py (BLIP3-o DiT)"
-    echo "    - fixed_loss.py (flow matching loss)"
-    echo "    - fixed_dataset.py (data loading)"
-    echo "    - fixed_trainer.py (training loop)"
+    echo "  • Verify all required Python files are present"
     echo "  • Check embeddings directory structure and file formats"
     echo "  • Monitor GPU memory usage with nvidia-smi"
     echo "  • Try reducing batch_size if out-of-memory errors"
     echo ""
     echo "🔧 Quick Recovery Options:"
-    echo "  • Start with overfitting test: --overfit_test_size 5 --batch_size 2"
-    echo "  • Use smaller model: --model_size tiny"
-    echo "  • Enable more debugging: --debug_mode --max_shards 1"
-    echo "  • Check if embeddings are properly formatted"
+    echo "  • Use smaller model: --model_size small or tiny"
+    echo "  • Reduce batch size: --batch_size 4"
+    echo "  • Use fewer shards: MAX_SHARDS=2"
 fi
 
 echo ""
@@ -304,9 +283,10 @@ echo ""
 echo "🏁 Job completed at $(date)"
 echo "Total job time: $(echo "scale=2; ($(date +%s) - $SECONDS) / 3600" | bc -l) hours"
 echo ""
-echo "📚 ARCHITECTURE VALIDATION SUMMARY:"
-echo "This job tests BLIP3-o DiT architecture by reproducing clean EVA embeddings."
-echo "Success indicates the architecture is correctly implemented and ready for your main task."
-echo "========================================"
+echo "📚 CLEAN BLIP3-o SUMMARY:"
+echo "This job trains a clean BLIP3-o DiT to reproduce CLIP embeddings from EVA embeddings."
+echo "Success indicates the architecture can perform cross-modal embedding translation effectively."
+echo "The implementation follows the BLIP3-o paper with simple linear timestep scheduling."
+echo "=========================================="
 
 exit $TRAINING_EXIT_CODE

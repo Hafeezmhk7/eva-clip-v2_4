@@ -1,28 +1,22 @@
 #!/bin/bash
-#SBATCH --job-name=blip3o_train
+#SBATCH --job-name=clip_repro_training
 #SBATCH --partition=gpu_h100
 #SBATCH --nodes=1
-#SBATCH --ntasks=2
-#SBATCH --gpus=3
+#SBATCH --gpus=1
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=18
-#SBATCH --time=12:00:00
+#SBATCH --cpus-per-task=8
+#SBATCH --time=15:00:00
 #SBATCH --mem=64G
-#SBATCH --output=./slurm_out/blip3o_train_%j.out
-#SBATCH --error=./slurm_out/blip3o_train_%j.err
+#SBATCH --output=./slurm_out/clip_repro_%j.out
+#SBATCH --error=./slurm_out/clip_repro_%j.err
 
-# =============================================================================
-# FIXED BLIP3-o Training Job - Proper Implementation
-# Trains on 1 shard with evaluation every 100 steps
-# =============================================================================
-
-echo "🚀 FIXED BLIP3-o Training with Evaluation"
-echo "========================================="
+echo "🚀 CLIP Reproduction Training with BLIP3-o DiT"
+echo "==============================================="
 echo "Job ID: ${SLURM_JOB_ID}"
 echo "Node: $(hostname)"
 echo "Time: $(date)"
-echo "GPU: $(nvidia-smi --query-gpu=name --format=csv,noheader,nounits | head -1)"
-echo "========================================="
+echo "GPUs: $(nvidia-smi --query-gpu=name --format=csv,noheader,nounits | tr '\n' ', ')"
+echo "==============================================="
 
 cd $SLURM_SUBMIT_DIR
 
@@ -35,177 +29,79 @@ source activate eva_clip_env
 
 # Configuration
 EMBEDDINGS_DIR="/scratch-shared/azadaianchuk1/blip3o_workspace/embeddings/patch_only_256_tokens"
-OUTPUT_DIR="./checkpoints/blip3o_training_$(date +%Y%m%d_%H%M%S)"
+OUTPUT_DIR="./checkpoints/clip_repro_$(date +%Y%m%d_%H%M%S)"
 TRAINING_MODE="patch_only"
-MODEL_SIZE="small"
+MODEL_SIZE="base"
 
-# Training parameters - Aligned with BLIP3-o paper
-NUM_EPOCHS=20
-BATCH_SIZE=64
-LEARNING_RATE=2e-4
-GRADIENT_ACCUMULATION_STEPS=1
+# Training hyperparameters
+NUM_EPOCHS=10
+BATCH_SIZE=16
+LEARNING_RATE=5e-4
+WEIGHT_DECAY=0.01
+WARMUP_STEPS=100
+MAX_GRAD_NORM=1.0
 
-# Evaluation parameters - Key to our implementation
-EVAL_EVERY_N_STEPS=100
-EVAL_NUM_SAMPLES=1000
+# =============================================================================
+# CONFIGURABLE PARAMETERS - Edit values below
+# =============================================================================
+EVAL_EVERY_N_STEPS=326
+EVAL_NUM_SAMPLES=10            # Change this number
 EVAL_INFERENCE_STEPS=50
+OVERFIT_TEST_SIZE=0            # 0=disabled, >0=enabled
+DEBUG_MODE=false                # true=enabled, false=disabled
+USE_WANDB=true                  # true=enabled, false=disabled
+MAX_SHARDS=2
+# =============================================================================
 
 # Create output directory
 mkdir -p "${OUTPUT_DIR}"
 mkdir -p ./slurm_out
 
-echo ""
-echo "⚙️ Training Configuration:"
-echo "=========================="
-echo "Embeddings: $EMBEDDINGS_DIR"
-echo "Output: $OUTPUT_DIR"
-echo "Training mode: $TRAINING_MODE"
-echo "Model size: $MODEL_SIZE"
-echo "Batch size: $BATCH_SIZE"
-echo "Learning rate: $LEARNING_RATE"
-echo "Epochs: $NUM_EPOCHS"
-echo "Evaluation every: $EVAL_EVERY_N_STEPS steps"
-echo "Evaluation samples: $EVAL_NUM_SAMPLES"
-echo ""
+echo "⚙️ Configuration:"
+echo "  Eval samples: $EVAL_NUM_SAMPLES"
+echo "  Overfit test: $OVERFIT_TEST_SIZE"
+echo "  Debug mode: $DEBUG_MODE"
+echo "  WandB logging: $USE_WANDB"
 
 # Verify embeddings exist
 if [ ! -d "$EMBEDDINGS_DIR" ]; then
     echo "❌ Embeddings directory not found: $EMBEDDINGS_DIR"
-    echo "Available embeddings:"
-    ls -la "/scratch-shared/azadaianchuk1/blip3o_workspace/embeddings/" 2>/dev/null || echo "No embeddings found"
     exit 1
 fi
 
-echo "✅ Embeddings verified: $EMBEDDINGS_DIR"
+echo "🚀 Starting training..."
 
-# Verify training script exists
-if [ ! -f "train_blip3o_enhanced.py" ]; then
-    echo "❌ Training script not found: train_blip3o_enhanced.py"
-    exit 1
-fi
-
-echo "✅ Training script found"
-
-echo ""
-echo "🚀 Starting FIXED Training..."
-echo "=============================="
-echo "Expected behavior:"
-echo "  • Velocity similarity should increase from ~0.01"
-echo "  • Embedding similarity should increase during training"
-echo "  • Norms should be similar (both ~1.0 with normalization)"
-echo "  • Evaluation every 100 steps to track progress"
-echo "  • Final evaluation should match training metrics"
-echo ""
-
-# Launch training with evaluation
-python train_blip3o_enhanced.py \
+# Launch training - Python handles all parameter logic
+python train_dit.py \
     --chunked_embeddings_dir "$EMBEDDINGS_DIR" \
     --output_dir "$OUTPUT_DIR" \
-    --training_mode "$TRAINING_MODE" \
     --model_size "$MODEL_SIZE" \
-    --num_epochs $NUM_EPOCHS \
-    --batch_size $BATCH_SIZE \
+    --training_mode "$TRAINING_MODE" \
     --learning_rate $LEARNING_RATE \
-    --gradient_accumulation_steps $GRADIENT_ACCUMULATION_STEPS \
+    --batch_size $BATCH_SIZE \
+    --num_epochs $NUM_EPOCHS \
+    --warmup_steps $WARMUP_STEPS \
+    --weight_decay $WEIGHT_DECAY \
+    --max_grad_norm $MAX_GRAD_NORM \
     --eval_every_n_steps $EVAL_EVERY_N_STEPS \
     --eval_num_samples $EVAL_NUM_SAMPLES \
-    --eval_inference_steps $EVAL_INFERENCE_STEPS \
-    --max_training_shards 1 \
-    --fp16 \
-    --logging_steps 10 \
-    --save_steps 200
+    --overfit_test_size $OVERFIT_TEST_SIZE \
+    --max_shards $MAX_SHARDS \
+    --debug_mode $DEBUG_MODE \
+    --use_wandb $USE_WANDB \
+    --fp16
 
 TRAINING_EXIT_CODE=$?
 
-echo ""
 echo "========================================"
-echo "📊 Training Results"
+echo "📊 Training completed with exit code: $TRAINING_EXIT_CODE"
 echo "========================================"
 
 if [ $TRAINING_EXIT_CODE -eq 0 ]; then
-    echo "✅ Training completed successfully!"
-    
-    echo ""
-    echo "📋 Training Summary:"
-    echo "==================="
-    
-    # Find and display training info
-    TRAINING_INFO="$OUTPUT_DIR/training_info.json"
-    
-    if [ -f "$TRAINING_INFO" ]; then
-        echo ""
-        echo "📊 Final Metrics:"
-        echo "=================="
-        
-        # Extract key metrics using Python
-        python -c "
-import json
-try:
-    with open('$TRAINING_INFO', 'r') as f:
-        data = json.load(f)
-    
-    if 'final_results' in data and 'training_summary' in data['final_results']:
-        summary = data['final_results']['training_summary']
-        print(f'📈 Final Velocity Similarity: {summary.get(\"final_velocity_sim\", 0):.4f}')
-        print(f'📈 Best Velocity Similarity: {summary.get(\"best_velocity_sim\", 0):.4f}')
-        print(f'🎯 Final Embedding Similarity: {summary.get(\"final_embedding_sim\", 0):.4f}')
-        print(f'🎯 Best Embedding Similarity: {summary.get(\"best_embedding_sim\", 0):.4f}')
-        print(f'🏥 Training Health: {summary.get(\"training_health\", \"Unknown\")}')
-        print(f'📊 Evaluations Performed: {summary.get(\"evaluations_performed\", 0)}')
-        
-        # Assessment
-        best_emb = summary.get('best_embedding_sim', 0)
-        if best_emb > 0.1:
-            print('🎉 SUCCESS: Good embedding generation!')
-        elif best_emb > 0.05:
-            print('📈 PROGRESS: Shows learning, may need more training')
-        else:
-            print('⚠️ NEEDS WORK: Low similarity, check implementation')
-    
-    if 'final_results' in data and 'final_evaluation' in data['final_results']:
-        eval_results = data['final_results']['final_evaluation']
-        if eval_results:
-            print(f'')
-            print(f'🔍 Final Evaluation Results:')
-            print(f'   Overall Similarity: {eval_results.get(\"overall_embedding_similarity\", 0):.4f}')
-            print(f'   High Quality Images: {eval_results.get(\"high_quality_images\", 0)*100:.1f}%')
-            print(f'   Samples Evaluated: {eval_results.get(\"samples_evaluated\", 0):,}')
-            
-except Exception as e:
-    print(f'Could not parse training info: {e}')
-"
-        
-        echo ""
-        echo "📁 Training artifacts saved to: $OUTPUT_DIR"
-        echo "📄 Training info: $TRAINING_INFO"
-    else
-        echo "⚠️ No training info file found"
-    fi
-    
-    echo ""
-    echo "🎯 Next Steps:"
-    echo "=============="
-    echo "1. Run comprehensive evaluation:"
-    echo "   sbatch job_scripts/evaluate_blip3o.job $OUTPUT_DIR"
-    echo ""
-    echo "2. Check if training and evaluation metrics match"
-    echo "3. If successful, scale to more shards"
-    
-    echo ""
-    echo "✅ SUCCESS: FIXED Training completed!"
-    
+    echo "✅ Training successful"
+    echo "📁 Results saved to: $OUTPUT_DIR"
 else
-    echo "❌ FAILED: Training exit code $TRAINING_EXIT_CODE"
-    echo ""
-    echo "💡 Troubleshooting:"
-    echo "  • Check log files in ./slurm_out/"
-    echo "  • Verify embeddings and model paths"
-    echo "  • Check CUDA memory usage"
-    echo "  • Try smaller batch size if OOM"
+    echo "❌ Training failed"
 fi
-
-echo ""
-echo "🏁 Job completed at $(date)"
-echo "========================================"
 
 exit $TRAINING_EXIT_CODE
