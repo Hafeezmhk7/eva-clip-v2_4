@@ -33,15 +33,15 @@ module load Miniconda3/24.7.1-0
 module load CUDA/12.6.0
 source activate eva_clip_env
 
-# # ✅ FIXED: Set WandB API key
-# export WANDB_API_KEY="0d9895af249ee18e4fa141e8a2350e0f4adb920f"
-# export WANDB_MODE="online"  # Ensure online mode
-# export WANDB_CACHE_DIR="${TMPDIR}/wandb_cache"  # Use temp dir for cache
-# mkdir -p "${WANDB_CACHE_DIR}"
+# ✅ FIXED: Set WandB API key
+export WANDB_API_KEY="0d9895af249ee18e4fa141e8a2350e0f4adb920f"
+export WANDB_MODE="online"  # Ensure online mode
+export WANDB_CACHE_DIR="${TMPDIR}/wandb_cache"  # Use temp dir for cache
+mkdir -p "${WANDB_CACHE_DIR}"
 
-# # Verify WandB login
-# echo "🔐 Verifying WandB authentication..."
-# python -c "import wandb; wandb.login(key='$WANDB_API_KEY'); print('✅ WandB login successful')"
+# Verify WandB login
+echo "🔐 Verifying WandB authentication..."
+python -c "import wandb; wandb.login(key='$WANDB_API_KEY'); print('✅ WandB login successful')"
 
 
 # Configuration
@@ -51,11 +51,11 @@ TRAINING_MODE="patch_only"
 MODEL_SIZE="base"
 
 # Training hyperparameters
-NUM_EPOCHS=10
-BATCH_SIZE=64
-LEARNING_RATE=1e-4
+NUM_EPOCHS=15
+BATCH_SIZE=128
+LEARNING_RATE=4e-4
 WEIGHT_DECAY=0.01
-WARMUP_STEPS=100
+WARMUP_STEPS=500
 MAX_GRAD_NORM=1.0
 
 # Evaluation parameters
@@ -64,7 +64,7 @@ EVAL_NUM_SAMPLES=100
 EVAL_INFERENCE_STEPS=50
 
 # Data configuration
-MAX_SHARDS=3
+MAX_SHARDS=30
 
 # Create output directory
 mkdir -p "${OUTPUT_DIR}"

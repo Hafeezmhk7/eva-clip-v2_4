@@ -118,7 +118,7 @@ def parse_arguments():
                        help="Use timestep-dependent loss weighting")
     
     # WandB configuration
-    parser.add_argument("--use_wandb", action="store_true", default=False,
+    parser.add_argument("--use_wandb", action="store_true", default=True,
                        help="Enable WandB logging")
     parser.add_argument("--wandb_project", type=str, default="blip3o-clip-ultra-conservative",
                        help="WandB project name")

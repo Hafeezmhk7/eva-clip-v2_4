@@ -730,11 +730,152 @@ class UltraConservativeBLIP3oCLIPTrainer:
                 f'{prefix}error': str(e),
             }
 
+    def _log_training_metrics(self, loss: float, metrics: Dict[str, float], grad_norm: float, epoch_failures: int):
+        """Enhanced WandB logging for training metrics"""
+        if not self.use_wandb:
+            return
+        
+        try:
+            # Prepare comprehensive WandB metrics
+            wandb_metrics = {
+                # Basic training metrics
+                "train/loss": loss,
+                "train/grad_norm": grad_norm,
+                "train/learning_rate": self.optimizer.param_groups[0]['lr'],
+                "train/epoch": self.current_epoch,
+                "train/step": self.global_step,
+                
+                # Stability metrics
+                "stability/consecutive_failures": self.consecutive_failures,
+                "stability/epoch_failures": epoch_failures,
+                "stability/emergency_lr_reductions": self.emergency_lr_reductions,
+                "stability/stability_alerts": self.stability_alerts,
+                "stability/steps_since_last_stable": self.global_step - self.last_stable_step,
+                
+                # Loss explosion detection
+                "stability/loss_explosion_detected": loss > self.loss_explosion_threshold,
+                "stability/loss_explosion_threshold": self.loss_explosion_threshold,
+                
+                # System metrics
+                "system/gpu_memory_allocated": torch.cuda.memory_allocated() / 1e9 if torch.cuda.is_available() else 0,
+                "system/gpu_memory_reserved": torch.cuda.memory_reserved() / 1e9 if torch.cuda.is_available() else 0,
+            }
+            
+            # Add loss component metrics if available
+            if metrics:
+                for key, value in metrics.items():
+                    if isinstance(value, (int, float)) and not math.isnan(value) and not math.isinf(value):
+                        if key.startswith('eval_'):
+                            continue  # Skip eval metrics here
+                        wandb_metrics[f"train/{key}"] = value
+            
+            # Moving averages for stability
+            if len(self.loss_history) >= 10:
+                recent_losses = list(self.loss_history)[-10:]
+                wandb_metrics["train/loss_ma_10"] = sum(recent_losses) / len(recent_losses)
+            
+            if len(self.grad_norm_history) >= 10:
+                recent_grads = list(self.grad_norm_history)[-10:]
+                wandb_metrics["train/grad_norm_ma_10"] = sum(recent_grads) / len(recent_grads)
+            
+            # Adaptive gradient clipping metrics
+            if self.adaptive_grad_clipping and len(self.grad_norm_history) >= 10:
+                recent_grad_norms = list(self.grad_norm_history)[-10:]
+                avg_recent_grad = sum(recent_grad_norms) / len(recent_grad_norms)
+                effective_grad_norm = self.max_grad_norm * 0.5 if avg_recent_grad > self.max_grad_norm * 2 else self.max_grad_norm
+                wandb_metrics["train/effective_grad_clip"] = effective_grad_norm
+                wandb_metrics["train/grad_clip_adaptive"] = avg_recent_grad > self.max_grad_norm * 2
+            
+            # Best metrics tracking
+            wandb_metrics["train/best_eval_similarity"] = self.best_eval_similarity
+            wandb_metrics["train/best_loss"] = self.best_loss
+            
+            # Update best loss
+            if loss < self.best_loss:
+                self.best_loss = loss
+                wandb_metrics["train/new_best_loss"] = True
+            
+            # Log to WandB
+            wandb.log(wandb_metrics, step=self.global_step)
+            
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to log training metrics to WandB: {e}")
+
+    def _log_evaluation_metrics(self, eval_metrics: Dict[str, float]):
+        """Enhanced WandB logging for evaluation metrics"""
+        if not self.use_wandb or not eval_metrics:
+            return
+        
+        try:
+            wandb_eval_metrics = {}
+            
+            # Core evaluation metrics
+            for key, value in eval_metrics.items():
+                if isinstance(value, (int, float)) and not math.isnan(value) and not math.isinf(value):
+                    if key.startswith('eval_'):
+                        wandb_eval_metrics[f"eval/{key[5:]}"] = value
+                    elif key.startswith('denorm_'):
+                        wandb_eval_metrics[f"eval/denorm_{key[7:]}"] = value
+                    elif key.startswith('norm_'):
+                        wandb_eval_metrics[f"eval/norm_{key[5:]}"] = value
+                    else:
+                        wandb_eval_metrics[f"eval/{key}"] = value
+            
+            # Special handling for key metrics
+            if 'eval_clip_similarity' in eval_metrics:
+                similarity = eval_metrics['eval_clip_similarity']
+                wandb_eval_metrics["eval/clip_similarity"] = similarity
+                
+                # Quality indicators
+                wandb_eval_metrics["eval/quality_excellent"] = similarity > 0.8
+                wandb_eval_metrics["eval/quality_good"] = similarity > 0.6
+                wandb_eval_metrics["eval/quality_fair"] = similarity > 0.4
+                wandb_eval_metrics["eval/quality_poor"] = similarity <= 0.2
+                
+                # Update best similarity
+                if similarity > self.best_eval_similarity:
+                    self.best_eval_similarity = similarity
+                    wandb_eval_metrics["eval/new_best_similarity"] = True
+                    wandb_eval_metrics["eval/best_similarity_step"] = self.global_step
+            
+            # Success rate and error tracking
+            if 'eval_success_rate' in eval_metrics:
+                wandb_eval_metrics["eval/success_rate"] = eval_metrics['eval_success_rate']
+                wandb_eval_metrics["eval/failure_rate"] = 1.0 - eval_metrics['eval_success_rate']
+            
+            if 'eval_errors' in eval_metrics:
+                wandb_eval_metrics["eval/error_count"] = eval_metrics['eval_errors']
+            
+            # Normalization health
+            if 'denorm_clip_similarity' in eval_metrics and 'norm_clip_similarity' in eval_metrics:
+                denorm_sim = eval_metrics['denorm_clip_similarity']
+                norm_sim = eval_metrics['norm_clip_similarity']
+                wandb_eval_metrics["eval/denorm_vs_norm_diff"] = abs(denorm_sim - norm_sim)
+                wandb_eval_metrics["eval/denormalization_working"] = abs(denorm_sim - norm_sim) < 0.1
+            
+            # Log to WandB
+            wandb.log(wandb_eval_metrics, step=self.global_step)
+            
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to log evaluation metrics to WandB: {e}")
+
     def train(self) -> Dict[str, Any]:
-        """ULTRA-CONSERVATIVE main training loop"""
+        """ULTRA-CONSERVATIVE main training loop with comprehensive WandB logging"""
         logger.info("🚀 Starting ULTRA-CONSERVATIVE BLIP3-o training...")
         logger.info(f"  🔒 Ultra-conservative features enabled")
         logger.info(f"  🔒 Enhanced stability monitoring active")
+        logger.info(f"  📊 WandB logging: {'✅ ENABLED' if self.use_wandb else '❌ DISABLED'}")
+        
+        # Log initial setup to WandB
+        if self.use_wandb:
+            wandb.log({
+                "setup/training_started": True,
+                "setup/model_parameters": sum(p.numel() for p in self.model.parameters()),
+                "setup/clip_normalizer_available": self.clip_normalizer is not None,
+                "setup/ultra_conservative_features": True,
+                "setup/estimated_steps_per_epoch": self.estimated_steps_per_epoch,
+                "setup/total_estimated_steps": self.estimated_steps_per_epoch * self.num_epochs,
+            }, step=0)
         
         self.model.train()
         start_time = time.time()
@@ -747,6 +888,14 @@ class UltraConservativeBLIP3oCLIPTrainer:
                 epoch_loss = 0.0
                 epoch_steps = 0
                 epoch_failures = 0
+                epoch_start_time = time.time()
+                
+                # Log epoch start
+                if self.use_wandb:
+                    wandb.log({
+                        "epoch/started": epoch + 1,
+                        "epoch/timestamp": time.time(),
+                    }, step=self.global_step)
                 
                 try:
                     dataloader_iter = iter(self.train_dataloader)
@@ -760,12 +909,22 @@ class UltraConservativeBLIP3oCLIPTrainer:
                             logger.info(f"Epoch {epoch + 1} completed: {batch_count} batches, {epoch_failures} failures")
                             break
                         
+                        step_start_time = time.time()
+                        
                         # Compute loss with stability checks
                         loss, metrics, is_stable = self._compute_loss_with_stability_check(batch)
                         
                         if not is_stable:
                             self._handle_training_instability()
                             epoch_failures += 1
+                            
+                            # Log failure to WandB
+                            if self.use_wandb:
+                                wandb.log({
+                                    "failures/step_failed": True,
+                                    "failures/reason": "unstable_loss",
+                                    "failures/loss_value": loss.item() if torch.isfinite(loss) else float('inf'),
+                                }, step=self.global_step)
                             continue
                         
                         # Backward pass with stability checks
@@ -774,6 +933,14 @@ class UltraConservativeBLIP3oCLIPTrainer:
                         if not step_success:
                             self._handle_training_instability()
                             epoch_failures += 1
+                            
+                            # Log failure to WandB
+                            if self.use_wandb:
+                                wandb.log({
+                                    "failures/step_failed": True,
+                                    "failures/reason": "unstable_gradients",
+                                    "failures/grad_norm": grad_norm if not math.isinf(grad_norm) else float('inf'),
+                                }, step=self.global_step)
                             continue
                         
                         # Success - reset failure counter
@@ -789,32 +956,77 @@ class UltraConservativeBLIP3oCLIPTrainer:
                         self.grad_norm_history.append(grad_norm)
                         self.lr_history.append(self.optimizer.param_groups[0]['lr'])
                         
-                        # Logging
+                        # Step timing
+                        step_time = time.time() - step_start_time
+                        
+                        # Log training metrics to WandB
+                        self._log_training_metrics(loss.item(), metrics, grad_norm, epoch_failures)
+                        
+                        # Additional per-step WandB logging
+                        if self.use_wandb:
+                            wandb.log({
+                                "timing/step_time": step_time,
+                                "timing/samples_per_second": batch.get('batch_size', 8) / step_time if step_time > 0 else 0,
+                            }, step=self.global_step)
+                        
+                        # Console logging
                         if self.global_step % self.log_every_n_steps == 0:
                             logger.info(f"Step {self.global_step}: Loss={loss.item():.6f}, GradNorm={grad_norm:.3f}, Failures={epoch_failures}")
                         
                         # Evaluation
                         if self.global_step % self.eval_every_n_steps == 0:
                             logger.info(f"Running evaluation at step {self.global_step}...")
+                            eval_start_time = time.time()
+                            
                             eval_metrics = self._safe_evaluate()
+                            eval_time = time.time() - eval_start_time
                             
                             if eval_metrics and 'eval_clip_similarity' in eval_metrics:
                                 similarity = eval_metrics['eval_clip_similarity']
                                 logger.info(f"✅ Evaluation: CLIP similarity = {similarity:.4f}")
                                 
+                                # Log evaluation metrics to WandB
+                                self._log_evaluation_metrics(eval_metrics)
+                                
+                                # Additional evaluation timing
+                                if self.use_wandb:
+                                    wandb.log({
+                                        "timing/eval_time": eval_time,
+                                        "eval/timestamp": time.time(),
+                                    }, step=self.global_step)
+                                
                                 if similarity > self.best_eval_similarity:
                                     self.best_eval_similarity = similarity
                                     logger.info(f"🎉 NEW BEST similarity: {similarity:.4f}")
+                            else:
+                                logger.warning("⚠️ Evaluation failed or returned no metrics")
+                                if self.use_wandb:
+                                    wandb.log({
+                                        "eval/failed": True,
+                                        "eval/error": eval_metrics.get('eval_error', 'unknown') if eval_metrics else 'no_metrics',
+                                    }, step=self.global_step)
                         
                         # Save checkpoint
                         if self.global_step % self.save_every_n_steps == 0:
-                            self._save_checkpoint()
+                            checkpoint_success = self._save_checkpoint()
+                            if self.use_wandb:
+                                wandb.log({
+                                    "checkpoints/saved": checkpoint_success,
+                                    "checkpoints/step": self.global_step,
+                                }, step=self.global_step)
                 
                 except Exception as e:
                     logger.error(f"❌ Error during epoch {epoch + 1}: {e}")
+                    if self.use_wandb:
+                        wandb.log({
+                            "errors/epoch_error": True,
+                            "errors/epoch": epoch + 1,
+                            "errors/message": str(e),
+                        }, step=self.global_step)
                     continue
                 
                 # End of epoch summary
+                epoch_time = time.time() - epoch_start_time
                 avg_loss = epoch_loss / max(epoch_steps, 1)
                 failure_rate = epoch_failures / max(batch_count, 1)
                 
@@ -823,10 +1035,25 @@ class UltraConservativeBLIP3oCLIPTrainer:
                 logger.info(f"  Failure rate: {failure_rate*100:.1f}%")
                 logger.info(f"  Emergency LR reductions: {self.emergency_lr_reductions}")
                 logger.info(f"  Best similarity: {self.best_eval_similarity:.4f}")
+                logger.info(f"  Epoch time: {epoch_time:.1f}s")
+                
+                # Log epoch summary to WandB
+                if self.use_wandb:
+                    wandb.log({
+                        "epoch/completed": epoch + 1,
+                        "epoch/avg_loss": avg_loss,
+                        "epoch/failure_rate": failure_rate,
+                        "epoch/time_seconds": epoch_time,
+                        "epoch/steps": epoch_steps,
+                        "epoch/batches": batch_count,
+                        "epoch/failures": epoch_failures,
+                    }, step=self.global_step)
             
             # Final evaluation
             logger.info("Running final evaluation...")
+            final_eval_start_time = time.time()
             final_eval = self._safe_evaluate(num_samples=self.eval_num_samples * 2)
+            final_eval_time = time.time() - final_eval_start_time
             
             total_time = time.time() - start_time
             
@@ -836,6 +1063,7 @@ class UltraConservativeBLIP3oCLIPTrainer:
                 'total_time_seconds': total_time,
                 'total_steps': self.global_step,
                 'best_eval_similarity': self.best_eval_similarity,
+                'best_loss': self.best_loss,
                 'emergency_lr_reductions': self.emergency_lr_reductions,
                 'stability_alerts': self.stability_alerts,
                 'final_eval': final_eval,
@@ -847,9 +1075,34 @@ class UltraConservativeBLIP3oCLIPTrainer:
                 },
             }
             
+            # Log final summary to WandB
+            if self.use_wandb:
+                final_wandb_metrics = {
+                    "final/training_completed": True,
+                    "final/total_time_seconds": total_time,
+                    "final/total_steps": self.global_step,
+                    "final/best_eval_similarity": self.best_eval_similarity,
+                    "final/best_loss": self.best_loss,
+                    "final/emergency_lr_reductions": self.emergency_lr_reductions,
+                    "final/stability_alerts": self.stability_alerts,
+                    "final/eval_time": final_eval_time,
+                }
+                
+                # Add final evaluation metrics
+                if final_eval:
+                    for key, value in final_eval.items():
+                        if isinstance(value, (int, float)) and not math.isnan(value) and not math.isinf(value):
+                            final_wandb_metrics[f"final/{key}"] = value
+                
+                wandb.log(final_wandb_metrics, step=self.global_step)
+                
+                # Mark run as finished
+                wandb.finish()
+            
             logger.info("🎉 ULTRA-CONSERVATIVE training completed!")
             logger.info(f"  Total time: {total_time:.1f} seconds")
             logger.info(f"  Best similarity: {self.best_eval_similarity:.4f}")
+            logger.info(f"  Best loss: {self.best_loss:.6f}")
             logger.info(f"  Emergency interventions: {self.emergency_lr_reductions}")
             logger.info(f"  🔒 Training stability maintained through conservative approach")
             
@@ -857,6 +1110,12 @@ class UltraConservativeBLIP3oCLIPTrainer:
             
         except Exception as e:
             logger.error(f"❌ Training failed: {e}")
+            if self.use_wandb:
+                wandb.log({
+                    "final/training_failed": True,
+                    "final/error": str(e),
+                }, step=self.global_step)
+                wandb.finish()
             raise
 
     def _save_checkpoint(self) -> bool:
