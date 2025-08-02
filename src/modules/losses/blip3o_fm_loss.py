@@ -1,7 +1,14 @@
 #!/usr/bin/env python3
 """
-FIXED Flow Matching Loss for CLIP Reproduction with Gradient Stability
-Based on BLIP3-o paper and flow matching literature best practices
+UPDATED Flow Matching Loss with Semantic-Preserving Components
+src/modules/losses/blip3o_fm_loss.py
+
+Key improvements:
+1. Multi-component loss combining velocity + semantic + cosine terms
+2. Timestep-aware weighting for better training dynamics
+3. Perceptual distance preservation
+4. Better numerical stability
+5. Enhanced metrics tracking
 """
 
 import torch
@@ -14,361 +21,475 @@ import math
 logger = logging.getLogger(__name__)
 
 
-class StableBLIP3oCLIPFlowMatchingLoss(nn.Module):
+class SemanticPreservingFlowMatchingLoss(nn.Module):
     """
-    FIXED Flow Matching Loss for CLIP reproduction with gradient stability
+    IMPROVED Flow Matching Loss with Semantic Preservation
     
-    Key fixes for gradient explosion:
-    - Stable loss scaling and clipping
-    - Robust similarity computation
-    - NaN/Inf detection and handling
-    - Conservative velocity target computation
+    This loss addresses the velocity-semantic alignment disconnect by:
+    1. Standard velocity prediction loss
+    2. Semantic consistency loss for later timesteps
+    3. Cosine similarity preservation
+    4. Timestep-adaptive weighting
     """
     
     def __init__(
         self,
         prediction_type: str = "velocity",
         flow_type: str = "rectified",
-        loss_weight: float = 1.0,
+        
+        # Loss component weights
+        velocity_weight: float = 1.0,
+        semantic_weight: float = 0.1,
+        cosine_weight: float = 0.05,
+        
+        # Timestep weighting
+        use_timestep_weighting: bool = True,
+        early_timestep_threshold: float = 0.3,
+        late_timestep_threshold: float = 0.7,
+        
+        # Stability parameters
         eps: float = 1e-8,
         min_timestep: float = 1e-3,
         max_timestep: float = 1.0 - 1e-3,
-        # FIXED: Stability parameters
-        max_loss_scale: float = 100.0,  # Prevent extremely large losses
-        gradient_clip_value: float = 10.0,  # Clip gradients in loss computation
-        stable_similarity: bool = True,  # Use stable similarity computation
-        loss_smoothing: float = 0.1,  # Smooth loss to reduce spikes
+        
+        # Advanced features
+        use_lpips_loss: bool = False,
+        normalize_targets: bool = False,
     ):
         super().__init__()
         
         self.prediction_type = prediction_type
         self.flow_type = flow_type
-        self.loss_weight = loss_weight
+        
+        # Loss weights
+        self.velocity_weight = velocity_weight
+        self.semantic_weight = semantic_weight
+        self.cosine_weight = cosine_weight
+        
+        # Timestep weighting
+        self.use_timestep_weighting = use_timestep_weighting
+        self.early_timestep_threshold = early_timestep_threshold
+        self.late_timestep_threshold = late_timestep_threshold
+        
+        # Stability
         self.eps = eps
         self.min_timestep = min_timestep
         self.max_timestep = max_timestep
         
-        # FIXED: Stability parameters
-        self.max_loss_scale = max_loss_scale
-        self.gradient_clip_value = gradient_clip_value
-        self.stable_similarity = stable_similarity
-        self.loss_smoothing = loss_smoothing
+        # Advanced features
+        self.use_lpips_loss = use_lpips_loss
+        self.normalize_targets = normalize_targets
         
         # Validate inputs
         assert prediction_type in ["velocity", "noise", "sample"]
         assert flow_type in ["rectified", "reflow"]
         
-        logger.info(f"🛡️ Stable CLIP Flow Matching Loss initialized:")
+        # Initialize LPIPS if requested
+        if self.use_lpips_loss:
+            try:
+                import lpips
+                self.lpips_fn = lpips.LPIPS(net='alex')
+                logger.info("✅ LPIPS loss initialized")
+            except ImportError:
+                logger.warning("LPIPS not available, falling back to MSE")
+                self.use_lpips_loss = False
+        
+        logger.info(f"✅ IMPROVED Flow Matching Loss initialized:")
         logger.info(f"  Prediction type: {prediction_type}")
         logger.info(f"  Flow type: {flow_type}")
-        logger.info(f"  Max loss scale: {max_loss_scale}")
-        logger.info(f"  Gradient clip value: {gradient_clip_value}")
-        logger.info(f"  Stable similarity: {stable_similarity}")
+        logger.info(f"  Weights - Velocity: {velocity_weight}, Semantic: {semantic_weight}, Cosine: {cosine_weight}")
+        logger.info(f"  Timestep weighting: {use_timestep_weighting}")
 
     def _clamp_timesteps(self, timesteps: torch.Tensor) -> torch.Tensor:
         """Clamp timesteps to avoid numerical issues"""
         return torch.clamp(timesteps, min=self.min_timestep, max=self.max_timestep)
 
-    def _check_tensor_health(self, tensor: torch.Tensor, name: str) -> bool:
-        """Check tensor for NaN/Inf values"""
-        if torch.isnan(tensor).any():
-            logger.error(f"🚨 NaN detected in {name}")
-            return False
-        if torch.isinf(tensor).any():
-            logger.error(f"🚨 Inf detected in {name}")
-            return False
-        return True
+    def _compute_timestep_weights(self, timesteps: torch.Tensor) -> Dict[str, torch.Tensor]:
+        """Compute timestep-dependent weights for different loss components"""
+        if not self.use_timestep_weighting:
+            batch_size = timesteps.shape[0]
+            device = timesteps.device
+            return {
+                'velocity_weights': torch.ones(batch_size, device=device),
+                'semantic_weights': torch.ones(batch_size, device=device),
+                'cosine_weights': torch.ones(batch_size, device=device),
+            }
+        
+        # Velocity loss: constant throughout
+        velocity_weights = torch.ones_like(timesteps)
+        
+        # Semantic loss: focus on later timesteps where prediction is more accurate
+        semantic_weights = torch.where(
+            timesteps > self.late_timestep_threshold,
+            torch.ones_like(timesteps),
+            torch.zeros_like(timesteps)
+        )
+        
+        # Cosine loss: emphasize middle timesteps
+        cosine_weights = torch.where(
+            (timesteps > self.early_timestep_threshold) & (timesteps < self.late_timestep_threshold),
+            torch.ones_like(timesteps),
+            torch.ones_like(timesteps) * 0.5  # Reduced weight for early/late
+        )
+        
+        return {
+            'velocity_weights': velocity_weights,
+            'semantic_weights': semantic_weights,
+            'cosine_weights': cosine_weights,
+        }
 
-    def _stable_cosine_similarity(self, x: torch.Tensor, y: torch.Tensor, dim: int = -1) -> torch.Tensor:
-        """Compute cosine similarity with numerical stability"""
-        if not self.stable_similarity:
-            return F.cosine_similarity(x, y, dim=dim)
+    def _compute_predicted_clean(
+        self, 
+        model_output: torch.Tensor, 
+        noisy_input: torch.Tensor, 
+        timesteps: torch.Tensor, 
+        noise: torch.Tensor
+    ) -> torch.Tensor:
+        """Compute predicted clean embeddings from model output"""
         
-        # Normalize with numerical stability
-        x_norm = F.normalize(x, p=2, dim=dim, eps=self.eps)
-        y_norm = F.normalize(y, p=2, dim=dim, eps=self.eps)
+        if self.prediction_type == "velocity":
+            # For rectified flow: x_0 = x_t - (1-t) * v_pred
+            t_expanded = timesteps.view(-1, 1, 1)
+            predicted_clean = noisy_input - (1 - t_expanded) * model_output
+            
+        elif self.prediction_type == "noise":
+            # For noise prediction: x_0 = x_t - noise_pred
+            predicted_clean = noisy_input - model_output
+            
+        elif self.prediction_type == "sample":
+            # Direct prediction
+            predicted_clean = model_output
+            
+        else:
+            raise ValueError(f"Unknown prediction type: {self.prediction_type}")
         
-        # Compute similarity
-        similarity = torch.sum(x_norm * y_norm, dim=dim)
-        
-        # Clamp to valid range [-1, 1]
-        similarity = torch.clamp(similarity, min=-1.0 + self.eps, max=1.0 - self.eps)
-        
-        return similarity
-
-    def _smooth_loss(self, loss: torch.Tensor, target_loss: torch.Tensor) -> torch.Tensor:
-        """Apply loss smoothing to reduce spikes"""
-        if self.loss_smoothing > 0:
-            # Exponential moving average style smoothing
-            smooth_factor = self.loss_smoothing
-            smoothed_loss = smooth_factor * target_loss + (1 - smooth_factor) * loss
-            return smoothed_loss
-        return loss
+        return predicted_clean
 
     def forward(
         self,
-        model_output: torch.Tensor,  # [B, N, 1024] - Model's velocity prediction
+        model_output: torch.Tensor,  # [B, N, 1024] - Model's prediction
         target_samples: torch.Tensor,  # [B, N, 1024] - Clean CLIP embeddings
         timesteps: torch.Tensor,  # [B] - Flow matching timesteps
         eva_conditioning: torch.Tensor,  # [B, N, 4096] - EVA features (for logging)
         noise: Optional[torch.Tensor] = None,
+        noisy_input: Optional[torch.Tensor] = None,
         return_metrics: bool = True,
         **kwargs
     ) -> Tuple[torch.Tensor, Optional[Dict[str, float]]]:
         """
-        FIXED: Compute rectified flow matching loss with stability checks
+        Compute multi-component flow matching loss with semantic preservation
         """
-        
-        # Input validation
-        if not self._check_tensor_health(model_output, "model_output"):
-            raise ValueError("Invalid model_output tensor")
-        if not self._check_tensor_health(target_samples, "target_samples"):
-            raise ValueError("Invalid target_samples tensor")
-        if not self._check_tensor_health(timesteps, "timesteps"):
-            raise ValueError("Invalid timesteps tensor")
         
         batch_size, num_tokens, embed_dim = model_output.shape
         device = model_output.device
         dtype = model_output.dtype
         
-        # Clamp timesteps for numerical stability
+        # Clamp timesteps
         timesteps = self._clamp_timesteps(timesteps)
         
-        # Keep targets as-is (no normalization during training)
-        target_clean = target_samples.detach()
+        # Normalize targets if requested
+        if self.normalize_targets:
+            target_samples = F.normalize(target_samples, p=2, dim=-1)
         
-        # Use standard Gaussian noise with stability checks
+        # Use provided noise or create new
         if noise is None:
-            noise = torch.randn_like(target_clean, device=device, dtype=dtype)
-        
-        # Check noise health
-        if not self._check_tensor_health(noise, "noise"):
-            logger.warning("⚠️ Regenerating noise due to NaN/Inf")
-            noise = torch.randn_like(target_clean, device=device, dtype=dtype)
+            noise = torch.randn_like(target_samples, device=device, dtype=dtype)
         
         # Expand timesteps for broadcasting [B, 1, 1]
         t = timesteps.view(batch_size, 1, 1).to(dtype)
         
-        # RECTIFIED FLOW COMPUTATION with stability
+        # RECTIFIED FLOW COMPUTATION
         if self.flow_type == "rectified":
             # Linear interpolation: x_t = (1-t) * noise + t * target
+            if noisy_input is None:
+                noisy_input = (1 - t) * noise + t * target_samples
+            
             # Velocity target: v = target - noise (for rectified flow)
-            true_velocity = target_clean - noise
-            target_for_loss = true_velocity
+            true_velocity = target_samples - noise
+            velocity_target = true_velocity
         else:
             raise NotImplementedError("Only rectified flow is implemented")
         
-        # Check velocity target health
-        if not self._check_tensor_health(target_for_loss, "velocity_target"):
-            raise ValueError("Invalid velocity target")
+        # Get timestep weights
+        weights = self._compute_timestep_weights(timesteps)
         
-        # LOSS COMPUTATION with stability
+        # COMPONENT 1: VELOCITY PREDICTION LOSS
         if self.prediction_type == "velocity":
-            # Direct velocity prediction loss with robust computation
-            prediction_loss = F.mse_loss(model_output, target_for_loss, reduction='none')
-            
-            # FIXED: Check for extreme loss values
-            max_loss = prediction_loss.max().item()
-            if max_loss > self.max_loss_scale:
-                logger.warning(f"⚠️ Clamping extreme loss: {max_loss:.2f} -> {self.max_loss_scale}")
-                prediction_loss = torch.clamp(prediction_loss, max=self.max_loss_scale)
-            
+            velocity_loss = F.mse_loss(model_output, velocity_target, reduction='none')
         else:
             raise NotImplementedError(f"Prediction type {self.prediction_type} not implemented")
         
-        # Check prediction loss health
-        if not self._check_tensor_health(prediction_loss, "prediction_loss"):
-            raise ValueError("Invalid prediction loss")
+        # Apply timestep weighting and reduce
+        velocity_loss = velocity_loss.mean(dim=(1, 2))  # [B]
+        velocity_loss = (velocity_loss * weights['velocity_weights']).mean()
         
-        # Reduce loss: mean over tokens and embedding dimensions, then over batch
-        prediction_loss = prediction_loss.mean(dim=(1, 2))  # [B]
+        # COMPONENT 2: SEMANTIC CONSISTENCY LOSS
+        predicted_clean = self._compute_predicted_clean(
+            model_output, noisy_input, timesteps, noise
+        )
         
-        # Main loss
-        main_loss = prediction_loss.mean()
+        # Only compute semantic loss for valid timesteps
+        semantic_mask = weights['semantic_weights'] > 0
+        if semantic_mask.any():
+            if self.use_lpips_loss and hasattr(self, 'lpips_fn'):
+                # LPIPS loss (perceptually motivated)
+                try:
+                    # Reshape for LPIPS: [B*N, 1, 1, D] (treating embedding as 1D image)
+                    pred_clean_lpips = predicted_clean[semantic_mask].view(-1, 1, 1, embed_dim)
+                    target_lpips = target_samples[semantic_mask].view(-1, 1, 1, embed_dim)
+                    
+                    # Normalize to [-1, 1] range for LPIPS
+                    pred_clean_lpips = 2 * (pred_clean_lpips - pred_clean_lpips.min()) / (pred_clean_lpips.max() - pred_clean_lpips.min()) - 1
+                    target_lpips = 2 * (target_lpips - target_lpips.min()) / (target_lpips.max() - target_lpips.min()) - 1
+                    
+                    semantic_loss = self.lpips_fn(pred_clean_lpips, target_lpips).mean()
+                except Exception as e:
+                    logger.warning(f"LPIPS computation failed: {e}, falling back to MSE")
+                    semantic_loss = F.mse_loss(
+                        predicted_clean[semantic_mask], 
+                        target_samples[semantic_mask]
+                    )
+            else:
+                # Standard MSE loss
+                semantic_loss = F.mse_loss(
+                    predicted_clean[semantic_mask], 
+                    target_samples[semantic_mask]
+                )
+        else:
+            semantic_loss = torch.tensor(0.0, device=device, dtype=dtype)
         
-        # FIXED: Apply loss smoothing if enabled
-        if hasattr(self, '_prev_loss'):
-            main_loss = self._smooth_loss(main_loss, self._prev_loss)
-        self._prev_loss = main_loss.detach()
+        # COMPONENT 3: COSINE SIMILARITY PRESERVATION
+        cosine_mask = weights['cosine_weights'] > 0
+        if cosine_mask.any():
+            pred_norm = F.normalize(predicted_clean[cosine_mask], p=2, dim=-1)
+            target_norm = F.normalize(target_samples[cosine_mask], p=2, dim=-1)
+            cosine_sim = F.cosine_similarity(pred_norm, target_norm, dim=-1)
+            cosine_loss = 1.0 - cosine_sim.mean()
+        else:
+            cosine_loss = torch.tensor(0.0, device=device, dtype=dtype)
         
-        # Total loss with stability check
-        total_loss = main_loss * self.loss_weight
+        # TOTAL LOSS COMBINATION
+        total_loss = (
+            self.velocity_weight * velocity_loss + 
+            self.semantic_weight * semantic_loss +
+            self.cosine_weight * cosine_loss
+        )
         
-        # Final stability check
-        if not self._check_tensor_health(total_loss, "total_loss"):
-            logger.error("🚨 Total loss contains NaN/Inf - returning safe fallback")
-            total_loss = torch.tensor(1.0, device=device, requires_grad=True)
-        
-        # METRICS COMPUTATION with stability
+        # METRICS COMPUTATION
         metrics = {}
         if return_metrics:
             with torch.no_grad():
-                try:
-                    # FIXED: Stable similarity computation
-                    cosine_sim = self._stable_cosine_similarity(model_output, target_for_loss, dim=-1)
-                    per_image_sim = cosine_sim.mean(dim=1)  # [B]
-                    mean_similarity = per_image_sim.mean().item()
-                    
-                    # Compute norms for monitoring (raw, unnormalized)
-                    pred_norm = torch.norm(model_output, dim=-1).mean().item()
-                    target_norm_val = torch.norm(target_for_loss, dim=-1).mean().item()
-                    clip_norm = torch.norm(target_clean, dim=-1).mean().item()
-                    noise_norm = torch.norm(noise, dim=-1).mean().item()
-                    
-                    # Error analysis with stability
-                    error = model_output - target_for_loss
-                    error_norm = torch.norm(error, dim=-1).mean().item()
-                    relative_error = error_norm / (target_norm_val + self.eps)
-                    
-                    # FIXED: Clamp metrics to reasonable ranges
-                    mean_similarity = float(np.clip(mean_similarity, -1.0, 1.0))
-                    pred_norm = float(np.clip(pred_norm, 0.0, 1000.0))
-                    target_norm_val = float(np.clip(target_norm_val, 0.0, 1000.0))
-                    
-                    metrics = {
-                        # Core metrics
-                        'loss': main_loss.item(),
-                        'total_loss': total_loss.item(),
-                        'velocity_similarity': mean_similarity,
-                        'velocity_similarity_std': per_image_sim.std().item(),
-                        
-                        # Raw norm tracking
-                        'pred_norm': pred_norm,
-                        'target_norm': target_norm_val,
-                        'clip_norm': clip_norm,
-                        'noise_norm': noise_norm,
-                        
-                        # Error analysis
-                        'error_norm': error_norm,
-                        'relative_error': relative_error,
-                        
-                        # Flow matching specific
-                        'timestep_mean': timesteps.mean().item(),
-                        'timestep_std': timesteps.std().item(),
-                        
-                        # Stability metrics
-                        'max_prediction_loss': max_loss,
-                        'loss_scale_applied': max_loss > self.max_loss_scale,
-                    }
-                    
-                    # Check for numerical issues in metrics
-                    for key, value in metrics.items():
-                        if math.isnan(value) or math.isinf(value):
-                            logger.warning(f"⚠️ Invalid metric {key}: {value}")
-                            metrics[key] = 0.0
-                    
-                    # Overall health check
-                    if torch.isnan(total_loss) or torch.isinf(total_loss):
-                        metrics['numerical_issue'] = True
-                        logger.error("🚨 Numerical issue detected in loss computation!")
-                    else:
-                        metrics['numerical_issue'] = False
+                # Normalize for similarity computation
+                pred_normalized = F.normalize(model_output, p=2, dim=-1)
+                target_norm = F.normalize(velocity_target, p=2, dim=-1)
                 
-                except Exception as e:
-                    logger.error(f"❌ Error computing metrics: {e}")
-                    metrics = {
-                        'loss': total_loss.item() if torch.isfinite(total_loss) else 1.0,
-                        'total_loss': total_loss.item() if torch.isfinite(total_loss) else 1.0,
-                        'velocity_similarity': 0.0,
-                        'numerical_issue': True,
-                        'metrics_error': str(e),
-                    }
+                # Velocity cosine similarity
+                velocity_cosine_sim = F.cosine_similarity(pred_normalized, target_norm, dim=-1)
+                per_image_velocity_sim = velocity_cosine_sim.mean(dim=1)  # [B]
+                mean_velocity_similarity = per_image_velocity_sim.mean().item()
+                
+                # Predicted clean embedding similarity
+                if semantic_mask.any():
+                    pred_clean_norm = F.normalize(predicted_clean, p=2, dim=-1)
+                    target_clean_norm = F.normalize(target_samples, p=2, dim=-1)
+                    clean_cosine_sim = F.cosine_similarity(pred_clean_norm, target_clean_norm, dim=-1)
+                    per_image_clean_sim = clean_cosine_sim.mean(dim=1)  # [B]
+                    mean_clean_similarity = per_image_clean_sim.mean().item()
+                else:
+                    mean_clean_similarity = 0.0
+                
+                # Compute norms for monitoring
+                pred_norm_val = torch.norm(model_output, dim=-1).mean().item()
+                target_norm_val = torch.norm(velocity_target, dim=-1).mean().item()
+                clean_pred_norm = torch.norm(predicted_clean, dim=-1).mean().item()
+                clean_target_norm = torch.norm(target_samples, dim=-1).mean().item()
+                
+                # Error analysis
+                velocity_error = model_output - velocity_target
+                velocity_error_norm = torch.norm(velocity_error, dim=-1).mean().item()
+                velocity_relative_error = velocity_error_norm / (target_norm_val + self.eps)
+                
+                # Clean embedding error
+                clean_error = predicted_clean - target_samples
+                clean_error_norm = torch.norm(clean_error, dim=-1).mean().item()
+                clean_relative_error = clean_error_norm / (clean_target_norm + self.eps)
+                
+                # Timestep analysis
+                active_semantic_ratio = semantic_mask.float().mean().item()
+                active_cosine_ratio = cosine_mask.float().mean().item()
+                
+                metrics = {
+                    # Main losses
+                    'velocity_loss': velocity_loss.item(),
+                    'semantic_loss': semantic_loss.item() if isinstance(semantic_loss, torch.Tensor) else 0.0,
+                    'cosine_loss': cosine_loss.item() if isinstance(cosine_loss, torch.Tensor) else 0.0,
+                    'total_loss': total_loss.item(),
+                    
+                    # Velocity metrics
+                    'velocity_similarity': mean_velocity_similarity,
+                    'velocity_similarity_std': per_image_velocity_sim.std().item(),
+                    'velocity_error_norm': velocity_error_norm,
+                    'velocity_relative_error': velocity_relative_error,
+                    
+                    # Clean embedding metrics (CRITICAL FOR EVALUATION)
+                    'clean_similarity': mean_clean_similarity,
+                    'clean_error_norm': clean_error_norm,
+                    'clean_relative_error': clean_relative_error,
+                    
+                    # Norm tracking
+                    'pred_velocity_norm': pred_norm_val,
+                    'target_velocity_norm': target_norm_val,
+                    'pred_clean_norm': clean_pred_norm,
+                    'target_clean_norm': clean_target_norm,
+                    
+                    # Timestep analysis
+                    'timestep_mean': timesteps.mean().item(),
+                    'timestep_std': timesteps.std().item(),
+                    'active_semantic_ratio': active_semantic_ratio,
+                    'active_cosine_ratio': active_cosine_ratio,
+                    
+                    # Weight tracking
+                    'velocity_weight_mean': weights['velocity_weights'].mean().item(),
+                    'semantic_weight_mean': weights['semantic_weights'].mean().item(),
+                    'cosine_weight_mean': weights['cosine_weights'].mean().item(),
+                }
+                
+                # Check for numerical issues
+                if torch.isnan(total_loss) or torch.isinf(total_loss):
+                    metrics['numerical_issue'] = True
+                    logger.error("❌ Numerical issue detected in loss computation!")
+                    
+                    # Debug info
+                    logger.error(f"  Velocity loss: {velocity_loss.item()}")
+                    logger.error(f"  Semantic loss: {semantic_loss.item() if isinstance(semantic_loss, torch.Tensor) else 0.0}")
+                    logger.error(f"  Cosine loss: {cosine_loss.item() if isinstance(cosine_loss, torch.Tensor) else 0.0}")
         
         return total_loss, metrics
 
     def compute_eval_loss(
         self,
-        generated: torch.Tensor,  # Generated CLIP embeddings
-        target: torch.Tensor,     # Target CLIP embeddings
+        generated: torch.Tensor,  # Generated CLIP embeddings (potentially normalized)
+        target: torch.Tensor,     # Target CLIP embeddings (potentially normalized)
+        denormalize_fn: Optional[callable] = None,  # Function to denormalize embeddings
     ) -> Dict[str, float]:
-        """FIXED: Compute evaluation metrics for generated embeddings with stability"""
+        """
+        Compute comprehensive evaluation metrics for generated embeddings
+        
+        Args:
+            generated: Generated embeddings [B, N, D]
+            target: Target embeddings [B, N, D]
+            denormalize_fn: Optional function to convert to original CLIP space
+        """
         with torch.no_grad():
-            try:
-                # Input validation
-                if not self._check_tensor_health(generated, "generated"):
-                    raise ValueError("Invalid generated tensor")
-                if not self._check_tensor_health(target, "target"):
-                    raise ValueError("Invalid target tensor")
-                
-                # FIXED: Stable similarity computation
-                cosine_sim = self._stable_cosine_similarity(generated, target, dim=-1)
-                per_image_sim = cosine_sim.mean(dim=1)
-                
-                # MSE in raw space with stability
-                mse_loss = F.mse_loss(generated, target)
-                if not torch.isfinite(mse_loss):
-                    logger.warning("⚠️ Invalid MSE loss, setting to fallback value")
-                    mse_loss = torch.tensor(1.0)
-                
-                # Quality metrics with stability checks
-                sim_values = per_image_sim.cpu().numpy()
-                high_quality = float(np.mean(sim_values > 0.7))
-                very_high_quality = float(np.mean(sim_values > 0.8))
-                excellent_quality = float(np.mean(sim_values > 0.9))
-                
-                # Scale analysis (raw space)
-                generated_norm_val = torch.norm(generated, dim=-1).mean().item()
-                target_norm_val = torch.norm(target, dim=-1).mean().item()
-                
-                # Clamp values to reasonable ranges
-                generated_norm_val = float(np.clip(generated_norm_val, 0.0, 1000.0))
-                target_norm_val = float(np.clip(target_norm_val, 0.0, 1000.0))
-                
-                return {
-                    'eval_clip_similarity': float(np.clip(per_image_sim.mean().item(), -1.0, 1.0)),
-                    'eval_mse_loss': mse_loss.item(),
-                    'eval_high_quality': high_quality,
-                    'eval_very_high_quality': very_high_quality,
-                    'eval_excellent_quality': excellent_quality,
-                    'eval_similarity_std': float(np.clip(per_image_sim.std().item(), 0.0, 2.0)),
+            eval_metrics = {}
+            
+            # Denormalize if function provided
+            if denormalize_fn is not None:
+                try:
+                    generated_denorm = denormalize_fn(generated)
+                    target_denorm = denormalize_fn(target)
                     
-                    # Raw embedding norms
-                    'eval_generated_norm': generated_norm_val,
-                    'eval_target_norm': target_norm_val,
-                    'eval_norm_ratio': generated_norm_val / (target_norm_val + self.eps),
-                    
-                    # Stability indicators
-                    'eval_numerical_issue': False,
-                }
-                
-            except Exception as e:
-                logger.error(f"❌ Error in evaluation: {e}")
-                return {
-                    'eval_clip_similarity': 0.0,
-                    'eval_mse_loss': 1.0,
-                    'eval_high_quality': 0.0,
-                    'eval_very_high_quality': 0.0,
-                    'eval_excellent_quality': 0.0,
-                    'eval_similarity_std': 0.0,
-                    'eval_generated_norm': 1.0,
-                    'eval_target_norm': 1.0,
-                    'eval_norm_ratio': 1.0,
-                    'eval_numerical_issue': True,
-                    'eval_error': str(e),
-                }
+                    # Compute metrics in original space
+                    eval_metrics.update(self._compute_similarity_metrics(
+                        generated_denorm, target_denorm, prefix="denorm_"
+                    ))
+                except Exception as e:
+                    logger.warning(f"Denormalization failed: {e}")
+            
+            # Compute metrics in current space (normalized)
+            eval_metrics.update(self._compute_similarity_metrics(
+                generated, target, prefix="norm_"
+            ))
+            
+            # Use denormalized metrics as primary if available, otherwise normalized
+            primary_prefix = "denorm_" if denormalize_fn is not None and f"denorm_clip_similarity" in eval_metrics else "norm_"
+            
+            # Set primary evaluation metrics
+            eval_metrics.update({
+                'eval_clip_similarity': eval_metrics[f'{primary_prefix}clip_similarity'],
+                'eval_mse_loss': eval_metrics[f'{primary_prefix}mse_loss'],
+                'eval_high_quality': eval_metrics[f'{primary_prefix}high_quality'],
+                'eval_very_high_quality': eval_metrics[f'{primary_prefix}very_high_quality'],
+                'eval_excellent_quality': eval_metrics[f'{primary_prefix}excellent_quality'],
+                'eval_similarity_std': eval_metrics[f'{primary_prefix}similarity_std'],
+                'eval_generated_norm': eval_metrics[f'{primary_prefix}generated_norm'],
+                'eval_target_norm': eval_metrics[f'{primary_prefix}target_norm'],
+                'eval_norm_ratio': eval_metrics[f'{primary_prefix}norm_ratio'],
+            })
+            
+            return eval_metrics
+    
+    def _compute_similarity_metrics(
+        self, 
+        generated: torch.Tensor, 
+        target: torch.Tensor, 
+        prefix: str = ""
+    ) -> Dict[str, float]:
+        """Compute similarity metrics between generated and target embeddings"""
+        
+        # Normalize for cosine similarity computation
+        generated_norm = F.normalize(generated, p=2, dim=-1)
+        target_norm = F.normalize(target, p=2, dim=-1)
+        
+        # Cosine similarity
+        similarity = F.cosine_similarity(generated_norm, target_norm, dim=-1)
+        per_image_sim = similarity.mean(dim=1)
+        
+        # MSE loss in current space
+        mse_loss = F.mse_loss(generated, target)
+        
+        # Quality metrics
+        high_quality = (per_image_sim > 0.7).float().mean().item()
+        very_high_quality = (per_image_sim > 0.8).float().mean().item()
+        excellent_quality = (per_image_sim > 0.9).float().mean().item()
+        
+        # Norm analysis
+        generated_norm_val = torch.norm(generated, dim=-1).mean().item()
+        target_norm_val = torch.norm(target, dim=-1).mean().item()
+        
+        # L2 distance
+        l2_distance = torch.norm(generated - target, p=2, dim=-1).mean().item()
+        
+        # Dot product (unnormalized similarity)
+        dot_product = (generated * target).sum(dim=-1).mean().item()
+        
+        return {
+            f'{prefix}clip_similarity': per_image_sim.mean().item(),
+            f'{prefix}mse_loss': mse_loss.item(),
+            f'{prefix}high_quality': high_quality,
+            f'{prefix}very_high_quality': very_high_quality,
+            f'{prefix}excellent_quality': excellent_quality,
+            f'{prefix}similarity_std': per_image_sim.std().item(),
+            f'{prefix}generated_norm': generated_norm_val,
+            f'{prefix}target_norm': target_norm_val,
+            f'{prefix}norm_ratio': generated_norm_val / (target_norm_val + 1e-8),
+            f'{prefix}l2_distance': l2_distance,
+            f'{prefix}dot_product': dot_product,
+        }
 
 
-# Import numpy for clipping
-import numpy as np
-
-
-def create_stable_clip_reproduction_loss(
+def create_improved_clip_reproduction_loss(
     prediction_type: str = "velocity",
     flow_type: str = "rectified", 
-    loss_weight: float = 1.0,
-    max_loss_scale: float = 100.0,  # Prevent extreme losses
-    gradient_clip_value: float = 10.0,  # Gradient clipping
-    stable_similarity: bool = True,  # Stable similarity computation
+    velocity_weight: float = 1.0,
+    semantic_weight: float = 0.1,
+    cosine_weight: float = 0.05,
+    use_timestep_weighting: bool = True,
     **kwargs
-) -> StableBLIP3oCLIPFlowMatchingLoss:
-    """Factory function for stable CLIP reproduction loss"""
+) -> SemanticPreservingFlowMatchingLoss:
+    """Factory function for improved CLIP reproduction loss"""
     
-    return StableBLIP3oCLIPFlowMatchingLoss(
+    return SemanticPreservingFlowMatchingLoss(
         prediction_type=prediction_type,
         flow_type=flow_type,
-        loss_weight=loss_weight,
-        max_loss_scale=max_loss_scale,
-        gradient_clip_value=gradient_clip_value,
-        stable_similarity=stable_similarity,
+        velocity_weight=velocity_weight,
+        semantic_weight=semantic_weight,
+        cosine_weight=cosine_weight,
+        use_timestep_weighting=use_timestep_weighting,
         **kwargs
     )
+
+
+# Backward compatibility aliases
+BLIP3oCLIPFlowMatchingLoss = SemanticPreservingFlowMatchingLoss
+create_clip_reproduction_loss = create_improved_clip_reproduction_loss

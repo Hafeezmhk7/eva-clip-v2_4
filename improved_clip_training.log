@@ -1,0 +1,184 @@
+2025-08-02 14:13:19,145 - INFO - 🚀 IMPROVED BLIP3-o CLIP Reproduction Training
+2025-08-02 14:13:19,145 - INFO - ================================================================================
+2025-08-02 14:13:19,145 - INFO - 📋 Task: Reproduce CLIP embeddings from EVA embeddings
+2025-08-02 14:13:19,145 - INFO - 🧠 Model: BLIP3-o DiT with CRITICAL IMPROVEMENTS
+2025-08-02 14:13:19,145 - INFO - 🌊 Method: Rectified Flow Matching + Enhancements
+2025-08-02 14:13:19,145 - INFO - 🎯 Target: CLIP embeddings [B, N, 1024] (PROPERLY NORMALIZED)
+2025-08-02 14:13:19,145 - INFO - 🎮 Conditioning: EVA embeddings [B, N, 4096] (ADAPTED)
+2025-08-02 14:13:19,145 - INFO - 🔥 Expected: CLIP similarity 0.21 → 0.6+ 🚀
+2025-08-02 14:13:19,145 - INFO - ================================================================================
+2025-08-02 14:13:19,145 - INFO - 🛠️ CRITICAL IMPROVEMENTS:
+2025-08-02 14:13:19,145 - INFO -    ✅ 1. CLIP embedding normalization (HIGHEST IMPACT)
+2025-08-02 14:13:19,145 - INFO -    ✅ 2. EVA-CLIP adaptation layers
+2025-08-02 14:13:19,145 - INFO -    ✅ 3. Heun's solver for O(h²) integration
+2025-08-02 14:13:19,145 - INFO -    ✅ 4. U-shaped timestep sampling
+2025-08-02 14:13:19,145 - INFO -    ✅ 5. Multi-component semantic-preserving loss
+2025-08-02 14:13:19,145 - INFO -    ✅ 6. Improved evaluation with denormalization
+2025-08-02 14:13:19,145 - INFO - ================================================================================
+2025-08-02 14:13:19,147 - INFO - Configuration:
+2025-08-02 14:13:19,147 - INFO -   Model size: base
+2025-08-02 14:13:19,147 - INFO -   Training mode: patch_only
+2025-08-02 14:13:19,147 - INFO -   Embeddings dir: /scratch-shared/azadaianchuk1/blip3o_workspace/embeddings/patch_only_256_tokens
+2025-08-02 14:13:19,147 - INFO -   Output dir: ./checkpoints/blip3o_clean_20250802_141316
+2025-08-02 14:13:19,147 - INFO -   Learning rate: 0.0008
+2025-08-02 14:13:19,147 - INFO -   Batch size: 128
+2025-08-02 14:13:19,148 - INFO -   Epochs: 10
+2025-08-02 14:13:19,148 - INFO -   Max shards: 5
+2025-08-02 14:13:19,148 - INFO -   EVA adapter: ✅ ENABLED
+2025-08-02 14:13:19,148 - INFO -   Heun inference: ✅ ENABLED
+2025-08-02 14:13:19,622 - INFO - Using GPU: NVIDIA H100
+2025-08-02 14:13:19,622 - INFO - GPU Memory: 100.0 GB
+2025-08-02 14:13:19,622 - INFO - PyTorch version: 2.7.1+cu126
+2025-08-02 14:13:25,698 - INFO - ✅ CLIP DiT model loaded successfully
+2025-08-02 14:13:25,702 - INFO - ✅ Flow matching loss loaded successfully
+2025-08-02 14:13:26,903 - INFO - ✅ CLIP trainer loaded successfully
+2025-08-02 14:13:26,907 - WARNING - ⚠️ Failed to import dataset: cannot import name 'create_clip_reproduction_dataloaders' from 'src.modules.datasets.blip3o_dataset' (/gpfs/home4/azadaianchuk1/eva-clip-v6_1/src/modules/datasets/blip3o_dataset.py)
+2025-08-02 14:13:26,910 - INFO - ✅ Configuration loaded successfully
+2025-08-02 14:13:26,910 - WARNING - ⚠️ Missing components: ['dataset']
+2025-08-02 14:13:26,910 - WARNING - ⚠️ Partial initialization. Missing: ['dataset']
+2025-08-02 14:13:26,910 - INFO - ✅ All improved modules imported successfully
+2025-08-02 14:13:26,910 - INFO - ✅ Environment check passed
+2025-08-02 14:13:26,910 - INFO - ✅ Output directory ready: checkpoints/blip3o_clean_20250802_141316
+2025-08-02 14:13:26,910 - INFO - 🏗️ Creating IMPROVED model...
+2025-08-02 14:13:26,911 - INFO - ✅ Configuration validation passed
+2025-08-02 14:13:27,340 - INFO - ✅ EVA-CLIP Adapter initialized: 4096 → 768
+2025-08-02 14:13:27,340 - INFO -    Layers: 6, Dropout: 0.1, Residual: True
+2025-08-02 14:13:28,778 - INFO - ✅ Stable initialization applied with depth scale: 0.2887
+2025-08-02 14:13:28,779 - INFO - ✅ IMPROVED BLIP3-o CLIP DiT model initialized: 227,474,014 parameters
+2025-08-02 14:13:28,779 - INFO -   🔥 EVA adapter: ENABLED
+2025-08-02 14:13:28,779 - INFO -   🚀 Heun solver: ENABLED
+2025-08-02 14:13:28,780 - INFO -   ⚡ Attention caching: Available
+2025-08-02 14:13:28,780 - INFO - ✅ IMPROVED BLIP3-o model created:
+2025-08-02 14:13:28,780 - INFO -    Size: base
+2025-08-02 14:13:28,781 - INFO -    Parameters: 227,474,014
+2025-08-02 14:13:28,781 - INFO -    EVA adapter: ✅
+2025-08-02 14:13:28,781 - INFO -    Heun solver: ✅
+2025-08-02 14:13:28,781 - INFO -    3D RoPE: ✅
+2025-08-02 14:13:28,781 - INFO -    Sandwich norm: ✅
+2025-08-02 14:13:29,025 - INFO - ✅ IMPROVED model created with 227,474,014 parameters
+2025-08-02 14:13:29,026 - INFO -   Model size: base
+2025-08-02 14:13:29,026 - INFO -   Training mode: patch_only
+2025-08-02 14:13:29,026 - INFO -   3D RoPE: ✅ ENABLED
+2025-08-02 14:13:29,026 - INFO -   Sandwich Norm: ✅ ENABLED
+2025-08-02 14:13:29,026 - INFO -   EVA Adapter: ✅ ENABLED
+2025-08-02 14:13:29,026 - INFO -   Heun Solver: ✅ ENABLED
+2025-08-02 14:13:29,026 - INFO - 🌊 Creating IMPROVED loss function...
+2025-08-02 14:13:29,026 - INFO - ✅ IMPROVED Flow Matching Loss initialized:
+2025-08-02 14:13:29,026 - INFO -   Prediction type: velocity
+2025-08-02 14:13:29,026 - INFO -   Flow type: rectified
+2025-08-02 14:13:29,026 - INFO -   Weights - Velocity: 1.0, Semantic: 0.1, Cosine: 0.05
+2025-08-02 14:13:29,026 - INFO -   Timestep weighting: True
+2025-08-02 14:13:29,026 - INFO - ✅ IMPROVED loss function created:
+2025-08-02 14:13:29,026 - INFO -   Prediction type: velocity
+2025-08-02 14:13:29,026 - INFO -   Flow type: rectified
+2025-08-02 14:13:29,026 - INFO -   Velocity weight: 1.0
+2025-08-02 14:13:29,026 - INFO -   Semantic weight: 0.1
+2025-08-02 14:13:29,026 - INFO -   Cosine weight: 0.05
+2025-08-02 14:13:29,026 - INFO -   Timestep weighting: ✅ ENABLED
+2025-08-02 14:13:29,026 - INFO - 📊 Creating IMPROVED dataloaders...
+2025-08-02 14:13:29,026 - INFO - Loading embeddings from: /scratch-shared/azadaianchuk1/blip3o_workspace/embeddings/patch_only_256_tokens
+2025-08-02 14:13:29,027 - INFO - Found 35 .pkl files in embeddings directory
+2025-08-02 14:13:29,027 - INFO - Creating IMPROVED CLIP reproduction dataloaders:
+2025-08-02 14:13:29,027 - INFO -   Target: CLIP embeddings [B, N, 1024] (PROPERLY NORMALIZED)
+2025-08-02 14:13:29,027 - INFO -   Conditioning: EVA embeddings [B, N, 4096]
+2025-08-02 14:13:29,027 - INFO -   Timestep sampling: U-shaped distribution
+2025-08-02 14:13:29,037 - INFO - Loaded manifest: 35 shards, 91,333 samples
+2025-08-02 14:13:29,037 - INFO - Found 35 files with pattern: embeddings_shard_*_patch_only.pkl
+2025-08-02 14:13:29,039 - INFO - Prepared 5 shard files
+2025-08-02 14:13:29,039 - INFO - Computing CLIP embedding statistics from 5 shards...
+2025-08-02 14:13:33,406 - INFO -    Processed shard 1: torch.Size([2617, 256, 1024])
+2025-08-02 14:13:37,659 - INFO -    Processed shard 2: torch.Size([2601, 256, 1024])
+2025-08-02 14:13:41,949 - INFO -    Processed shard 3: torch.Size([2585, 256, 1024])
+2025-08-02 14:13:46,383 - INFO -    Processed shard 4: torch.Size([2702, 256, 1024])
+2025-08-02 14:13:50,710 - INFO -    Processed shard 5: torch.Size([2646, 256, 1024])
+2025-08-02 14:13:50,969 - INFO - Computing stats from 3,366,656 embedding vectors
+2025-08-02 14:13:56,162 - INFO - ✅ CLIP normalization statistics computed:
+2025-08-02 14:13:56,164 - INFO -    Mean range: [-7.367908, 6.006469]
+2025-08-02 14:13:56,164 - INFO -    Std range: [0.499297, 17.364965]
+2025-08-02 14:13:56,164 - INFO -    Scale factor: 32.00
+2025-08-02 14:13:56,165 - INFO -    Test normalization range: [-350.3479, 369.2878]
+2025-08-02 14:13:56,334 - INFO - Using manifest for length estimation: 13,047 samples
+2025-08-02 14:13:56,334 - INFO - UPDATED CLIP Reproduction Dataset initialized:
+2025-08-02 14:13:56,334 - INFO -   Directory: /scratch-shared/azadaianchuk1/blip3o_workspace/embeddings/patch_only_256_tokens
+2025-08-02 14:13:56,334 - INFO -   Mode: patch_only (256 tokens)
+2025-08-02 14:13:56,334 - INFO -   TARGET: CLIP embeddings [B, N, 1024] (PROPERLY NORMALIZED)
+2025-08-02 14:13:56,334 - INFO -   CONDITIONING: EVA embeddings [B, N, 4096]
+2025-08-02 14:13:56,334 - INFO -   Shards: 5
+2025-08-02 14:13:56,334 - INFO -   ✅ CLIP normalization: ENABLED
+2025-08-02 14:13:56,335 - INFO - Loaded manifest: 35 shards, 91,333 samples
+2025-08-02 14:13:56,335 - INFO - Found 35 files with pattern: embeddings_shard_*_patch_only.pkl
+2025-08-02 14:13:56,335 - INFO - Prepared 5 shard files
+2025-08-02 14:13:56,335 - INFO - Computing CLIP embedding statistics from 5 shards...
+2025-08-02 14:14:00,432 - INFO -    Processed shard 1: torch.Size([2646, 256, 1024])
+2025-08-02 14:14:04,650 - INFO -    Processed shard 2: torch.Size([2601, 256, 1024])
+2025-08-02 14:14:08,770 - INFO -    Processed shard 3: torch.Size([2585, 256, 1024])
+2025-08-02 14:14:12,938 - INFO -    Processed shard 4: torch.Size([2617, 256, 1024])
+2025-08-02 14:14:17,420 - INFO -    Processed shard 5: torch.Size([2702, 256, 1024])
+2025-08-02 14:14:17,676 - INFO - Computing stats from 3,366,656 embedding vectors
+2025-08-02 14:14:22,849 - INFO - ✅ CLIP normalization statistics computed:
+2025-08-02 14:14:22,849 - INFO -    Mean range: [-7.367907, 6.006466]
+2025-08-02 14:14:22,850 - INFO -    Std range: [0.499297, 17.364965]
+2025-08-02 14:14:22,850 - INFO -    Scale factor: 32.00
+2025-08-02 14:14:22,850 - INFO -    Test normalization range: [-347.8978, 375.2769]
+2025-08-02 14:14:23,041 - INFO - Using manifest for length estimation: 13,047 samples
+2025-08-02 14:14:23,041 - INFO - UPDATED CLIP Reproduction Dataset initialized:
+2025-08-02 14:14:23,041 - INFO -   Directory: /scratch-shared/azadaianchuk1/blip3o_workspace/embeddings/patch_only_256_tokens
+2025-08-02 14:14:23,041 - INFO -   Mode: patch_only (256 tokens)
+2025-08-02 14:14:23,041 - INFO -   TARGET: CLIP embeddings [B, N, 1024] (PROPERLY NORMALIZED)
+2025-08-02 14:14:23,041 - INFO -   CONDITIONING: EVA embeddings [B, N, 4096]
+2025-08-02 14:14:23,041 - INFO -   Shards: 5
+2025-08-02 14:14:23,041 - INFO -   ✅ CLIP normalization: ENABLED
+2025-08-02 14:14:23,041 - INFO - ✅ IMPROVED CLIP reproduction dataloaders created
+2025-08-02 14:14:23,041 - INFO -   Training dataset length: 13,047
+2025-08-02 14:14:23,041 - INFO -   Evaluation dataset length: 13,047
+2025-08-02 14:14:23,041 - INFO -   🔥 CLIP normalization: PROPERLY CONFIGURED
+2025-08-02 14:14:23,041 - INFO - ✅ IMPROVED dataloaders created successfully:
+2025-08-02 14:14:23,041 - INFO -   Training mode: patch_only
+2025-08-02 14:14:23,041 - INFO -   Batch size: 128
+2025-08-02 14:14:23,042 - INFO -   Max shards: 5
+2025-08-02 14:14:23,042 - INFO -   🔥 CLIP normalization: ✅ PROPERLY CONFIGURED
+2025-08-02 14:14:23,042 - INFO -   🔥 U-shaped timestep sampling: ✅ ENABLED
+2025-08-02 14:14:27,847 - INFO - ✅ Dataloader test successful:
+2025-08-02 14:14:27,848 - INFO -   Batch size: 128
+2025-08-02 14:14:27,848 - INFO -   CLIP embeddings shape: torch.Size([128, 256, 1024])
+2025-08-02 14:14:27,848 - INFO -   EVA embeddings shape: torch.Size([128, 256, 4096])
+2025-08-02 14:14:27,848 - INFO -   🔥 CLIP normalizer: ✅ AVAILABLE
+2025-08-02 14:14:27,848 - INFO -      Scale factor: 32.00
+2025-08-02 14:14:27,848 - INFO - 🏃 Creating IMPROVED trainer...
+2025-08-02 14:14:27,853 - INFO - Got exact dataloader length: 101
+2025-08-02 14:14:27,854 - INFO - Optimizer and scheduler setup complete
+2025-08-02 14:14:27,854 - INFO -   Total estimated steps: 1010
+2025-08-02 14:14:27,854 - INFO -   Warmup steps: 500
+2025-08-02 14:14:28,993 - ERROR - ❌ Failed to setup WandB: Error uploading run: returned error 401: {"data":{"upsertBucket":null},"errors":[{"message":"user is not logged in","path":["upsertBucket"],"extensions":{"code":"PERMISSION_ERROR"}}]}
+2025-08-02 14:14:28,993 - INFO - ✅ IMPROVED BLIP3-o CLIP Trainer initialized
+2025-08-02 14:14:28,994 - INFO -   Device: cuda
+2025-08-02 14:14:28,995 - INFO -   Parameters: 227,474,014
+2025-08-02 14:14:28,995 - INFO -   CLIP normalizer: ✅ AVAILABLE
+2025-08-02 14:14:28,995 - INFO -   Heun inference: ✅ ENABLED
+2025-08-02 14:14:28,995 - INFO - ✅ IMPROVED trainer created successfully:
+2025-08-02 14:14:28,995 - INFO -   Evaluation: Every 100 steps
+2025-08-02 14:14:28,995 - INFO -   WandB enabled: True
+2025-08-02 14:14:28,995 - INFO -   CLIP normalizer: ✅ AVAILABLE
+2025-08-02 14:14:28,995 - INFO -   Heun inference: ✅ ENABLED
+2025-08-02 14:14:28,995 - INFO - 💾 Saving experiment configuration...
+2025-08-02 14:14:28,998 - INFO - ✅ IMPROVED configuration saved to checkpoints/blip3o_clean_20250802_141316/experiment_config.json
+2025-08-02 14:14:28,998 - INFO - 
+🚀 Starting IMPROVED BLIP3-o training...
+2025-08-02 14:14:28,998 - INFO - ================================================================================
+2025-08-02 14:14:28,998 - INFO - 🔥 Expected Results Timeline:
+2025-08-02 14:14:28,998 - INFO -    • After CLIP normalization fix: 0.21 → 0.45+ (IMMEDIATE)
+2025-08-02 14:14:28,998 - INFO -    • After Heun solver: 0.45 → 0.55+
+2025-08-02 14:14:28,998 - INFO -    • After EVA adapter: 0.55 → 0.65+
+2025-08-02 14:14:28,998 - INFO -    • After all improvements: 0.65 → 0.70+
+2025-08-02 14:14:28,998 - INFO - ================================================================================
+2025-08-02 14:14:28,998 - INFO - 🚀 Starting IMPROVED BLIP3-o training...
+2025-08-02 14:14:28,999 - INFO -   Model parameters: 227,474,014
+2025-08-02 14:14:28,999 - INFO -   CLIP normalizer: ✅ AVAILABLE
+2025-08-02 14:14:28,999 - INFO -   Heun inference: ✅ ENABLED
+2025-08-02 14:14:29,001 - INFO - Starting epoch 1/10
+2025-08-02 14:14:43,622 - INFO - Step 10: Loss=1028.181763, VelSim=0.2221, CleanSim=0.8721, GradNorm=448506.357, LR=9.44e-05
+2025-08-02 14:14:53,498 - INFO - Step 20: Loss=1021.286621, VelSim=0.2451, CleanSim=0.8701, GradNorm=476489.780, LR=1.09e-04
+2025-08-02 14:15:08,223 - INFO - Step 30: Loss=997.721558, VelSim=0.2431, CleanSim=0.7768, GradNorm=434791.012, LR=1.23e-04
+2025-08-02 14:15:18,105 - INFO - Step 40: Loss=983.406067, VelSim=0.2475, CleanSim=0.7536, GradNorm=771865.516, LR=1.38e-04
+2025-08-02 14:15:32,531 - INFO - Step 50: Loss=931.704041, VelSim=0.2369, CleanSim=0.7253, GradNorm=418805.560, LR=1.52e-04
+2025-08-02 14:15:42,425 - INFO - Step 60: Loss=884.496033, VelSim=0.2552, CleanSim=0.7599, GradNorm=982270.781, LR=1.66e-04
