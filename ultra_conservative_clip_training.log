@@ -1,1080 +1,387 @@
-2025-08-02 20:31:09,870 - INFO - 🚀 ULTRA-CONSERVATIVE BLIP3-o CLIP Reproduction Training
-2025-08-02 20:31:09,870 - INFO - ================================================================================
-2025-08-02 20:31:09,871 - INFO - 📋 Task: Reproduce CLIP embeddings from EVA embeddings
-2025-08-02 20:31:09,871 - INFO - 🧠 Model: BLIP3-o DiT with ULTRA-CONSERVATIVE normalization
-2025-08-02 20:31:09,871 - INFO - 🌊 Method: Rectified Flow Matching + Robust normalization
-2025-08-02 20:31:09,871 - INFO - 🎯 Target: CLIP embeddings [B, N, 1024] (ULTRA-CONSERVATIVE)
-2025-08-02 20:31:09,871 - INFO - 🎮 Conditioning: EVA embeddings [B, N, 4096]
-2025-08-02 20:31:09,871 - INFO - 🔥 Focus: Training stability and robust performance
-2025-08-02 20:31:09,871 - INFO - ================================================================================
-2025-08-02 20:31:09,871 - INFO - 🛠️ ULTRA-CONSERVATIVE FEATURES:
-2025-08-02 20:31:09,871 - INFO -    ✅ 1. Much smaller scale factor (4.0 → 1.5)
-2025-08-02 20:31:09,871 - INFO -    ✅ 2. Percentile-based statistics (robust outlier handling)
-2025-08-02 20:31:09,871 - INFO -    ✅ 3. Fallback to identity normalization if needed
-2025-08-02 20:31:09,871 - INFO -    ✅ 4. Strict validation ranges (±10 max)
-2025-08-02 20:31:09,871 - INFO -    ✅ 5. Conservative clamping and error recovery
-2025-08-02 20:31:09,871 - INFO -    ✅ 6. Enhanced error handling throughout
-2025-08-02 20:31:09,871 - INFO - ================================================================================
-2025-08-02 20:31:09,873 - INFO - Found 35 embedding files
-2025-08-02 20:31:09,873 - WARNING - ⚠️ Large batch size (64) may cause memory issues
-2025-08-02 20:31:09,873 - INFO - ULTRA-CONSERVATIVE Configuration:
-2025-08-02 20:31:09,874 - INFO -   Model size: base
-2025-08-02 20:31:09,874 - INFO -   Training mode: patch_only
-2025-08-02 20:31:09,874 - INFO -   Embeddings dir: /scratch-shared/azadaianchuk1/blip3o_workspace/embeddings/patch_only_256_tokens
-2025-08-02 20:31:09,874 - INFO -   Output dir: ./checkpoints/blip3o_clean_20250802_203106
-2025-08-02 20:31:09,874 - INFO -   Learning rate: 0.0001
-2025-08-02 20:31:09,874 - INFO -   Batch size: 64
-2025-08-02 20:31:09,874 - INFO -   Epochs: 10
-2025-08-02 20:31:09,874 - INFO -   Max shards: 3
-2025-08-02 20:31:09,874 - INFO -   Loss weights:
-2025-08-02 20:31:09,874 - INFO -     Velocity: 1.0
-2025-08-02 20:31:09,874 - INFO -     Semantic: 0.5
-2025-08-02 20:31:09,874 - INFO -     Cosine: 0.2
-2025-08-02 20:31:09,874 - INFO -     Consistency: 0.3
-2025-08-02 20:31:09,874 - INFO -   EVA adapter: ✅ ENABLED
-2025-08-02 20:31:09,875 - INFO -   Heun inference: ✅ ENABLED
-2025-08-02 20:31:10,310 - INFO - Using GPU: NVIDIA H100
-2025-08-02 20:31:10,310 - INFO - GPU Memory: 100.0 GB
-2025-08-02 20:31:10,310 - INFO - PyTorch version: 2.7.1+cu126
-2025-08-02 20:31:16,889 - INFO - ✅ CLIP DiT model loaded successfully
-2025-08-02 20:31:16,903 - INFO - ✅ Flow matching loss loaded successfully
-2025-08-02 20:31:18,308 - INFO - ✅ CLIP trainer loaded successfully
-2025-08-02 20:31:18,322 - WARNING - ⚠️ Failed to import dataset: cannot import name 'create_clip_reproduction_dataloaders' from 'src.modules.datasets.blip3o_dataset' (/gpfs/home4/azadaianchuk1/eva-clip-v6_2/src/modules/datasets/blip3o_dataset.py)
-2025-08-02 20:31:18,327 - INFO - ✅ Configuration loaded successfully
-2025-08-02 20:31:18,327 - WARNING - ⚠️ Missing components: ['dataset']
-2025-08-02 20:31:18,328 - WARNING - ⚠️ Partial initialization. Missing: ['dataset']
-2025-08-02 20:31:18,328 - INFO - ✅ Ultra-conservative dataset module loaded
-2025-08-02 20:31:18,328 - INFO - ✅ Improved model module loaded
-2025-08-02 20:31:18,328 - INFO - ✅ Fixed loss module loaded
-2025-08-02 20:31:18,328 - INFO - ✅ Fixed trainer module loaded
-2025-08-02 20:31:18,328 - INFO - ✅ All required modules loaded successfully
-2025-08-02 20:31:18,328 - INFO - ✅ Environment check passed
-2025-08-02 20:31:18,328 - INFO - ✅ Output directory ready: checkpoints/blip3o_clean_20250802_203106
-2025-08-02 20:31:18,328 - INFO - 🏗️ Creating model...
-2025-08-02 20:31:18,328 - INFO - ✅ Configuration validation passed
-2025-08-02 20:31:18,757 - INFO - ✅ EVA-CLIP Adapter initialized: 4096 → 768
-2025-08-02 20:31:18,758 - INFO -    Layers: 6, Dropout: 0.1, Residual: True
-2025-08-02 20:31:20,202 - INFO - ✅ Stable initialization applied with depth scale: 0.2887
-2025-08-02 20:31:20,204 - INFO - ✅ IMPROVED BLIP3-o CLIP DiT model initialized: 227,474,014 parameters
-2025-08-02 20:31:20,204 - INFO -   🔥 EVA adapter: ENABLED
-2025-08-02 20:31:20,204 - INFO -   🚀 Heun solver: ENABLED
-2025-08-02 20:31:20,204 - INFO -   ⚡ Attention caching: Available
-2025-08-02 20:31:20,204 - INFO - ✅ IMPROVED BLIP3-o model created:
-2025-08-02 20:31:20,204 - INFO -    Size: base
-2025-08-02 20:31:20,205 - INFO -    Parameters: 227,474,014
-2025-08-02 20:31:20,205 - INFO -    EVA adapter: ✅
-2025-08-02 20:31:20,205 - INFO -    Heun solver: ✅
-2025-08-02 20:31:20,205 - INFO -    3D RoPE: ✅
-2025-08-02 20:31:20,205 - INFO -    Sandwich norm: ✅
-2025-08-02 20:31:20,439 - INFO - ✅ Model created with 227,474,014 parameters
-2025-08-02 20:31:20,439 - INFO -   Model size: base
-2025-08-02 20:31:20,439 - INFO -   Training mode: patch_only
-2025-08-02 20:31:20,439 - INFO -   3D RoPE: ✅ ENABLED
-2025-08-02 20:31:20,439 - INFO -   Sandwich Norm: ✅ ENABLED
-2025-08-02 20:31:20,439 - INFO -   EVA Adapter: ✅ ENABLED
-2025-08-02 20:31:20,439 - INFO -   Heun Solver: ✅ ENABLED
-2025-08-02 20:31:20,439 - INFO - 🌊 Creating loss function...
-2025-08-02 20:31:20,440 - INFO - ✅ ROBUST Flow Matching Loss initialized:
-2025-08-02 20:31:20,440 - INFO -   Prediction type: velocity
-2025-08-02 20:31:20,440 - INFO -   Flow type: rectified
-2025-08-02 20:31:20,440 - INFO -   Weights - Velocity: 1.0, Semantic: 0.5, Cosine: 0.2
-2025-08-02 20:31:20,440 - INFO -   Consistency weight: 0.3
-2025-08-02 20:31:20,440 - INFO -   🔒 Robust features: stability checks, adaptive scaling, overflow protection
-2025-08-02 20:31:20,440 - INFO - ✅ ULTRA-CONSERVATIVE loss function created:
-2025-08-02 20:31:20,440 - INFO -   Prediction type: velocity
-2025-08-02 20:31:20,440 - INFO -   Flow type: rectified
-2025-08-02 20:31:20,440 - INFO -   Weights - Velocity: 1.0, Semantic: 0.5, Cosine: 0.2
-2025-08-02 20:31:20,440 - INFO -   Consistency weight: 0.3
-2025-08-02 20:31:20,440 - INFO -   Timestep weighting: ✅ ENABLED
-2025-08-02 20:31:20,440 - INFO - 📊 Creating ULTRA-CONSERVATIVE dataloaders...
-2025-08-02 20:31:20,440 - INFO - Loading embeddings from: /scratch-shared/azadaianchuk1/blip3o_workspace/embeddings/patch_only_256_tokens
-2025-08-02 20:31:20,440 - INFO - Found 35 .pkl files in embeddings directory
-2025-08-02 20:31:20,440 - INFO - Creating ULTRA-CONSERVATIVE CLIP reproduction dataloaders:
-2025-08-02 20:31:20,440 - INFO -   Target: CLIP embeddings [B, N, 1024] (ULTRA-CONSERVATIVE NORMALIZATION)
-2025-08-02 20:31:20,440 - INFO -   Conditioning: EVA embeddings [B, N, 4096]
-2025-08-02 20:31:20,440 - INFO -   Timestep sampling: U-shaped distribution
-2025-08-02 20:31:20,441 - INFO - Loaded manifest: 35 shards, 91,333 samples
-2025-08-02 20:31:20,441 - INFO - Found 35 files with pattern: embeddings_shard_*_patch_only.pkl
-2025-08-02 20:31:20,441 - INFO - Prepared 3 shard files
-2025-08-02 20:31:20,441 - INFO - Computing ULTRA-CONSERVATIVE CLIP statistics from 3 shards...
-2025-08-02 20:31:25,103 - INFO -    Processed shard 1: torch.Size([2601, 256, 1024]) -> 10000 samples
-2025-08-02 20:31:29,704 - INFO -    Processed shard 2: torch.Size([2646, 256, 1024]) -> 10000 samples
-2025-08-02 20:31:34,223 - INFO -    Processed shard 3: torch.Size([2585, 256, 1024]) -> 10000 samples
-2025-08-02 20:31:34,241 - INFO - Computing stats from 30,000 embedding vectors
-2025-08-02 20:31:34,251 - INFO -    Removed 2179 samples with extreme norms
-2025-08-02 20:31:36,593 - INFO -    Final outlier removal: 4171 samples (13.9%)
-2025-08-02 20:31:46,169 - INFO - ✅ ULTRA-CONSERVATIVE CLIP normalization statistics computed:
-2025-08-02 20:31:46,170 - INFO -    Median range: [-7.257812, 5.859375]
-2025-08-02 20:31:46,170 - INFO -    Std range: [0.925709, 4.911024]
-2025-08-02 20:31:46,170 - INFO -    Scale factor: 1.50 (ULTRA-CONSERVATIVE)
-2025-08-02 20:31:46,170 - INFO -    Data range (1%-99%): [-10.500, 10.474]
-2025-08-02 20:31:46,171 - INFO -    Normalized range: [-3.69, 3.70]
-2025-08-02 20:31:46,172 - INFO -    ✅ Normalization validation passed - safe for training
-2025-08-02 20:31:46,188 - INFO - Using manifest for length estimation: 7,828 samples
-2025-08-02 20:31:46,188 - INFO - ULTRA-CONSERVATIVE CLIP Reproduction Dataset initialized:
-2025-08-02 20:31:46,188 - INFO -   Directory: /scratch-shared/azadaianchuk1/blip3o_workspace/embeddings/patch_only_256_tokens
-2025-08-02 20:31:46,188 - INFO -   Mode: patch_only (256 tokens)
-2025-08-02 20:31:46,188 - INFO -   TARGET: CLIP embeddings [B, N, 1024] (ULTRA-CONSERVATIVE NORMALIZATION)
-2025-08-02 20:31:46,188 - INFO -   CONDITIONING: EVA embeddings [B, N, 4096]
-2025-08-02 20:31:46,188 - INFO -   Shards: 3
-2025-08-02 20:31:46,188 - INFO -   ✅ ULTRA-CONSERVATIVE CLIP normalization: ENABLED
-2025-08-02 20:31:46,189 - INFO - Loaded manifest: 35 shards, 91,333 samples
-2025-08-02 20:31:46,189 - INFO - Found 35 files with pattern: embeddings_shard_*_patch_only.pkl
-2025-08-02 20:31:46,189 - INFO - Prepared 3 shard files
-2025-08-02 20:31:46,189 - INFO - Computing ULTRA-CONSERVATIVE CLIP statistics from 3 shards...
-2025-08-02 20:31:50,841 - INFO -    Processed shard 1: torch.Size([2646, 256, 1024]) -> 10000 samples
-2025-08-02 20:31:55,296 - INFO -    Processed shard 2: torch.Size([2601, 256, 1024]) -> 10000 samples
-2025-08-02 20:31:59,967 - INFO -    Processed shard 3: torch.Size([2585, 256, 1024]) -> 10000 samples
-2025-08-02 20:31:59,970 - INFO - Computing stats from 30,000 embedding vectors
-2025-08-02 20:31:59,976 - INFO -    Removed 2265 samples with extreme norms
-2025-08-02 20:32:02,297 - INFO -    Final outlier removal: 4338 samples (14.5%)
-2025-08-02 20:32:11,834 - INFO - ✅ ULTRA-CONSERVATIVE CLIP normalization statistics computed:
-2025-08-02 20:32:11,835 - INFO -    Median range: [-7.238281, 5.843750]
-2025-08-02 20:32:11,835 - INFO -    Std range: [0.918330, 4.898004]
-2025-08-02 20:32:11,835 - INFO -    Scale factor: 1.50 (ULTRA-CONSERVATIVE)
-2025-08-02 20:32:11,835 - INFO -    Data range (1%-99%): [-10.469, 10.272]
-2025-08-02 20:32:11,836 - INFO -    Normalized range: [-3.76, 3.80]
-2025-08-02 20:32:11,836 - INFO -    ✅ Normalization validation passed - safe for training
-2025-08-02 20:32:11,852 - INFO - Using manifest for length estimation: 7,828 samples
-2025-08-02 20:32:11,853 - INFO - ULTRA-CONSERVATIVE CLIP Reproduction Dataset initialized:
-2025-08-02 20:32:11,853 - INFO -   Directory: /scratch-shared/azadaianchuk1/blip3o_workspace/embeddings/patch_only_256_tokens
-2025-08-02 20:32:11,853 - INFO -   Mode: patch_only (256 tokens)
-2025-08-02 20:32:11,853 - INFO -   TARGET: CLIP embeddings [B, N, 1024] (ULTRA-CONSERVATIVE NORMALIZATION)
-2025-08-02 20:32:11,853 - INFO -   CONDITIONING: EVA embeddings [B, N, 4096]
-2025-08-02 20:32:11,853 - INFO -   Shards: 3
-2025-08-02 20:32:11,853 - INFO -   ✅ ULTRA-CONSERVATIVE CLIP normalization: ENABLED
-2025-08-02 20:32:11,853 - INFO - ✅ ULTRA-CONSERVATIVE CLIP reproduction dataloaders created
-2025-08-02 20:32:11,853 - INFO -   Training dataset length: 7,828
-2025-08-02 20:32:11,853 - INFO -   Evaluation dataset length: 7,828
-2025-08-02 20:32:11,853 - INFO -   🔥 ULTRA-CONSERVATIVE CLIP normalization: PROPERLY CONFIGURED
-2025-08-02 20:32:11,853 - INFO - ✅ ULTRA-CONSERVATIVE dataloaders created successfully:
-2025-08-02 20:32:11,853 - INFO -   Training mode: patch_only
-2025-08-02 20:32:11,853 - INFO -   Batch size: 64
-2025-08-02 20:32:11,853 - INFO -   Max shards: 3
-2025-08-02 20:32:11,853 - INFO -   🔥 ULTRA-CONSERVATIVE CLIP normalization: ✅ CONFIGURED
-2025-08-02 20:32:16,415 - INFO - ✅ Dataloader test successful:
-2025-08-02 20:32:16,415 - INFO -   Batch size: 64
-2025-08-02 20:32:16,415 - INFO -   CLIP embeddings shape: torch.Size([64, 256, 1024])
-2025-08-02 20:32:16,415 - INFO -   EVA embeddings shape: torch.Size([64, 256, 4096])
-2025-08-02 20:32:16,416 - INFO -   🔥 CLIP normalizer: ✅ AVAILABLE
-2025-08-02 20:32:16,416 - INFO -      Stats computed: True
-2025-08-02 20:32:16,416 - INFO -      Scale factor: 1.50 (ULTRA-CONSERVATIVE)
-2025-08-02 20:32:16,417 - INFO -      Normalized range: [-8.00, 8.00]
-2025-08-02 20:32:16,417 - INFO -      ✅ Normalization range acceptable for training
-2025-08-02 20:32:16,417 - INFO - 🏃 Creating trainer...
-2025-08-02 20:32:16,421 - INFO - Got exact dataloader length: 122
-2025-08-02 20:32:16,423 - INFO - ✅ Conservative optimizer setup complete
-2025-08-02 20:32:16,423 - INFO - ✅ Mixed precision enabled
-2025-08-02 20:32:16,423 - INFO - ✅ ULTRA-CONSERVATIVE BLIP3-o Trainer initialized
-2025-08-02 20:32:16,423 - INFO -   Device: cuda
-2025-08-02 20:32:16,424 - INFO -   Parameters: 227,474,014
-2025-08-02 20:32:16,424 - INFO -   CLIP normalizer: ✅ AVAILABLE
-2025-08-02 20:32:16,424 - INFO -   🔒 Ultra-conservative features: stability checks, adaptive clipping, emergency recovery
-2025-08-02 20:32:16,424 - INFO - ✅ ULTRA-CONSERVATIVE trainer created successfully:
-2025-08-02 20:32:16,424 - INFO -   Evaluation: Every 50 steps
-2025-08-02 20:32:16,424 - INFO -   WandB enabled: False
-2025-08-02 20:32:16,424 - INFO -   CLIP normalizer: ✅ AVAILABLE
-2025-08-02 20:32:16,424 - INFO -   Heun inference: ✅ ENABLED
-2025-08-02 20:32:16,424 - INFO - 💾 Saving experiment configuration...
-2025-08-02 20:32:16,427 - INFO - ✅ Configuration saved to checkpoints/blip3o_clean_20250802_203106/experiment_config.json
-2025-08-02 20:32:16,427 - INFO - 
+2025-08-02 21:23:37,558 - INFO - 🚀 ULTRA-CONSERVATIVE BLIP3-o CLIP Reproduction Training
+2025-08-02 21:23:37,559 - INFO - ================================================================================
+2025-08-02 21:23:37,559 - INFO - 📋 Task: Reproduce CLIP embeddings from EVA embeddings
+2025-08-02 21:23:37,559 - INFO - 🧠 Model: BLIP3-o DiT with ULTRA-CONSERVATIVE normalization
+2025-08-02 21:23:37,560 - INFO - 🌊 Method: Rectified Flow Matching + Robust normalization
+2025-08-02 21:23:37,560 - INFO - 🎯 Target: CLIP embeddings [B, N, 1024] (ULTRA-CONSERVATIVE)
+2025-08-02 21:23:37,560 - INFO - 🎮 Conditioning: EVA embeddings [B, N, 4096]
+2025-08-02 21:23:37,560 - INFO - 🔥 Focus: Training stability and robust performance
+2025-08-02 21:23:37,560 - INFO - ================================================================================
+2025-08-02 21:23:37,560 - INFO - 🛠️ ULTRA-CONSERVATIVE FEATURES:
+2025-08-02 21:23:37,560 - INFO -    ✅ 1. Much smaller scale factor (4.0 → 1.5)
+2025-08-02 21:23:37,560 - INFO -    ✅ 2. Percentile-based statistics (robust outlier handling)
+2025-08-02 21:23:37,560 - INFO -    ✅ 3. Fallback to identity normalization if needed
+2025-08-02 21:23:37,560 - INFO -    ✅ 4. Strict validation ranges (±10 max)
+2025-08-02 21:23:37,560 - INFO -    ✅ 5. Conservative clamping and error recovery
+2025-08-02 21:23:37,560 - INFO -    ✅ 6. Enhanced error handling throughout
+2025-08-02 21:23:37,560 - INFO - ================================================================================
+2025-08-02 21:23:37,562 - INFO - Found 35 embedding files
+2025-08-02 21:23:37,562 - WARNING - ⚠️ Large batch size (64) may cause memory issues
+2025-08-02 21:23:37,562 - INFO - ULTRA-CONSERVATIVE Configuration:
+2025-08-02 21:23:37,562 - INFO -   Model size: base
+2025-08-02 21:23:37,562 - INFO -   Training mode: patch_only
+2025-08-02 21:23:37,562 - INFO -   Embeddings dir: /scratch-shared/azadaianchuk1/blip3o_workspace/embeddings/patch_only_256_tokens
+2025-08-02 21:23:37,563 - INFO -   Output dir: ./checkpoints/blip3o_clean_20250802_212334
+2025-08-02 21:23:37,563 - INFO -   Learning rate: 0.0001
+2025-08-02 21:23:37,563 - INFO -   Batch size: 64
+2025-08-02 21:23:37,563 - INFO -   Epochs: 10
+2025-08-02 21:23:37,563 - INFO -   Max shards: 3
+2025-08-02 21:23:37,563 - INFO -   Loss weights:
+2025-08-02 21:23:37,563 - INFO -     Velocity: 1.0
+2025-08-02 21:23:37,563 - INFO -     Semantic: 0.5
+2025-08-02 21:23:37,563 - INFO -     Cosine: 0.2
+2025-08-02 21:23:37,563 - INFO -     Consistency: 0.3
+2025-08-02 21:23:37,563 - INFO -   EVA adapter: ✅ ENABLED
+2025-08-02 21:23:37,563 - INFO -   Heun inference: ✅ ENABLED
+2025-08-02 21:23:38,179 - INFO - Using GPU: NVIDIA H100
+2025-08-02 21:23:38,179 - INFO - GPU Memory: 100.0 GB
+2025-08-02 21:23:38,179 - INFO - PyTorch version: 2.7.1+cu126
+2025-08-02 21:23:44,882 - INFO - ✅ CLIP DiT model loaded successfully
+2025-08-02 21:23:44,887 - INFO - ✅ Flow matching loss loaded successfully
+2025-08-02 21:23:46,227 - INFO - ✅ CLIP trainer loaded successfully
+2025-08-02 21:23:46,232 - WARNING - ⚠️ Failed to import dataset: cannot import name 'create_clip_reproduction_dataloaders' from 'src.modules.datasets.blip3o_dataset' (/gpfs/home4/azadaianchuk1/eva-clip-v6_2/src/modules/datasets/blip3o_dataset.py)
+2025-08-02 21:23:46,237 - INFO - ✅ Configuration loaded successfully
+2025-08-02 21:23:46,237 - WARNING - ⚠️ Missing components: ['dataset']
+2025-08-02 21:23:46,237 - WARNING - ⚠️ Partial initialization. Missing: ['dataset']
+2025-08-02 21:23:46,237 - INFO - ✅ Ultra-conservative dataset module loaded
+2025-08-02 21:23:46,237 - INFO - ✅ Improved model module loaded
+2025-08-02 21:23:46,237 - INFO - ✅ Fixed loss module loaded
+2025-08-02 21:23:46,237 - INFO - ✅ Fixed trainer module loaded
+2025-08-02 21:23:46,237 - INFO - ✅ All required modules loaded successfully
+2025-08-02 21:23:46,238 - INFO - ✅ Environment check passed
+2025-08-02 21:23:46,238 - INFO - ✅ Output directory ready: checkpoints/blip3o_clean_20250802_212334
+2025-08-02 21:23:46,238 - INFO - 🏗️ Creating model...
+2025-08-02 21:23:46,238 - INFO - ✅ Configuration validation passed
+2025-08-02 21:23:46,669 - INFO - ✅ EVA-CLIP Adapter initialized: 4096 → 768
+2025-08-02 21:23:46,669 - INFO -    Layers: 6, Dropout: 0.1, Residual: True
+2025-08-02 21:23:48,103 - INFO - ✅ Stable initialization applied with depth scale: 0.2887
+2025-08-02 21:23:48,106 - INFO - ✅ IMPROVED BLIP3-o CLIP DiT model initialized: 227,474,014 parameters
+2025-08-02 21:23:48,106 - INFO -   🔥 EVA adapter: ENABLED
+2025-08-02 21:23:48,106 - INFO -   🚀 Heun solver: ENABLED
+2025-08-02 21:23:48,106 - INFO -   ⚡ Attention caching: Available
+2025-08-02 21:23:48,106 - INFO - ✅ IMPROVED BLIP3-o model created:
+2025-08-02 21:23:48,107 - INFO -    Size: base
+2025-08-02 21:23:48,108 - INFO -    Parameters: 227,474,014
+2025-08-02 21:23:48,108 - INFO -    EVA adapter: ✅
+2025-08-02 21:23:48,108 - INFO -    Heun solver: ✅
+2025-08-02 21:23:48,108 - INFO -    3D RoPE: ✅
+2025-08-02 21:23:48,108 - INFO -    Sandwich norm: ✅
+2025-08-02 21:23:48,337 - INFO - ✅ Model created with 227,474,014 parameters
+2025-08-02 21:23:48,337 - INFO -   Model size: base
+2025-08-02 21:23:48,337 - INFO -   Training mode: patch_only
+2025-08-02 21:23:48,337 - INFO -   3D RoPE: ✅ ENABLED
+2025-08-02 21:23:48,337 - INFO -   Sandwich Norm: ✅ ENABLED
+2025-08-02 21:23:48,337 - INFO -   EVA Adapter: ✅ ENABLED
+2025-08-02 21:23:48,337 - INFO -   Heun Solver: ✅ ENABLED
+2025-08-02 21:23:48,337 - INFO - 🌊 Creating loss function...
+2025-08-02 21:23:48,338 - INFO - ✅ ROBUST Flow Matching Loss initialized:
+2025-08-02 21:23:48,338 - INFO -   Prediction type: velocity
+2025-08-02 21:23:48,338 - INFO -   Flow type: rectified
+2025-08-02 21:23:48,338 - INFO -   Weights - Velocity: 1.0, Semantic: 0.5, Cosine: 0.2
+2025-08-02 21:23:48,338 - INFO -   Consistency weight: 0.3
+2025-08-02 21:23:48,338 - INFO -   🔒 Robust features: stability checks, adaptive scaling, overflow protection
+2025-08-02 21:23:48,338 - INFO - ✅ ULTRA-CONSERVATIVE loss function created:
+2025-08-02 21:23:48,338 - INFO -   Prediction type: velocity
+2025-08-02 21:23:48,338 - INFO -   Flow type: rectified
+2025-08-02 21:23:48,338 - INFO -   Weights - Velocity: 1.0, Semantic: 0.5, Cosine: 0.2
+2025-08-02 21:23:48,338 - INFO -   Consistency weight: 0.3
+2025-08-02 21:23:48,338 - INFO -   Timestep weighting: ✅ ENABLED
+2025-08-02 21:23:48,338 - INFO - 📊 Creating ULTRA-CONSERVATIVE dataloaders...
+2025-08-02 21:23:48,338 - INFO - Loading embeddings from: /scratch-shared/azadaianchuk1/blip3o_workspace/embeddings/patch_only_256_tokens
+2025-08-02 21:23:48,339 - INFO - Found 35 .pkl files in embeddings directory
+2025-08-02 21:23:48,339 - INFO - Creating ULTRA-CONSERVATIVE CLIP reproduction dataloaders:
+2025-08-02 21:23:48,339 - INFO -   Target: CLIP embeddings [B, N, 1024] (ULTRA-CONSERVATIVE NORMALIZATION)
+2025-08-02 21:23:48,339 - INFO -   Conditioning: EVA embeddings [B, N, 4096]
+2025-08-02 21:23:48,339 - INFO -   Timestep sampling: U-shaped distribution
+2025-08-02 21:23:48,382 - INFO - Loaded manifest: 35 shards, 91,333 samples
+2025-08-02 21:23:48,383 - INFO - Found 35 files with pattern: embeddings_shard_*_patch_only.pkl
+2025-08-02 21:23:48,385 - INFO - Prepared 3 shard files
+2025-08-02 21:23:48,385 - INFO - Computing ULTRA-CONSERVATIVE CLIP statistics from 3 shards...
+2025-08-02 21:23:54,632 - INFO -    Processed shard 1: torch.Size([2601, 256, 1024]) -> 10000 samples
+2025-08-02 21:24:00,169 - INFO -    Processed shard 2: torch.Size([2646, 256, 1024]) -> 10000 samples
+2025-08-02 21:24:04,927 - INFO -    Processed shard 3: torch.Size([2585, 256, 1024]) -> 10000 samples
+2025-08-02 21:24:04,938 - INFO - Computing stats from 30,000 embedding vectors
+2025-08-02 21:24:04,952 - INFO -    Removed 2217 samples with extreme norms
+2025-08-02 21:24:07,289 - INFO -    Final outlier removal: 4206 samples (14.0%)
+2025-08-02 21:24:16,862 - INFO - ✅ ULTRA-CONSERVATIVE CLIP normalization statistics computed:
+2025-08-02 21:24:16,871 - INFO -    Median range: [-7.257812, 5.835938]
+2025-08-02 21:24:16,872 - INFO -    Std range: [0.923756, 4.865451]
+2025-08-02 21:24:16,872 - INFO -    Scale factor: 1.50 (ULTRA-CONSERVATIVE)
+2025-08-02 21:24:16,872 - INFO -    Data range (1%-99%): [-10.484, 10.055]
+2025-08-02 21:24:16,874 - INFO -    Normalized range: [-3.77, 3.75]
+2025-08-02 21:24:16,879 - INFO -    ✅ Normalization validation passed - safe for training
+2025-08-02 21:24:16,893 - INFO - Using manifest for length estimation: 7,828 samples
+2025-08-02 21:24:16,893 - INFO - ULTRA-CONSERVATIVE CLIP Reproduction Dataset initialized:
+2025-08-02 21:24:16,893 - INFO -   Directory: /scratch-shared/azadaianchuk1/blip3o_workspace/embeddings/patch_only_256_tokens
+2025-08-02 21:24:16,893 - INFO -   Mode: patch_only (256 tokens)
+2025-08-02 21:24:16,893 - INFO -   TARGET: CLIP embeddings [B, N, 1024] (ULTRA-CONSERVATIVE NORMALIZATION)
+2025-08-02 21:24:16,893 - INFO -   CONDITIONING: EVA embeddings [B, N, 4096]
+2025-08-02 21:24:16,893 - INFO -   Shards: 3
+2025-08-02 21:24:16,893 - INFO -   ✅ ULTRA-CONSERVATIVE CLIP normalization: ENABLED
+2025-08-02 21:24:16,894 - INFO - Loaded manifest: 35 shards, 91,333 samples
+2025-08-02 21:24:16,894 - INFO - Found 35 files with pattern: embeddings_shard_*_patch_only.pkl
+2025-08-02 21:24:16,894 - INFO - Prepared 3 shard files
+2025-08-02 21:24:16,894 - INFO - Computing ULTRA-CONSERVATIVE CLIP statistics from 3 shards...
+2025-08-02 21:24:22,378 - INFO -    Processed shard 1: torch.Size([2646, 256, 1024]) -> 10000 samples
+2025-08-02 21:24:27,469 - INFO -    Processed shard 2: torch.Size([2601, 256, 1024]) -> 10000 samples
+2025-08-02 21:24:32,341 - INFO -    Processed shard 3: torch.Size([2585, 256, 1024]) -> 10000 samples
+2025-08-02 21:24:32,345 - INFO - Computing stats from 30,000 embedding vectors
+2025-08-02 21:24:32,351 - INFO -    Removed 2225 samples with extreme norms
+2025-08-02 21:24:34,671 - INFO -    Final outlier removal: 4252 samples (14.2%)
+2025-08-02 21:24:44,198 - INFO - ✅ ULTRA-CONSERVATIVE CLIP normalization statistics computed:
+2025-08-02 21:24:44,198 - INFO -    Median range: [-7.250000, 5.851562]
+2025-08-02 21:24:44,198 - INFO -    Std range: [0.924479, 4.898727]
+2025-08-02 21:24:44,198 - INFO -    Scale factor: 1.50 (ULTRA-CONSERVATIVE)
+2025-08-02 21:24:44,199 - INFO -    Data range (1%-99%): [-10.500, 10.457]
+2025-08-02 21:24:44,200 - INFO -    Normalized range: [-3.69, 3.75]
+2025-08-02 21:24:44,200 - INFO -    ✅ Normalization validation passed - safe for training
+2025-08-02 21:24:44,214 - INFO - Using manifest for length estimation: 7,828 samples
+2025-08-02 21:24:44,214 - INFO - ULTRA-CONSERVATIVE CLIP Reproduction Dataset initialized:
+2025-08-02 21:24:44,214 - INFO -   Directory: /scratch-shared/azadaianchuk1/blip3o_workspace/embeddings/patch_only_256_tokens
+2025-08-02 21:24:44,214 - INFO -   Mode: patch_only (256 tokens)
+2025-08-02 21:24:44,214 - INFO -   TARGET: CLIP embeddings [B, N, 1024] (ULTRA-CONSERVATIVE NORMALIZATION)
+2025-08-02 21:24:44,214 - INFO -   CONDITIONING: EVA embeddings [B, N, 4096]
+2025-08-02 21:24:44,214 - INFO -   Shards: 3
+2025-08-02 21:24:44,214 - INFO -   ✅ ULTRA-CONSERVATIVE CLIP normalization: ENABLED
+2025-08-02 21:24:44,215 - INFO - ✅ ULTRA-CONSERVATIVE CLIP reproduction dataloaders created
+2025-08-02 21:24:44,215 - INFO -   Training dataset length: 7,828
+2025-08-02 21:24:44,215 - INFO -   Evaluation dataset length: 7,828
+2025-08-02 21:24:44,215 - INFO -   🔥 ULTRA-CONSERVATIVE CLIP normalization: PROPERLY CONFIGURED
+2025-08-02 21:24:44,215 - INFO - ✅ ULTRA-CONSERVATIVE dataloaders created successfully:
+2025-08-02 21:24:44,215 - INFO -   Training mode: patch_only
+2025-08-02 21:24:44,215 - INFO -   Batch size: 64
+2025-08-02 21:24:44,215 - INFO -   Max shards: 3
+2025-08-02 21:24:44,215 - INFO -   🔥 ULTRA-CONSERVATIVE CLIP normalization: ✅ CONFIGURED
+2025-08-02 21:24:49,160 - INFO - ✅ Dataloader test successful:
+2025-08-02 21:24:49,162 - INFO -   Batch size: 64
+2025-08-02 21:24:49,162 - INFO -   CLIP embeddings shape: torch.Size([64, 256, 1024])
+2025-08-02 21:24:49,162 - INFO -   EVA embeddings shape: torch.Size([64, 256, 4096])
+2025-08-02 21:24:49,162 - INFO -   🔥 CLIP normalizer: ✅ AVAILABLE
+2025-08-02 21:24:49,163 - INFO -      Stats computed: True
+2025-08-02 21:24:49,163 - INFO -      Scale factor: 1.50 (ULTRA-CONSERVATIVE)
+2025-08-02 21:24:49,164 - INFO -      Normalized range: [-8.00, 8.00]
+2025-08-02 21:24:49,164 - INFO -      ✅ Normalization range acceptable for training
+2025-08-02 21:24:49,164 - INFO - 🏃 Creating trainer...
+2025-08-02 21:24:49,168 - INFO - Got exact dataloader length: 122
+2025-08-02 21:24:49,169 - INFO - ✅ Conservative optimizer setup complete
+2025-08-02 21:24:49,170 - INFO - ✅ Mixed precision enabled
+2025-08-02 21:24:49,170 - INFO - ✅ ENHANCED BLIP3-o Trainer initialized
+2025-08-02 21:24:49,170 - INFO -   Device: cuda
+2025-08-02 21:24:49,171 - INFO -   Parameters: 227,474,014
+2025-08-02 21:24:49,171 - INFO -   CLIP normalizer: ✅ AVAILABLE
+2025-08-02 21:24:49,171 - INFO -   🔥 DENORMALIZED EVALUATION: ✅ ENABLED
+2025-08-02 21:24:49,171 - INFO -   📊 Image generation validation: Ready
+2025-08-02 21:24:49,171 - INFO - ✅ ULTRA-CONSERVATIVE trainer created successfully:
+2025-08-02 21:24:49,171 - INFO -   Evaluation: Every 50 steps
+2025-08-02 21:24:49,171 - INFO -   WandB enabled: False
+2025-08-02 21:24:49,171 - INFO -   CLIP normalizer: ✅ AVAILABLE
+2025-08-02 21:24:49,171 - INFO -   Heun inference: ✅ ENABLED
+2025-08-02 21:24:49,171 - INFO - 💾 Saving experiment configuration...
+2025-08-02 21:24:49,173 - INFO - ✅ Configuration saved to checkpoints/blip3o_clean_20250802_212334/experiment_config.json
+2025-08-02 21:24:49,173 - INFO - 
 🚀 Starting ULTRA-CONSERVATIVE BLIP3-o training...
-2025-08-02 20:32:16,427 - INFO - ================================================================================
-2025-08-02 20:32:16,427 - INFO - 🎯 Expected Results:
-2025-08-02 20:32:16,427 - INFO -    • Stable training without normalization crashes
-2025-08-02 20:32:16,427 - INFO -    • Gradual improvement in CLIP similarity
-2025-08-02 20:32:16,427 - INFO -    • No extreme gradient/loss spikes
-2025-08-02 20:32:16,427 - INFO -    • Robust handling of outliers
-2025-08-02 20:32:16,427 - INFO - ================================================================================
-2025-08-02 20:32:16,427 - INFO - 🚀 Starting ULTRA-CONSERVATIVE BLIP3-o training...
-2025-08-02 20:32:16,427 - INFO -   🔒 Ultra-conservative features enabled
-2025-08-02 20:32:16,427 - INFO -   🔒 Enhanced stability monitoring active
-2025-08-02 20:32:16,429 - INFO - Starting epoch 1/10
-2025-08-02 20:32:27,385 - INFO - Step 10: Loss=1.898528, GradNorm=13034.154, Failures=0
-2025-08-02 20:32:27,982 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:32:28,596 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:32:29,208 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:32:29,820 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:32:30,432 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:32:31,044 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:32:31,658 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:32:32,272 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:32:32,884 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:32:33,496 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:32:33,512 - INFO - Step 20: Loss=1.911685, GradNorm=23388.677, Failures=0
-2025-08-02 20:32:34,109 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:32:34,720 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:32:35,334 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:32:35,945 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:32:36,559 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:32:37,171 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:32:37,785 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:32:38,397 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:32:39,009 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:32:39,622 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:32:39,639 - INFO - Step 30: Loss=1.886940, GradNorm=15279.431, Failures=0
-2025-08-02 20:32:40,235 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:32:40,848 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:32:41,461 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:32:42,072 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:32:42,685 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:32:43,298 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:32:43,911 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:32:44,524 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:32:45,137 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:32:45,750 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:32:45,767 - INFO - Step 40: Loss=1.893352, GradNorm=33169.623, Failures=0
-2025-08-02 20:32:50,982 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:32:51,595 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:32:52,209 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:32:52,825 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:32:53,438 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:32:54,054 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:32:54,668 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:32:55,281 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:32:55,895 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:32:56,508 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:32:56,524 - INFO - Step 50: Loss=1.859359, GradNorm=229806.940, Failures=0
-2025-08-02 20:32:56,524 - INFO - Running evaluation at step 50...
-2025-08-02 20:32:56,524 - INFO - Starting ULTRA-CONSERVATIVE evaluation with 100 samples
-2025-08-02 20:33:42,979 - INFO - ✅ ULTRA-CONSERVATIVE evaluation completed: 128 samples
-2025-08-02 20:33:42,981 - INFO -    CLIP similarity: 0.8772
-2025-08-02 20:33:42,981 - INFO -    Success rate: 100.0%
-2025-08-02 20:33:42,984 - INFO - ✅ Evaluation: CLIP similarity = 0.8772
-2025-08-02 20:33:42,984 - INFO - 🎉 NEW BEST similarity: 0.8772
-2025-08-02 20:33:43,576 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:33:44,185 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:33:44,794 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:33:45,403 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:33:46,012 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:33:46,621 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:33:47,230 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:33:47,840 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:33:48,449 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:33:49,058 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:33:49,075 - INFO - Step 60: Loss=1.868018, GradNorm=70403.018, Failures=0
-2025-08-02 20:33:49,667 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:33:50,275 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:33:50,884 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:33:51,493 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:33:52,101 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:33:52,711 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:33:53,320 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:33:53,929 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:33:54,539 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:33:55,147 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:33:55,164 - INFO - Step 70: Loss=1.844938, GradNorm=46808.997, Failures=0
-2025-08-02 20:33:55,757 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:33:56,366 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:33:56,975 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:33:57,584 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:33:58,192 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:33:58,800 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:33:59,409 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:34:00,018 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:34:00,628 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:34:01,237 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:34:01,253 - INFO - Step 80: Loss=1.863383, GradNorm=27418.043, Failures=0
-2025-08-02 20:34:01,846 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:34:06,982 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:34:07,593 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:34:08,202 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:34:08,810 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:34:09,419 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:34:10,028 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:34:10,637 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:34:11,247 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:34:11,856 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:34:11,872 - INFO - Step 90: Loss=1.826092, GradNorm=103111.304, Failures=0
-2025-08-02 20:34:12,465 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:34:13,073 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:34:13,682 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:34:14,291 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:34:14,900 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:34:15,509 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:34:16,118 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:34:16,727 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:34:17,335 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:34:17,944 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:34:17,960 - INFO - Step 100: Loss=1.816287, GradNorm=32932.058, Failures=0
-2025-08-02 20:34:17,960 - INFO - Running evaluation at step 100...
-2025-08-02 20:34:17,960 - INFO - Starting ULTRA-CONSERVATIVE evaluation with 100 samples
-2025-08-02 20:35:05,275 - INFO - ✅ ULTRA-CONSERVATIVE evaluation completed: 128 samples
-2025-08-02 20:35:05,276 - INFO -    CLIP similarity: 0.8915
-2025-08-02 20:35:05,276 - INFO -    Success rate: 100.0%
-2025-08-02 20:35:05,279 - INFO - ✅ Evaluation: CLIP similarity = 0.8915
-2025-08-02 20:35:05,279 - INFO - 🎉 NEW BEST similarity: 0.8915
-2025-08-02 20:35:05,873 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:35:06,482 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:35:07,091 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:35:07,699 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:35:08,308 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:35:08,917 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:35:09,527 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:35:10,135 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:35:10,744 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:35:11,353 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:35:11,369 - INFO - Step 110: Loss=1.796984, GradNorm=11132.809, Failures=0
-2025-08-02 20:35:11,963 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:35:12,572 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:35:13,182 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:35:13,791 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:35:14,400 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:35:15,009 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:35:15,617 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:35:16,225 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:35:16,834 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:35:17,442 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:35:17,459 - INFO - Step 120: Loss=1.830128, GradNorm=9769.194, Failures=0
-2025-08-02 20:35:18,051 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:35:18,662 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:35:18,830 - INFO - Iteration completed: 7832 samples processed
-2025-08-02 20:35:18,830 - INFO - Epoch 1 completed: 122 batches, 0 failures
-2025-08-02 20:35:18,844 - INFO - Epoch 1 summary:
-2025-08-02 20:35:18,845 - INFO -   Average loss: 1.855066
-2025-08-02 20:35:18,845 - INFO -   Failure rate: 0.0%
-2025-08-02 20:35:18,845 - INFO -   Emergency LR reductions: 0
-2025-08-02 20:35:18,845 - INFO -   Best similarity: 0.8915
-2025-08-02 20:35:18,845 - INFO - Starting epoch 2/10
-2025-08-02 20:35:23,728 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:35:24,337 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:35:24,946 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:35:25,555 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:35:26,164 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:35:26,772 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:35:27,380 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:35:27,992 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:35:28,008 - INFO - Step 130: Loss=1.846730, GradNorm=9755.125, Failures=0
-2025-08-02 20:35:28,601 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:35:29,211 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:35:29,821 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:35:30,431 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:35:31,040 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:35:31,649 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:35:32,258 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:35:32,866 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:35:33,473 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:35:34,081 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:35:34,097 - INFO - Step 140: Loss=1.789671, GradNorm=18997.465, Failures=0
-2025-08-02 20:35:34,689 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:35:35,298 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:35:35,906 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:35:36,531 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:35:37,140 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:35:37,749 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:35:38,357 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:35:38,966 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:35:39,574 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:35:40,183 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:35:40,200 - INFO - Step 150: Loss=1.788228, GradNorm=5857.327, Failures=0
-2025-08-02 20:35:40,200 - INFO - Running evaluation at step 150...
-2025-08-02 20:35:40,200 - INFO - Starting ULTRA-CONSERVATIVE evaluation with 100 samples
-2025-08-02 20:36:27,045 - INFO - ✅ ULTRA-CONSERVATIVE evaluation completed: 128 samples
-2025-08-02 20:36:27,046 - INFO -    CLIP similarity: 0.8917
-2025-08-02 20:36:27,046 - INFO -    Success rate: 100.0%
-2025-08-02 20:36:27,049 - INFO - ✅ Evaluation: CLIP similarity = 0.8917
-2025-08-02 20:36:27,049 - INFO - 🎉 NEW BEST similarity: 0.8917
-2025-08-02 20:36:27,644 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:36:28,253 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:36:28,862 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:36:29,471 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:36:30,080 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:36:30,689 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:36:31,299 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:36:31,908 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:36:32,517 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:36:33,127 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:36:33,143 - INFO - Step 160: Loss=1.842548, GradNorm=21776.241, Failures=0
-2025-08-02 20:36:33,736 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:36:34,345 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:36:39,504 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:36:40,114 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:36:40,723 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:36:41,332 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:36:41,940 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:36:42,548 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:36:43,157 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:36:43,765 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:36:43,781 - INFO - Step 170: Loss=1.835438, GradNorm=16754.487, Failures=0
-2025-08-02 20:36:44,373 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:36:44,981 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:36:45,590 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:36:46,199 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:36:46,808 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:36:47,416 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:36:48,025 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:36:48,634 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:36:49,242 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:36:49,851 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:36:49,867 - INFO - Step 180: Loss=1.781056, GradNorm=8821.254, Failures=0
-2025-08-02 20:36:50,462 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:36:51,073 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:36:51,683 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:36:52,292 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:36:52,901 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:36:53,510 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:36:54,119 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:36:54,727 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:36:55,335 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:36:55,943 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:36:55,959 - INFO - Step 190: Loss=1.805413, GradNorm=12747.886, Failures=0
-2025-08-02 20:36:56,551 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:36:57,160 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:36:57,768 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:36:58,376 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:36:58,985 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:36:59,593 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:37:00,205 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:37:00,814 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:37:01,423 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:37:02,031 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:37:02,047 - INFO - Step 200: Loss=1.800605, GradNorm=20845.041, Failures=0
-2025-08-02 20:37:02,047 - INFO - Running evaluation at step 200...
-2025-08-02 20:37:02,047 - INFO - Starting ULTRA-CONSERVATIVE evaluation with 100 samples
-2025-08-02 20:37:48,675 - INFO - ✅ ULTRA-CONSERVATIVE evaluation completed: 128 samples
-2025-08-02 20:37:48,675 - INFO -    CLIP similarity: 0.8949
-2025-08-02 20:37:48,675 - INFO -    Success rate: 100.0%
-2025-08-02 20:37:48,678 - INFO - ✅ Evaluation: CLIP similarity = 0.8949
-2025-08-02 20:37:48,678 - INFO - 🎉 NEW BEST similarity: 0.8949
-2025-08-02 20:37:49,271 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:37:49,880 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:37:50,488 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:37:55,837 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:37:56,449 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:37:57,059 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:37:57,669 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:37:58,278 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:37:58,887 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:37:59,496 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:37:59,513 - INFO - Step 210: Loss=1.824541, GradNorm=5653.767, Failures=0
-2025-08-02 20:38:00,105 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:38:00,714 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:38:01,323 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:38:01,933 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:38:02,542 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:38:03,151 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:38:03,761 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:38:04,369 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:38:04,979 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:38:05,588 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:38:05,604 - INFO - Step 220: Loss=1.820812, GradNorm=5914.827, Failures=0
-2025-08-02 20:38:06,197 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:38:06,806 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:38:07,414 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:38:08,023 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:38:08,633 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:38:09,242 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:38:09,851 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:38:10,460 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:38:11,069 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:38:11,678 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:38:11,695 - INFO - Step 230: Loss=1.772303, GradNorm=21940.005, Failures=0
-2025-08-02 20:38:12,288 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:38:12,898 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:38:13,507 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:38:14,117 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:38:14,726 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:38:15,336 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:38:15,945 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:38:16,554 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:38:17,164 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:38:17,773 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:38:17,790 - INFO - Step 240: Loss=1.810720, GradNorm=12316.461, Failures=0
-2025-08-02 20:38:18,382 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:38:18,991 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:38:19,601 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:38:20,210 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:38:20,379 - INFO - Iteration completed: 7832 samples processed
-2025-08-02 20:38:20,379 - INFO - Epoch 2 completed: 122 batches, 0 failures
-2025-08-02 20:38:20,393 - INFO - Epoch 2 summary:
-2025-08-02 20:38:20,393 - INFO -   Average loss: 1.798720
-2025-08-02 20:38:20,393 - INFO -   Failure rate: 0.0%
-2025-08-02 20:38:20,393 - INFO -   Emergency LR reductions: 0
-2025-08-02 20:38:20,394 - INFO -   Best similarity: 0.8949
-2025-08-02 20:38:20,394 - INFO - Starting epoch 3/10
-2025-08-02 20:38:25,345 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:38:25,954 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:38:26,564 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:38:27,172 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:38:27,782 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:38:28,391 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:38:28,408 - INFO - Step 250: Loss=1.786309, GradNorm=5741.495, Failures=0
-2025-08-02 20:38:28,408 - INFO - Running evaluation at step 250...
-2025-08-02 20:38:28,408 - INFO - Starting ULTRA-CONSERVATIVE evaluation with 100 samples
-2025-08-02 20:39:15,263 - INFO - ✅ ULTRA-CONSERVATIVE evaluation completed: 128 samples
-2025-08-02 20:39:15,265 - INFO -    CLIP similarity: 0.8999
-2025-08-02 20:39:15,265 - INFO -    Success rate: 100.0%
-2025-08-02 20:39:15,268 - INFO - ✅ Evaluation: CLIP similarity = 0.8999
-2025-08-02 20:39:15,268 - INFO - 🎉 NEW BEST similarity: 0.8999
-2025-08-02 20:39:15,862 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:39:16,472 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:39:17,082 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:39:17,692 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:39:18,301 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:39:18,911 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:39:19,520 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:39:20,131 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:39:20,740 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:39:21,350 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:39:21,367 - INFO - Step 260: Loss=1.805391, GradNorm=9887.864, Failures=0
-2025-08-02 20:39:21,959 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:39:22,569 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:39:23,178 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:39:23,787 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:39:24,397 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:39:25,006 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:39:25,616 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:39:26,226 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:39:26,836 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:39:27,444 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:39:27,461 - INFO - Step 270: Loss=1.791784, GradNorm=6045.230, Failures=0
-2025-08-02 20:39:28,054 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:39:28,663 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:39:29,272 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:39:29,882 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:39:30,492 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:39:31,101 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:39:31,711 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:39:32,320 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:39:32,929 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:39:33,539 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:39:33,556 - INFO - Step 280: Loss=1.812215, GradNorm=6685.516, Failures=0
-2025-08-02 20:39:34,148 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:39:34,758 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:39:35,367 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:39:35,977 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:39:41,179 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:39:41,790 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:39:42,401 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:39:43,012 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:39:43,623 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:39:44,233 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:39:44,250 - INFO - Step 290: Loss=1.842075, GradNorm=7707.081, Failures=0
-2025-08-02 20:39:44,843 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:39:45,453 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:39:46,061 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:39:46,671 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:39:47,280 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:39:47,889 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:39:48,498 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:39:49,107 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:39:49,715 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:39:50,323 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:39:50,340 - INFO - Step 300: Loss=1.804898, GradNorm=7591.204, Failures=0
-2025-08-02 20:39:50,340 - INFO - Running evaluation at step 300...
-2025-08-02 20:39:50,340 - INFO - Starting ULTRA-CONSERVATIVE evaluation with 100 samples
-2025-08-02 20:40:37,062 - INFO - ✅ ULTRA-CONSERVATIVE evaluation completed: 128 samples
-2025-08-02 20:40:37,062 - INFO -    CLIP similarity: 0.8819
-2025-08-02 20:40:37,062 - INFO -    Success rate: 100.0%
-2025-08-02 20:40:37,065 - INFO - ✅ Evaluation: CLIP similarity = 0.8819
-2025-08-02 20:40:37,659 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:40:38,269 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:40:38,878 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:40:39,488 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:40:40,097 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:40:40,707 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:40:41,317 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:40:41,927 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:40:42,536 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:40:43,147 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:40:43,163 - INFO - Step 310: Loss=1.773946, GradNorm=7115.929, Failures=0
-2025-08-02 20:40:43,756 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:40:44,366 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:40:44,976 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:40:45,588 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:40:46,197 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:40:46,809 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:40:47,419 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:40:48,028 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:40:48,638 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:40:49,247 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:40:49,263 - INFO - Step 320: Loss=1.769961, GradNorm=7965.297, Failures=0
-2025-08-02 20:40:49,857 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:40:50,466 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:40:51,075 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:40:51,685 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:40:52,294 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:40:57,384 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:40:57,994 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:40:58,603 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:40:59,212 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:40:59,821 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:40:59,837 - INFO - Step 330: Loss=1.761924, GradNorm=8483.927, Failures=0
-2025-08-02 20:41:00,431 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:41:01,040 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:41:01,649 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:41:02,259 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:41:02,868 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:41:03,477 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:41:04,086 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:41:04,696 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:41:05,304 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:41:05,914 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:41:05,930 - INFO - Step 340: Loss=1.825439, GradNorm=6364.543, Failures=0
-2025-08-02 20:41:06,540 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:41:07,149 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:41:07,760 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:41:08,370 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:41:08,979 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:41:09,589 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:41:10,198 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:41:10,808 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:41:11,418 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:41:12,026 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:41:12,043 - INFO - Step 350: Loss=1.754649, GradNorm=5436.289, Failures=0
-2025-08-02 20:41:12,043 - INFO - Running evaluation at step 350...
-2025-08-02 20:41:12,043 - INFO - Starting ULTRA-CONSERVATIVE evaluation with 100 samples
-2025-08-02 20:41:58,670 - INFO - ✅ ULTRA-CONSERVATIVE evaluation completed: 128 samples
-2025-08-02 20:41:58,671 - INFO -    CLIP similarity: 0.9024
-2025-08-02 20:41:58,671 - INFO -    Success rate: 100.0%
-2025-08-02 20:41:58,674 - INFO - ✅ Evaluation: CLIP similarity = 0.9024
-2025-08-02 20:41:58,674 - INFO - 🎉 NEW BEST similarity: 0.9024
-2025-08-02 20:41:59,269 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:41:59,878 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:42:00,489 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:42:01,098 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:42:01,707 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:42:02,316 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:42:02,926 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:42:03,536 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:42:04,145 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:42:04,755 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:42:04,771 - INFO - Step 360: Loss=1.747406, GradNorm=8146.087, Failures=0
-2025-08-02 20:42:05,364 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:42:05,973 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:42:06,582 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:42:07,191 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:42:07,800 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:42:08,408 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:42:08,576 - INFO - Iteration completed: 7832 samples processed
-2025-08-02 20:42:08,576 - INFO - Epoch 3 completed: 122 batches, 0 failures
-2025-08-02 20:42:08,591 - INFO - Epoch 3 summary:
-2025-08-02 20:42:08,591 - INFO -   Average loss: 1.789628
-2025-08-02 20:42:08,591 - INFO -   Failure rate: 0.0%
-2025-08-02 20:42:08,591 - INFO -   Emergency LR reductions: 0
-2025-08-02 20:42:08,591 - INFO -   Best similarity: 0.9024
-2025-08-02 20:42:08,591 - INFO - Starting epoch 4/10
-2025-08-02 20:42:13,567 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:42:14,176 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:42:14,786 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:42:15,393 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:42:15,409 - INFO - Step 370: Loss=1.765833, GradNorm=15804.794, Failures=0
-2025-08-02 20:42:16,003 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:42:16,611 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:42:17,220 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:42:17,829 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:42:18,439 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:42:19,047 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:42:19,656 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:42:20,266 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:42:20,874 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:42:21,483 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:42:21,500 - INFO - Step 380: Loss=1.814064, GradNorm=13370.447, Failures=0
-2025-08-02 20:42:22,093 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:42:22,702 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:42:23,311 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:42:23,920 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:42:24,529 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:42:25,141 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:42:25,751 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:42:26,362 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:42:26,971 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:42:27,581 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:42:27,598 - INFO - Step 390: Loss=1.799646, GradNorm=6812.120, Failures=0
-2025-08-02 20:42:28,191 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:42:28,802 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:42:29,411 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:42:30,019 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:42:30,628 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:42:31,238 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:42:31,854 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:42:32,469 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:42:33,078 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:42:33,687 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:42:33,704 - INFO - Step 400: Loss=1.807635, GradNorm=9183.256, Failures=0
-2025-08-02 20:42:33,704 - INFO - Running evaluation at step 400...
-2025-08-02 20:42:33,704 - INFO - Starting ULTRA-CONSERVATIVE evaluation with 100 samples
-2025-08-02 20:43:20,491 - INFO - ✅ ULTRA-CONSERVATIVE evaluation completed: 128 samples
-2025-08-02 20:43:20,492 - INFO -    CLIP similarity: 0.9009
-2025-08-02 20:43:20,492 - INFO -    Success rate: 100.0%
-2025-08-02 20:43:20,495 - INFO - ✅ Evaluation: CLIP similarity = 0.9009
-2025-08-02 20:43:21,088 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:43:21,698 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:43:22,307 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:43:22,916 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:43:23,526 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:43:24,135 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:43:29,376 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:43:29,987 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:43:30,598 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:43:31,207 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:43:31,224 - INFO - Step 410: Loss=1.782838, GradNorm=10541.553, Failures=0
-2025-08-02 20:43:31,819 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:43:32,430 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:43:33,041 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:43:33,650 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:43:34,259 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:43:34,868 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:43:35,477 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:43:36,087 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:43:36,696 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:43:37,304 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:43:37,321 - INFO - Step 420: Loss=1.781623, GradNorm=8001.736, Failures=0
-2025-08-02 20:43:37,914 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:43:38,522 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:43:39,132 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:43:39,742 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:43:40,351 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:43:40,960 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:43:41,570 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:43:42,178 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:43:42,788 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:43:43,397 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:43:43,413 - INFO - Step 430: Loss=1.816154, GradNorm=10424.579, Failures=0
-2025-08-02 20:43:44,007 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:43:44,617 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:43:45,226 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:43:45,834 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:43:46,444 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:43:47,052 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:43:47,662 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:43:48,271 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:43:48,881 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:43:49,490 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:43:49,506 - INFO - Step 440: Loss=1.742784, GradNorm=10408.256, Failures=0
-2025-08-02 20:43:50,099 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:43:50,709 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:43:51,318 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:43:51,927 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:43:52,537 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:43:53,145 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:43:53,755 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:43:58,744 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:43:59,354 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:43:59,963 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:43:59,979 - INFO - Step 450: Loss=1.748815, GradNorm=9057.110, Failures=0
-2025-08-02 20:43:59,979 - INFO - Running evaluation at step 450...
-2025-08-02 20:43:59,980 - INFO - Starting ULTRA-CONSERVATIVE evaluation with 100 samples
-2025-08-02 20:44:46,751 - INFO - ✅ ULTRA-CONSERVATIVE evaluation completed: 128 samples
-2025-08-02 20:44:46,754 - INFO -    CLIP similarity: 0.8988
-2025-08-02 20:44:46,754 - INFO -    Success rate: 100.0%
-2025-08-02 20:44:46,757 - INFO - ✅ Evaluation: CLIP similarity = 0.8988
-2025-08-02 20:44:47,350 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:44:47,960 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:44:48,570 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:44:49,180 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:44:49,789 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:44:50,397 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:44:51,006 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:44:51,616 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:44:52,225 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:44:52,835 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:44:52,851 - INFO - Step 460: Loss=1.742705, GradNorm=6010.357, Failures=0
-2025-08-02 20:44:53,445 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:44:54,054 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:44:54,663 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:44:55,271 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:44:55,880 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:44:56,490 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:44:57,098 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:44:57,707 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:44:58,320 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:44:58,931 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:44:58,947 - INFO - Step 470: Loss=1.816529, GradNorm=10505.604, Failures=0
-2025-08-02 20:44:59,541 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:45:00,151 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:45:00,762 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:45:01,372 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:45:01,980 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:45:02,590 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:45:03,198 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:45:03,807 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:45:04,416 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:45:05,025 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:45:05,041 - INFO - Step 480: Loss=1.781234, GradNorm=11318.919, Failures=0
-2025-08-02 20:45:05,635 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:45:06,244 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:45:06,854 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:45:07,462 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:45:08,072 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:45:08,681 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:45:09,291 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:45:09,900 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:45:10,069 - INFO - Iteration completed: 7832 samples processed
-2025-08-02 20:45:10,070 - INFO - Epoch 4 completed: 122 batches, 0 failures
-2025-08-02 20:45:10,084 - INFO - Epoch 4 summary:
-2025-08-02 20:45:10,084 - INFO -   Average loss: 1.767747
-2025-08-02 20:45:10,084 - INFO -   Failure rate: 0.0%
-2025-08-02 20:45:10,084 - INFO -   Emergency LR reductions: 0
-2025-08-02 20:45:10,084 - INFO -   Best similarity: 0.9024
-2025-08-02 20:45:10,084 - INFO - Starting epoch 5/10
-2025-08-02 20:45:15,105 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:45:15,716 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:45:15,732 - INFO - Step 490: Loss=1.753627, GradNorm=12126.883, Failures=0
-2025-08-02 20:45:16,325 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:45:16,934 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:45:17,543 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:45:18,151 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:45:18,760 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:45:19,368 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:45:19,977 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:45:20,586 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:45:21,195 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:45:21,805 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:45:21,821 - INFO - Step 500: Loss=1.756760, GradNorm=6654.720, Failures=0
-2025-08-02 20:45:21,821 - INFO - Running evaluation at step 500...
-2025-08-02 20:45:21,821 - INFO - Starting ULTRA-CONSERVATIVE evaluation with 100 samples
-2025-08-02 20:46:08,479 - INFO - ✅ ULTRA-CONSERVATIVE evaluation completed: 128 samples
-2025-08-02 20:46:08,479 - INFO -    CLIP similarity: 0.9046
-2025-08-02 20:46:08,479 - INFO -    Success rate: 100.0%
-2025-08-02 20:46:08,482 - INFO - ✅ Evaluation: CLIP similarity = 0.9046
-2025-08-02 20:46:08,482 - INFO - 🎉 NEW BEST similarity: 0.9046
-2025-08-02 20:46:10,309 - INFO - ✅ Checkpoint saved: checkpoints/blip3o_clean_20250802_203106/checkpoint_step_500.pt
-2025-08-02 20:46:10,903 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:46:11,513 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:46:12,122 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:46:12,731 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:46:13,341 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:46:13,950 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:46:14,560 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:46:15,169 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:46:15,779 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:46:16,388 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:46:16,404 - INFO - Step 510: Loss=1.767943, GradNorm=6679.358, Failures=0
-2025-08-02 20:46:16,997 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:46:17,606 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:46:18,215 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:46:18,825 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:46:19,434 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:46:20,042 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:46:20,651 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:46:21,260 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:46:21,869 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:46:22,478 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:46:22,494 - INFO - Step 520: Loss=1.794567, GradNorm=5431.336, Failures=0
-2025-08-02 20:46:23,087 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:46:23,697 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:46:24,306 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:46:24,915 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:46:25,524 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:46:26,133 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:46:26,742 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:46:27,350 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:46:32,537 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:46:33,146 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:46:33,163 - INFO - Step 530: Loss=1.755512, GradNorm=6580.338, Failures=0
-2025-08-02 20:46:33,758 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:46:34,369 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:46:34,980 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:46:35,589 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:46:36,199 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:46:36,808 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:46:37,417 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:46:38,027 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:46:38,637 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:46:39,246 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:46:39,262 - INFO - Step 540: Loss=1.799278, GradNorm=10132.576, Failures=0
-2025-08-02 20:46:39,856 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:46:40,466 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:46:41,076 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:46:41,685 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:46:42,295 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:46:42,904 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:46:43,514 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:46:44,123 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:46:44,733 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:46:45,342 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:46:45,359 - INFO - Step 550: Loss=1.782552, GradNorm=8244.820, Failures=0
-2025-08-02 20:46:45,359 - INFO - Running evaluation at step 550...
-2025-08-02 20:46:45,359 - INFO - Starting ULTRA-CONSERVATIVE evaluation with 100 samples
-2025-08-02 20:47:32,016 - INFO - ✅ ULTRA-CONSERVATIVE evaluation completed: 128 samples
-2025-08-02 20:47:32,017 - INFO -    CLIP similarity: 0.8981
-2025-08-02 20:47:32,017 - INFO -    Success rate: 100.0%
-2025-08-02 20:47:32,019 - INFO - ✅ Evaluation: CLIP similarity = 0.8981
-2025-08-02 20:47:32,613 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:47:33,222 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:47:33,831 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:47:34,440 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:47:35,050 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:47:35,658 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:47:36,268 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:47:36,878 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:47:37,488 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:47:38,098 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:47:38,115 - INFO - Step 560: Loss=1.791837, GradNorm=9447.266, Failures=0
-2025-08-02 20:47:38,709 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:47:39,319 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:47:39,928 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:47:40,537 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:47:41,147 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:47:41,756 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:47:42,365 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:47:42,974 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:47:43,583 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:47:49,008 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:47:49,025 - INFO - Step 570: Loss=1.789498, GradNorm=8300.765, Failures=0
-2025-08-02 20:47:49,618 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:47:50,226 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:47:50,835 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:47:51,444 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:47:52,052 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:47:52,662 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:47:53,272 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:47:53,880 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:47:54,490 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:47:55,099 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:47:55,115 - INFO - Step 580: Loss=1.831128, GradNorm=15534.146, Failures=0
-2025-08-02 20:47:55,709 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:47:56,318 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:47:56,927 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:47:57,536 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:47:58,146 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:47:58,755 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:47:59,364 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:47:59,974 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:48:00,583 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:48:01,192 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:48:01,209 - INFO - Step 590: Loss=1.734144, GradNorm=6288.017, Failures=0
-2025-08-02 20:48:01,802 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:48:02,410 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:48:03,020 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:48:03,628 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:48:04,238 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:48:04,847 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:48:05,455 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:48:06,064 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:48:06,673 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:48:07,282 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:48:07,299 - INFO - Step 600: Loss=1.797628, GradNorm=25688.754, Failures=0
-2025-08-02 20:48:07,299 - INFO - Running evaluation at step 600...
-2025-08-02 20:48:07,299 - INFO - Starting ULTRA-CONSERVATIVE evaluation with 100 samples
-2025-08-02 20:48:54,242 - INFO - ✅ ULTRA-CONSERVATIVE evaluation completed: 128 samples
-2025-08-02 20:48:54,244 - INFO -    CLIP similarity: 0.8979
-2025-08-02 20:48:54,244 - INFO -    Success rate: 100.0%
-2025-08-02 20:48:54,246 - INFO - ✅ Evaluation: CLIP similarity = 0.8979
-2025-08-02 20:48:54,841 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:48:55,450 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:48:56,060 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:48:56,670 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:48:57,279 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:48:57,889 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:48:58,499 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:48:59,107 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:48:59,717 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:49:00,327 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:49:00,343 - INFO - Step 610: Loss=1.721246, GradNorm=5842.347, Failures=0
-2025-08-02 20:49:00,490 - INFO - Iteration completed: 7832 samples processed
-2025-08-02 20:49:00,490 - INFO - Epoch 5 completed: 122 batches, 0 failures
-2025-08-02 20:49:00,504 - INFO - Epoch 5 summary:
-2025-08-02 20:49:00,505 - INFO -   Average loss: 1.759515
-2025-08-02 20:49:00,505 - INFO -   Failure rate: 0.0%
-2025-08-02 20:49:00,505 - INFO -   Emergency LR reductions: 0
-2025-08-02 20:49:00,505 - INFO -   Best similarity: 0.9046
-2025-08-02 20:49:00,505 - INFO - Starting epoch 6/10
-2025-08-02 20:49:05,804 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:49:06,413 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:49:07,023 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:49:07,633 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:49:08,242 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:49:08,851 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:49:09,461 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:49:10,070 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:49:10,679 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:49:11,288 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:49:11,305 - INFO - Step 620: Loss=1.782535, GradNorm=6462.731, Failures=0
-2025-08-02 20:49:11,897 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:49:12,507 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:49:13,115 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:49:13,724 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:49:14,334 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:49:14,943 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:49:15,553 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:49:16,162 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:49:16,776 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:49:17,385 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:49:17,402 - INFO - Step 630: Loss=1.742379, GradNorm=6669.457, Failures=0
-2025-08-02 20:49:17,994 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:49:18,605 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:49:19,215 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:49:19,825 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:49:20,435 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:49:21,044 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:49:21,653 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:49:22,262 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:49:22,870 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:49:23,480 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:49:23,496 - INFO - Step 640: Loss=1.775370, GradNorm=11418.475, Failures=0
-2025-08-02 20:49:24,089 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:49:24,698 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:49:25,307 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:49:25,918 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:49:26,527 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:49:27,136 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:49:27,747 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:49:28,356 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:49:28,965 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:49:29,576 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:49:29,593 - INFO - Step 650: Loss=1.709135, GradNorm=7871.067, Failures=0
-2025-08-02 20:49:29,594 - INFO - Running evaluation at step 650...
-2025-08-02 20:49:29,594 - INFO - Starting ULTRA-CONSERVATIVE evaluation with 100 samples
-2025-08-02 20:50:16,344 - INFO - ✅ ULTRA-CONSERVATIVE evaluation completed: 128 samples
-2025-08-02 20:50:16,345 - INFO -    CLIP similarity: 0.8964
-2025-08-02 20:50:16,345 - INFO -    Success rate: 100.0%
-2025-08-02 20:50:16,348 - INFO - ✅ Evaluation: CLIP similarity = 0.8964
-2025-08-02 20:50:21,624 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:50:22,235 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:50:22,846 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:50:23,455 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:50:24,064 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:50:24,672 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:50:25,281 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:50:25,890 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:50:26,500 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:50:27,109 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:50:27,125 - INFO - Step 660: Loss=1.753762, GradNorm=13818.326, Failures=0
-2025-08-02 20:50:27,718 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:50:28,327 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:50:28,936 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:50:29,544 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:50:30,153 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:50:30,762 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:50:31,372 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:50:31,981 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:50:32,590 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:50:33,199 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:50:33,215 - INFO - Step 670: Loss=1.743650, GradNorm=6187.559, Failures=0
-2025-08-02 20:50:33,807 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:50:34,416 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:50:35,024 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:50:35,633 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:50:36,242 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:50:36,850 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:50:37,459 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:50:38,067 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:50:38,675 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:50:39,284 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:50:39,300 - INFO - Step 680: Loss=1.754150, GradNorm=8840.276, Failures=0
-2025-08-02 20:50:39,893 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:50:40,502 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:50:41,111 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:50:41,720 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:50:42,329 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:50:42,937 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:50:43,547 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:50:44,156 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:50:44,765 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:50:45,374 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:50:45,390 - INFO - Step 690: Loss=1.724409, GradNorm=8222.584, Failures=0
-2025-08-02 20:50:45,984 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:50:51,253 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:50:51,864 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:50:52,474 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:50:53,083 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:50:53,691 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:50:54,301 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:50:54,909 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:50:55,517 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:50:56,127 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
-2025-08-02 20:50:56,143 - INFO - Step 700: Loss=1.752666, GradNorm=7646.242, Failures=0
-2025-08-02 20:50:56,144 - INFO - Running evaluation at step 700...
-2025-08-02 20:50:56,144 - INFO - Starting ULTRA-CONSERVATIVE evaluation with 100 samples
+2025-08-02 21:24:49,173 - INFO - ================================================================================
+2025-08-02 21:24:49,173 - INFO - 🎯 Expected Results:
+2025-08-02 21:24:49,173 - INFO -    • Stable training without normalization crashes
+2025-08-02 21:24:49,173 - INFO -    • Gradual improvement in CLIP similarity
+2025-08-02 21:24:49,173 - INFO -    • No extreme gradient/loss spikes
+2025-08-02 21:24:49,173 - INFO -    • Robust handling of outliers
+2025-08-02 21:24:49,173 - INFO - ================================================================================
+2025-08-02 21:24:49,174 - INFO - 🚀 Starting ENHANCED BLIP3-o training with denormalized evaluation...
+2025-08-02 21:24:49,174 - INFO -   🔥 Denormalized evaluation: ENABLED
+2025-08-02 21:24:49,174 - INFO -   📊 Image generation validation: Active
+2025-08-02 21:24:49,175 - INFO - Starting epoch 1/10
+2025-08-02 21:25:00,231 - INFO - Step 10: Loss=1.876060, GradNorm=15870.557, Failures=0
+2025-08-02 21:25:00,826 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:25:01,436 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:25:02,047 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:25:02,656 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:25:03,268 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:25:03,879 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:25:04,489 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:25:05,100 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:25:05,711 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:25:06,323 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:25:06,339 - INFO - Step 20: Loss=1.873453, GradNorm=39109.229, Failures=0
+2025-08-02 21:25:06,934 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:25:07,546 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:25:08,157 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:25:08,768 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:25:09,381 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:25:09,993 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:25:10,605 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:25:11,215 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:25:11,827 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:25:12,438 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:25:12,455 - INFO - Step 30: Loss=1.869244, GradNorm=55044.360, Failures=0
+2025-08-02 21:25:13,050 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:25:13,662 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:25:14,273 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:25:14,885 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:25:15,496 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:25:16,108 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:25:16,720 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:25:17,334 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:25:17,945 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:25:18,557 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:25:18,573 - INFO - Step 40: Loss=1.853125, GradNorm=18733.804, Failures=0
+2025-08-02 21:25:24,521 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:25:25,136 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:25:25,749 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:25:26,362 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:25:26,974 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:25:27,586 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:25:28,199 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:25:28,810 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:25:29,424 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:25:30,036 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:25:30,052 - INFO - Step 50: Loss=1.875617, GradNorm=37175.170, Failures=0
+2025-08-02 21:25:30,052 - INFO - Running ENHANCED evaluation at step 50...
+2025-08-02 21:25:30,052 - INFO - Starting ENHANCED evaluation with 100 samples
+2025-08-02 21:25:30,052 - INFO - 🔥 Denormalized evaluation: ENABLED
+2025-08-02 21:26:16,848 - INFO - 🔥 Computing denormalized similarities for image generation validation...
+2025-08-02 21:26:16,925 - INFO - 🎉 NEW BEST denormalized similarity: 0.8703
+2025-08-02 21:26:16,925 - INFO - ✅ ENHANCED evaluation completed: 128 samples
+2025-08-02 21:26:16,925 - INFO -    Normalized similarity: 0.1649
+2025-08-02 21:26:16,925 - INFO -    🔥 Denormalized similarity: 0.8703
+2025-08-02 21:26:16,925 - INFO -    📊 Image generation ready: True
+2025-08-02 21:26:16,925 - INFO -    Success rate: 100.0%
+2025-08-02 21:26:16,928 - INFO - ✅ Evaluation: CLIP similarity = 0.8703
+2025-08-02 21:26:16,928 - INFO -    🔥 Denormalized similarity = 0.8703
+2025-08-02 21:26:16,928 - INFO - 🎉 NEW BEST similarity: 0.8703
+2025-08-02 21:26:17,519 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:26:18,125 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:26:18,733 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:26:19,340 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:26:19,948 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:26:20,556 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:26:21,164 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:26:21,772 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:26:22,379 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:26:22,987 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:26:23,003 - INFO - Step 60: Loss=1.846004, GradNorm=54572.509, Failures=0
+2025-08-02 21:26:23,595 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:26:24,204 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:26:24,812 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:26:25,422 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:26:26,030 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:26:26,639 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:26:27,247 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:26:27,854 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:26:28,463 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:26:29,071 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:26:29,088 - INFO - Step 70: Loss=1.881513, GradNorm=113912.283, Failures=0
+2025-08-02 21:26:29,678 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:26:30,286 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:26:30,894 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:26:31,502 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:26:32,109 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:26:32,718 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:26:33,326 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:26:33,934 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:26:34,542 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:26:35,149 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:26:35,165 - INFO - Step 80: Loss=1.856048, GradNorm=28615.722, Failures=0
+2025-08-02 21:26:35,756 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:26:40,873 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:26:41,481 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:26:42,089 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:26:42,700 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:26:43,308 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:26:43,918 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:26:44,526 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:26:45,133 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:26:45,741 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:26:45,757 - INFO - Step 90: Loss=1.831704, GradNorm=85368.041, Failures=0
+2025-08-02 21:26:46,350 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:26:46,958 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:26:47,566 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:26:48,173 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:26:48,781 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:26:49,389 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:26:49,998 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:26:50,606 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:26:51,213 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:26:51,820 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:26:51,836 - INFO - Step 100: Loss=1.803011, GradNorm=21140.827, Failures=0
+2025-08-02 21:26:51,836 - INFO - Running ENHANCED evaluation at step 100...
+2025-08-02 21:26:51,836 - INFO - Starting ENHANCED evaluation with 100 samples
+2025-08-02 21:26:51,836 - INFO - 🔥 Denormalized evaluation: ENABLED
+2025-08-02 21:27:38,527 - INFO - 🔥 Computing denormalized similarities for image generation validation...
+2025-08-02 21:27:38,603 - INFO - 🎉 NEW BEST denormalized similarity: 0.8810
+2025-08-02 21:27:38,603 - INFO - ✅ ENHANCED evaluation completed: 128 samples
+2025-08-02 21:27:38,603 - INFO -    Normalized similarity: 0.0310
+2025-08-02 21:27:38,603 - INFO -    🔥 Denormalized similarity: 0.8810
+2025-08-02 21:27:38,603 - INFO -    📊 Image generation ready: True
+2025-08-02 21:27:38,603 - INFO -    Success rate: 100.0%
+2025-08-02 21:27:38,606 - INFO - ✅ Evaluation: CLIP similarity = 0.8810
+2025-08-02 21:27:38,606 - INFO -    🔥 Denormalized similarity = 0.8810
+2025-08-02 21:27:38,606 - INFO - 🎉 NEW BEST similarity: 0.8810
+2025-08-02 21:27:39,199 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:27:39,807 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:27:40,415 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:27:41,023 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:27:41,631 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:27:42,239 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:27:42,848 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:27:43,455 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:27:44,063 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:27:44,671 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:27:44,687 - INFO - Step 110: Loss=1.845545, GradNorm=26571.219, Failures=0
+2025-08-02 21:27:45,280 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:27:45,889 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:27:46,497 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:27:47,105 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:27:47,714 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:27:48,324 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:27:48,935 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:27:49,545 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:27:50,155 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:27:50,764 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:27:50,781 - INFO - Step 120: Loss=1.811391, GradNorm=36738.734, Failures=0
+2025-08-02 21:27:51,373 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:27:51,984 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:27:52,156 - INFO - Iteration completed: 7832 samples processed
+2025-08-02 21:27:52,157 - INFO - Epoch 1 completed: 122 batches, 0 failures
+2025-08-02 21:27:52,171 - INFO - Epoch 1 summary:
+2025-08-02 21:27:52,171 - INFO -   Average loss: 1.857066
+2025-08-02 21:27:52,171 - INFO -   Failure rate: 0.0%
+2025-08-02 21:27:52,171 - INFO -   Emergency LR reductions: 0
+2025-08-02 21:27:52,171 - INFO -   Best similarity: 0.8810
+2025-08-02 21:27:52,171 - INFO -   Best denorm similarity: 0.8810
+2025-08-02 21:27:52,171 - INFO -   Denorm warnings: 0
+2025-08-02 21:27:52,171 - INFO - Starting epoch 2/10
+2025-08-02 21:27:57,142 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:27:57,752 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:27:58,361 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:27:58,970 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:27:59,579 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:28:00,190 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:28:00,798 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:28:01,406 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:28:01,423 - INFO - Step 130: Loss=1.829922, GradNorm=8398.093, Failures=0
+2025-08-02 21:28:02,016 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:28:02,627 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:28:03,238 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:28:03,850 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:28:04,458 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:28:05,067 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:28:05,676 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:28:06,285 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:28:06,895 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:28:07,504 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:28:07,521 - INFO - Step 140: Loss=1.748935, GradNorm=14852.685, Failures=0
+2025-08-02 21:28:08,117 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:28:08,727 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:28:09,337 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:28:09,948 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:28:10,559 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:28:11,168 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:28:11,777 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:28:12,387 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:28:12,997 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:28:13,606 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-02 21:28:13,623 - INFO - Step 150: Loss=1.804112, GradNorm=10952.459, Failures=0
+2025-08-02 21:28:13,623 - INFO - Running ENHANCED evaluation at step 150...
+2025-08-02 21:28:13,623 - INFO - Starting ENHANCED evaluation with 100 samples
+2025-08-02 21:28:13,623 - INFO - 🔥 Denormalized evaluation: ENABLED
