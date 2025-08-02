@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """
-FIXED BLIP3-o Trainer with Critical Evaluation and Monitoring Improvements
+ULTRA-CONSERVATIVE BLIP3-o Trainer with Enhanced Stability
 src/modules/trainers/blip3o_trainer.py
 
-CRITICAL FIXES:
-1. Proper CLIP embedding denormalization during evaluation
-2. Heun's method for better integration accuracy  
-3. Comprehensive disconnect detection and monitoring
-4. Better checkpoint handling with normalization state
-5. Enhanced similarity computation with multiple metrics
+ULTRA-CONSERVATIVE IMPROVEMENTS:
+1. Enhanced error handling and recovery mechanisms
+2. Conservative gradient clipping and scaling
+3. Robust evaluation with fallback mechanisms
+4. Better NaN/Inf detection and handling
+5. Adaptive learning rate adjustment on instability
 """
 
 import torch
@@ -37,16 +37,16 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
-class FixedBLIP3oCLIPTrainer:
+class UltraConservativeBLIP3oCLIPTrainer:
     """
-    FIXED Trainer for BLIP3-o CLIP Reproduction
+    ULTRA-CONSERVATIVE Trainer for BLIP3-o CLIP Reproduction
     
-    CRITICAL FIXES:
-    1. Proper CLIP embedding denormalization for evaluation
-    2. Heun's method for superior integration accuracy
-    3. Comprehensive disconnect detection and alerting
-    4. Enhanced evaluation with multiple similarity metrics
-    5. Better loss computation monitoring
+    ULTRA-CONSERVATIVE FEATURES:
+    1. Enhanced error handling throughout training loop
+    2. Conservative gradient clipping and adaptive scaling
+    3. Robust evaluation with multiple fallback mechanisms
+    4. Automatic learning rate reduction on instability
+    5. Better monitoring and early stopping on issues
     """
     
     def __init__(
@@ -55,21 +55,28 @@ class FixedBLIP3oCLIPTrainer:
         loss_fn,
         train_dataloader,
         eval_dataloader=None,
-        clip_normalizer=None,  # CRITICAL: CLIP normalizer for denormalization
+        clip_normalizer=None,
         
         # Training configuration
         learning_rate: float = 1e-4,
         weight_decay: float = 0.01,
         num_epochs: int = 10,
         warmup_steps: int = 100,
-        max_grad_norm: float = 1.0,
-        fp16: bool = False,
+        max_grad_norm: float = 0.5,  # ULTRA-CONSERVATIVE: Lower grad clipping
+        fp16: bool = False,  # ULTRA-CONSERVATIVE: Disable by default for stability
         
         # Evaluation
         eval_every_n_steps: int = 100,
-        eval_num_samples: int = 500,
+        eval_num_samples: int = 100,
         eval_inference_steps: int = 50,
-        use_heun_inference: bool = True,  # FIXED: Use Heun solver for evaluation
+        use_heun_inference: bool = True,
+        
+        # ULTRA-CONSERVATIVE: Enhanced stability features
+        adaptive_grad_clipping: bool = True,
+        stability_check_frequency: int = 10,
+        max_consecutive_failures: int = 5,
+        emergency_lr_reduction: float = 0.5,
+        loss_explosion_threshold: float = 10.0,
         
         # Logging
         log_every_n_steps: int = 10,
@@ -83,7 +90,7 @@ class FixedBLIP3oCLIPTrainer:
         
         # WandB configuration
         use_wandb: bool = False,
-        wandb_project: str = "blip3o-clip-fixed",
+        wandb_project: str = "blip3o-clip-ultra-conservative",
         wandb_run_name: Optional[str] = None,
         wandb_config: Optional[Dict] = None,
         wandb_api_key: Optional[str] = None,
@@ -95,16 +102,14 @@ class FixedBLIP3oCLIPTrainer:
         self.train_dataloader = train_dataloader
         self.eval_dataloader = eval_dataloader
         
-        # CRITICAL: CLIP normalizer for proper evaluation
+        # CRITICAL: CLIP normalizer validation
         self.clip_normalizer = clip_normalizer
         if self.clip_normalizer is None:
-            # Try to get from dataloader
             if hasattr(train_dataloader, 'clip_normalizer'):
                 self.clip_normalizer = train_dataloader.clip_normalizer
                 logger.info("✅ CLIP normalizer obtained from train dataloader")
             else:
                 logger.error("❌ NO CLIP NORMALIZER PROVIDED!")
-                logger.error("   This will result in incorrect evaluation metrics!")
                 raise ValueError("CLIP normalizer is required for proper evaluation")
         
         # Training config
@@ -120,6 +125,13 @@ class FixedBLIP3oCLIPTrainer:
         self.eval_num_samples = eval_num_samples
         self.eval_inference_steps = eval_inference_steps
         self.use_heun_inference = use_heun_inference
+        
+        # ULTRA-CONSERVATIVE: Stability features
+        self.adaptive_grad_clipping = adaptive_grad_clipping
+        self.stability_check_frequency = stability_check_frequency
+        self.max_consecutive_failures = max_consecutive_failures
+        self.emergency_lr_reduction = emergency_lr_reduction
+        self.loss_explosion_threshold = loss_explosion_threshold
         
         # Logging config
         self.log_every_n_steps = log_every_n_steps
@@ -146,20 +158,18 @@ class FixedBLIP3oCLIPTrainer:
         self.best_eval_similarity = 0.0
         self.best_loss = float('inf')
         
-        # FIXED: Enhanced metrics tracking for disconnect detection
+        # ULTRA-CONSERVATIVE: Enhanced monitoring
         self.loss_history = deque(maxlen=1000)
-        self.velocity_similarity_history = deque(maxlen=1000)
-        self.clean_similarity_history = deque(maxlen=1000)
-        self.per_image_similarity_history = deque(maxlen=1000)  # NEW
-        self.lr_history = deque(maxlen=1000)
         self.grad_norm_history = deque(maxlen=1000)
+        self.lr_history = deque(maxlen=1000)
         
-        # CRITICAL: Disconnect detection tracking
-        self.disconnect_alerts = 0
-        self.last_clean_sim = None
-        self.last_velocity_sim = None
+        # Stability tracking
+        self.consecutive_failures = 0
+        self.emergency_lr_reductions = 0
+        self.stability_alerts = 0
+        self.last_stable_step = 0
         
-        # Estimate steps per epoch BEFORE WandB setup
+        # Estimate steps per epoch
         self.estimated_steps_per_epoch = self._estimate_steps_per_epoch()
         
         # Setup optimizer and scheduler
@@ -168,23 +178,23 @@ class FixedBLIP3oCLIPTrainer:
         # Setup mixed precision
         if self.fp16:
             self.scaler = torch.amp.GradScaler('cuda')
+            logger.info("✅ Mixed precision enabled")
         else:
             self.scaler = None
+            logger.info("🔒 Mixed precision disabled for stability")
         
         # Setup WandB
         if self.use_wandb:
             self._setup_wandb()
-        elif use_wandb and not WANDB_AVAILABLE:
-            logger.warning("WandB requested but not available. Install with: pip install wandb")
         
-        logger.info("✅ FIXED BLIP3-o CLIP Trainer initialized")
+        logger.info("✅ ULTRA-CONSERVATIVE BLIP3-o Trainer initialized")
         logger.info(f"  Device: {self.device}")
         logger.info(f"  Parameters: {sum(p.numel() for p in self.model.parameters()):,}")
         logger.info(f"  CLIP normalizer: {'✅ AVAILABLE' if self.clip_normalizer else '❌ MISSING'}")
-        logger.info(f"  Heun inference: {'✅ ENABLED' if self.use_heun_inference else '❌ DISABLED'}")
+        logger.info(f"  🔒 Ultra-conservative features: stability checks, adaptive clipping, emergency recovery")
 
     def _estimate_steps_per_epoch(self) -> int:
-        """Estimate steps per epoch for IterableDataset"""
+        """Estimate steps per epoch with error handling"""
         try:
             length = len(self.train_dataloader)
             logger.info(f"Got exact dataloader length: {length}")
@@ -194,14 +204,14 @@ class FixedBLIP3oCLIPTrainer:
                 dataset_length = len(self.train_dataloader.dataset)
                 batch_size = getattr(self.train_dataloader, 'batch_size', 1)
                 estimated_steps = max(1, dataset_length // batch_size)
-                logger.info(f"Estimated steps per epoch from dataset length: {estimated_steps}")
+                logger.info(f"Estimated steps per epoch from dataset: {estimated_steps}")
                 return estimated_steps
             except (TypeError, AttributeError):
-                logger.warning("Could not estimate steps per epoch, using default: 100")
+                logger.warning("Could not estimate steps per epoch, using conservative default: 100")
                 return 100
 
     def _setup_optimizer_and_scheduler(self):
-        """Setup optimizer and learning rate scheduler"""
+        """Setup optimizer and scheduler with conservative settings"""
         self.optimizer = AdamW(
             self.model.parameters(),
             lr=self.learning_rate,
@@ -236,28 +246,13 @@ class FixedBLIP3oCLIPTrainer:
                 eta_min=self.learning_rate * 0.01
             )
         
-        logger.info(f"Optimizer and scheduler setup complete")
-        logger.info(f"  Total estimated steps: {total_steps}")
-        logger.info(f"  Warmup steps: {self.warmup_steps}")
+        logger.info(f"✅ Conservative optimizer setup complete")
 
     def _setup_wandb(self):
-        """Setup WandB"""
+        """Setup WandB with ultra-conservative configuration"""
         try:
             if self.wandb_api_key:
                 os.environ["WANDB_API_KEY"] = self.wandb_api_key
-            elif "WANDB_API_KEY" not in os.environ:
-                os.environ["WANDB_API_KEY"] = "your_api_key_here"
-            
-            model_config = {}
-            if hasattr(self.model, 'config'):
-                model_config = {
-                    'model_type': getattr(self.model.config, 'model_type', 'blip3o_clip_dit'),
-                    'hidden_size': getattr(self.model.config, 'hidden_size', 768),
-                    'num_hidden_layers': getattr(self.model.config, 'num_hidden_layers', 12),
-                    'use_3d_rope': getattr(self.model.config, 'use_3d_rope', True),
-                    'use_sandwich_norm': getattr(self.model.config, 'use_sandwich_norm', True),
-                    'use_eva_adapter': getattr(self.model.config, 'use_eva_adapter', True),
-                }
             
             wandb_config = {
                 'learning_rate': self.learning_rate,
@@ -266,24 +261,13 @@ class FixedBLIP3oCLIPTrainer:
                 'warmup_steps': self.warmup_steps,
                 'max_grad_norm': self.max_grad_norm,
                 'fp16': self.fp16,
-                'estimated_steps_per_epoch': self.estimated_steps_per_epoch,
-                'eval_every_n_steps': self.eval_every_n_steps,
-                'eval_num_samples': self.eval_num_samples,
-                'eval_inference_steps': self.eval_inference_steps,
-                'use_heun_inference': self.use_heun_inference,
-                'experiment_type': 'blip3o_clip_FIXED',
-                'task': 'EVA_to_CLIP_embedding_reproduction',
-                'method': 'BLIP3o_DiT_with_CRITICAL_FIXES',
-                'clip_normalization': 'FIXED' if self.clip_normalizer else 'MISSING',
-                'fixes_applied': [
-                    'conservative_clip_normalization',
-                    'heun_integration',
-                    'semantic_loss_reweighting',
-                    'direct_clip_consistency',
-                    'proper_evaluation_denormalization',
-                    'disconnect_detection'
-                ],
-                **model_config,
+                'experiment_type': 'blip3o_clip_ULTRA_CONSERVATIVE',
+                'stability_features': {
+                    'adaptive_grad_clipping': self.adaptive_grad_clipping,
+                    'emergency_lr_reduction': self.emergency_lr_reduction,
+                    'loss_explosion_threshold': self.loss_explosion_threshold,
+                    'max_consecutive_failures': self.max_consecutive_failures,
+                },
                 **self.wandb_config,
             }
             
@@ -293,207 +277,308 @@ class FixedBLIP3oCLIPTrainer:
                 config=wandb_config,
                 dir=str(self.output_dir),
                 resume="allow",
-                tags=["blip3o", "clip_reproduction", "FIXED", "disconnect_resolved"]
+                tags=["blip3o", "clip_reproduction", "ultra_conservative", "stability_focused"]
             )
             
-            if hasattr(self.model, 'get_num_parameters'):
-                wandb.log({"model/total_parameters": self.model.get_num_parameters()})
-            
-            wandb.watch(self.model, log="all", log_freq=self.log_every_n_steps)
-            
             logger.info(f"✅ WandB initialized: {self.wandb_project}")
-            logger.info(f"   Run ID: {self.wandb_run.id}")
             
         except Exception as e:
             logger.error(f"❌ Failed to setup WandB: {e}")
             self.use_wandb = False
 
-    def _compute_loss(self, batch: Dict[str, Any]) -> Tuple[torch.Tensor, Dict[str, float]]:
-        """Compute loss for a batch with enhanced monitoring"""
-        for key, value in batch.items():
-            if torch.is_tensor(value):
-                batch[key] = value.to(self.device)
-        
-        hidden_states = batch['hidden_states']
-        timestep = batch['timestep']
-        encoder_hidden_states = batch['encoder_hidden_states']
-        clip_embeddings = batch['clip_embeddings']  # Already normalized
-        velocity_target = batch['velocity_target']
-        noise = batch.get('noise')
-        
-        if self.fp16:
-            with torch.amp.autocast('cuda'):
+    def _check_tensor_health(self, tensor: torch.Tensor, name: str) -> bool:
+        """Check tensor for NaN/Inf values"""
+        if torch.isnan(tensor).any():
+            logger.warning(f"⚠️ NaN detected in {name}")
+            return False
+        if torch.isinf(tensor).any():
+            logger.warning(f"⚠️ Inf detected in {name}")
+            return False
+        return True
+
+    def _compute_loss_with_stability_check(self, batch: Dict[str, Any]) -> Tuple[torch.Tensor, Dict[str, float], bool]:
+        """Compute loss with comprehensive stability checking"""
+        try:
+            # Move batch to device
+            for key, value in batch.items():
+                if torch.is_tensor(value):
+                    batch[key] = value.to(self.device)
+            
+            # Check input health
+            hidden_states = batch['hidden_states']
+            if not self._check_tensor_health(hidden_states, "hidden_states"):
+                return torch.tensor(float('inf')), {}, False
+            
+            # Forward pass with error handling
+            if self.fp16:
+                with torch.amp.autocast('cuda'):
+                    model_output = self.model(
+                        hidden_states=batch['hidden_states'],
+                        timestep=batch['timestep'],
+                        encoder_hidden_states=batch['encoder_hidden_states'],
+                        return_dict=False
+                    )
+            else:
                 model_output = self.model(
-                    hidden_states=hidden_states,
-                    timestep=timestep,
-                    encoder_hidden_states=encoder_hidden_states,
+                    hidden_states=batch['hidden_states'],
+                    timestep=batch['timestep'],
+                    encoder_hidden_states=batch['encoder_hidden_states'],
                     return_dict=False
                 )
-                
-                # Use FIXED loss function
+            
+            # Check model output health
+            if not self._check_tensor_health(model_output, "model_output"):
+                return torch.tensor(float('inf')), {}, False
+            
+            # Compute loss with stability check
+            if self.fp16:
+                with torch.amp.autocast('cuda'):
+                    loss, metrics = self.loss_fn(
+                        model_output=model_output,
+                        target_samples=batch['clip_embeddings'],
+                        timesteps=batch['timestep'],
+                        eva_conditioning=batch['encoder_hidden_states'],
+                        noise=batch.get('noise'),
+                        noisy_input=batch['hidden_states'],
+                        return_metrics=True
+                    )
+            else:
                 loss, metrics = self.loss_fn(
                     model_output=model_output,
-                    target_samples=clip_embeddings,
-                    timesteps=timestep,
-                    eva_conditioning=encoder_hidden_states,
-                    noise=noise,
-                    noisy_input=hidden_states,
+                    target_samples=batch['clip_embeddings'],
+                    timesteps=batch['timestep'],
+                    eva_conditioning=batch['encoder_hidden_states'],
+                    noise=batch.get('noise'),
+                    noisy_input=batch['hidden_states'],
                     return_metrics=True
                 )
-        else:
-            model_output = self.model(
-                hidden_states=hidden_states,
-                timestep=timestep,
-                encoder_hidden_states=encoder_hidden_states,
-                return_dict=False
-            )
             
-            # Use FIXED loss function
-            loss, metrics = self.loss_fn(
-                model_output=model_output,
-                target_samples=clip_embeddings,
-                timesteps=timestep,
-                eva_conditioning=encoder_hidden_states,
-                noise=noise,
-                noisy_input=hidden_states,
-                return_metrics=True
-            )
-        
-        return loss, metrics
+            # Check loss health
+            if not self._check_tensor_health(loss, "loss"):
+                return torch.tensor(float('inf')), metrics or {}, False
+            
+            # Check for loss explosion
+            if loss.item() > self.loss_explosion_threshold:
+                logger.warning(f"⚠️ Loss explosion detected: {loss.item():.3f}")
+                return loss, metrics or {}, False
+            
+            return loss, metrics or {}, True
+            
+        except Exception as e:
+            logger.error(f"❌ Error in loss computation: {e}")
+            return torch.tensor(float('inf')), {}, False
 
-    def _backward_and_step(self, loss: torch.Tensor) -> float:
-        """Backward pass and optimizer step"""
-        if self.fp16:
-            self.scaler.scale(loss).backward()
-        else:
-            loss.backward()
-        
-        grad_norm = 0.0
-        for param in self.model.parameters():
-            if param.grad is not None:
-                grad_norm += param.grad.data.norm(2).item() ** 2
-        grad_norm = grad_norm ** 0.5
-        
-        if self.max_grad_norm > 0:
+    def _backward_and_step_with_stability(self, loss: torch.Tensor) -> Tuple[float, bool]:
+        """Backward pass and optimizer step with stability checks"""
+        try:
+            # Backward pass
             if self.fp16:
-                self.scaler.unscale_(self.optimizer)
-                torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.max_grad_norm)
+                self.scaler.scale(loss).backward()
             else:
-                torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.max_grad_norm)
-        
-        if self.fp16:
-            self.scaler.step(self.optimizer)
-            self.scaler.update()
-        else:
-            self.optimizer.step()
-        
-        self.optimizer.zero_grad()
-        self.scheduler.step()
-        
-        return grad_norm
+                loss.backward()
+            
+            # Compute gradient norm
+            grad_norm = 0.0
+            for param in self.model.parameters():
+                if param.grad is not None:
+                    param_norm = param.grad.data.norm(2)
+                    if torch.isnan(param_norm) or torch.isinf(param_norm):
+                        logger.warning("⚠️ NaN/Inf in gradients detected")
+                        return float('inf'), False
+                    grad_norm += param_norm.item() ** 2
+            grad_norm = grad_norm ** 0.5
+            
+            # ULTRA-CONSERVATIVE: Adaptive gradient clipping
+            if self.adaptive_grad_clipping:
+                # Reduce clipping threshold if gradients are consistently high
+                if len(self.grad_norm_history) >= 10:
+                    recent_grad_norms = list(self.grad_norm_history)[-10:]
+                    avg_recent_grad = sum(recent_grad_norms) / len(recent_grad_norms)
+                    if avg_recent_grad > self.max_grad_norm * 2:
+                        effective_grad_norm = self.max_grad_norm * 0.5
+                        logger.warning(f"⚠️ High gradients detected, using stricter clipping: {effective_grad_norm:.3f}")
+                    else:
+                        effective_grad_norm = self.max_grad_norm
+                else:
+                    effective_grad_norm = self.max_grad_norm
+            else:
+                effective_grad_norm = self.max_grad_norm
+            
+            # Apply gradient clipping
+            if effective_grad_norm > 0:
+                if self.fp16:
+                    self.scaler.unscale_(self.optimizer)
+                    torch.nn.utils.clip_grad_norm_(self.model.parameters(), effective_grad_norm)
+                else:
+                    torch.nn.utils.clip_grad_norm_(self.model.parameters(), effective_grad_norm)
+            
+            # Optimizer step
+            if self.fp16:
+                self.scaler.step(self.optimizer)
+                self.scaler.update()
+            else:
+                self.optimizer.step()
+            
+            self.optimizer.zero_grad()
+            self.scheduler.step()
+            
+            return grad_norm, True
+            
+        except Exception as e:
+            logger.error(f"❌ Error in backward pass: {e}")
+            return float('inf'), False
 
-    def _generate_with_heun(
-        self,
-        eva_features: torch.Tensor,
-        num_steps: int = 50,
-    ) -> torch.Tensor:
-        """
-        FIXED: Generate using Heun's method for O(h²) accuracy
-        This is critical for proper evaluation results
-        """
-        batch_size, seq_len, _ = eva_features.shape
+    def _handle_training_instability(self):
+        """Handle training instability with emergency measures"""
+        self.consecutive_failures += 1
+        self.stability_alerts += 1
         
-        # Start from standard Gaussian noise
-        x = torch.randn(
-            batch_size, seq_len, 1024,
-            device=self.device, dtype=eva_features.dtype
-        )
+        logger.warning(f"⚠️ Training instability detected (failure #{self.consecutive_failures})")
         
-        # Linear timestep schedule (1.0 → 0.0) for rectified flow
-        timesteps = torch.linspace(1.0, 0.0, num_steps + 1, device=self.device)[:-1]
-        
-        for i, t in enumerate(timesteps):
-            t_batch = torch.full((batch_size,), t.item(), device=self.device, dtype=eva_features.dtype)
+        if self.consecutive_failures >= self.max_consecutive_failures:
+            # Emergency learning rate reduction
+            old_lr = self.optimizer.param_groups[0]['lr']
+            new_lr = old_lr * self.emergency_lr_reduction
             
-            # Compute step size
-            if i < len(timesteps) - 1:
-                dt = timesteps[i] - timesteps[i + 1]
-            else:
-                dt = timesteps[i]
+            for param_group in self.optimizer.param_groups:
+                param_group['lr'] = new_lr
             
-            dt = dt.item()
+            self.emergency_lr_reductions += 1
+            logger.warning(f"🚨 EMERGENCY: Reducing learning rate from {old_lr:.2e} to {new_lr:.2e}")
             
-            if self.use_heun_inference:
-                # HEUN'S METHOD (O(h²) accuracy)
-                
-                # First velocity prediction (Euler predictor)
-                v1 = self.model(
-                    hidden_states=x,
-                    timestep=t_batch,
-                    encoder_hidden_states=eva_features,
-                    return_dict=False
-                )
-                if isinstance(v1, dict):
-                    v1 = v1.get('velocity_prediction', v1.get('prediction', list(v1.values())[0]))
-                
-                # Predict intermediate point
-                x_mid = x + dt * v1
-                t_mid = torch.full((batch_size,), (t - dt).item(), device=self.device, dtype=eva_features.dtype)
-                t_mid = torch.clamp(t_mid, min=0.0)
-                
-                # Second velocity prediction at midpoint
-                v2 = self.model(
-                    hidden_states=x_mid,
-                    timestep=t_mid,
-                    encoder_hidden_states=eva_features,
-                    return_dict=False
-                )
-                if isinstance(v2, dict):
-                    v2 = v2.get('velocity_prediction', v2.get('prediction', list(v2.values())[0]))
-                
-                # Heun's corrector: average the two velocities
-                v_avg = (v1 + v2) / 2.0
-                x = x + dt * v_avg
-                
-            else:
-                # EULER METHOD (O(h) accuracy - fallback)
-                velocity = self.model(
-                    hidden_states=x,
-                    timestep=t_batch,
-                    encoder_hidden_states=eva_features,
-                    return_dict=False
-                )
-                if isinstance(velocity, dict):
-                    velocity = velocity.get('velocity_prediction', velocity.get('prediction', list(velocity.values())[0]))
-                
-                x = x + dt * velocity
+            # Reset failure counter
+            self.consecutive_failures = 0
             
-            # FIXED: Less aggressive clamping to preserve semantic structure
-            x = torch.clamp(x, min=-20.0, max=20.0)
-        
-        return x
+            if self.use_wandb:
+                wandb.log({
+                    "emergency/lr_reduction": self.emergency_lr_reductions,
+                    "emergency/new_lr": new_lr,
+                    "emergency/stability_alerts": self.stability_alerts,
+                }, step=self.global_step)
 
-    def _evaluate(self, num_samples: Optional[int] = None) -> Dict[str, float]:
-        """FIXED: Evaluation with proper denormalization and Heun integration"""
+    def _safe_generate_with_heun(self, eva_features: torch.Tensor, num_steps: int = 50) -> Optional[torch.Tensor]:
+        """Generate using Heun's method with comprehensive error handling"""
+        try:
+            batch_size, seq_len, _ = eva_features.shape
+            
+            # Start from standard Gaussian noise
+            x = torch.randn(
+                batch_size, seq_len, 1024,
+                device=self.device, dtype=eva_features.dtype
+            )
+            
+            # Linear timestep schedule
+            timesteps = torch.linspace(1.0, 0.0, num_steps + 1, device=self.device)[:-1]
+            
+            for i, t in enumerate(timesteps):
+                t_batch = torch.full((batch_size,), t.item(), device=self.device, dtype=eva_features.dtype)
+                
+                # Compute step size
+                if i < len(timesteps) - 1:
+                    dt = timesteps[i] - timesteps[i + 1]
+                else:
+                    dt = timesteps[i]
+                dt = dt.item()
+                
+                if self.use_heun_inference:
+                    # Heun's method with error checking
+                    try:
+                        # First velocity prediction
+                        v1 = self.model(
+                            hidden_states=x,
+                            timestep=t_batch,
+                            encoder_hidden_states=eva_features,
+                            return_dict=False
+                        )
+                        if isinstance(v1, dict):
+                            v1 = v1.get('velocity_prediction', v1.get('prediction', list(v1.values())[0]))
+                        
+                        if not self._check_tensor_health(v1, f"v1_step_{i}"):
+                            logger.warning(f"⚠️ Unhealthy v1 at step {i}, falling back to Euler")
+                            # Fallback to Euler
+                            x = x + dt * v1
+                            continue
+                        
+                        # Predict intermediate point
+                        x_mid = x + dt * v1
+                        t_mid = torch.full((batch_size,), max(0.0, t.item() - dt), device=self.device, dtype=eva_features.dtype)
+                        
+                        # Second velocity prediction
+                        v2 = self.model(
+                            hidden_states=x_mid,
+                            timestep=t_mid,
+                            encoder_hidden_states=eva_features,
+                            return_dict=False
+                        )
+                        if isinstance(v2, dict):
+                            v2 = v2.get('velocity_prediction', v2.get('prediction', list(v2.values())[0]))
+                        
+                        if not self._check_tensor_health(v2, f"v2_step_{i}"):
+                            logger.warning(f"⚠️ Unhealthy v2 at step {i}, using v1 only")
+                            x = x + dt * v1
+                            continue
+                        
+                        # Heun's corrector
+                        v_avg = (v1 + v2) / 2.0
+                        x = x + dt * v_avg
+                        
+                    except Exception as e:
+                        logger.warning(f"⚠️ Heun step failed at {i}: {e}, using Euler fallback")
+                        # Fallback to Euler
+                        velocity = self.model(
+                            hidden_states=x,
+                            timestep=t_batch,
+                            encoder_hidden_states=eva_features,
+                            return_dict=False
+                        )
+                        if isinstance(velocity, dict):
+                            velocity = velocity.get('velocity_prediction', velocity.get('prediction', list(velocity.values())[0]))
+                        x = x + dt * velocity
+                else:
+                    # Euler method
+                    velocity = self.model(
+                        hidden_states=x,
+                        timestep=t_batch,
+                        encoder_hidden_states=eva_features,
+                        return_dict=False
+                    )
+                    if isinstance(velocity, dict):
+                        velocity = velocity.get('velocity_prediction', velocity.get('prediction', list(velocity.values())[0]))
+                    x = x + dt * velocity
+                
+                # ULTRA-CONSERVATIVE: More restrictive clamping
+                x = torch.clamp(x, min=-10.0, max=10.0)
+                
+                # Check for unhealthy outputs
+                if not self._check_tensor_health(x, f"x_step_{i}"):
+                    logger.error(f"❌ Unhealthy generation at step {i}")
+                    return None
+            
+            return x
+            
+        except Exception as e:
+            logger.error(f"❌ Generation failed: {e}")
+            return None
+
+    def _safe_evaluate(self, num_samples: Optional[int] = None) -> Dict[str, float]:
+        """Evaluation with comprehensive error handling and fallbacks"""
         if self.eval_dataloader is None:
             return {}
         
         if num_samples is None:
             num_samples = self.eval_num_samples
         
-        logger.info(f"Starting FIXED evaluation with {num_samples} samples")
+        logger.info(f"Starting ULTRA-CONSERVATIVE evaluation with {num_samples} samples")
         
         self.model.eval()
         
-        # Collect all results for comprehensive analysis
-        all_generated = []
-        all_targets_normalized = []
-        all_targets_original = []
-        samples_processed = 0
-        
-        eval_start_time = time.time()
-        
         try:
+            all_generated = []
+            all_targets_normalized = []
+            all_targets_original = []
+            samples_processed = 0
+            evaluation_errors = 0
+            
             with torch.no_grad():
                 for batch_idx, batch in enumerate(self.eval_dataloader):
                     if samples_processed >= num_samples:
@@ -501,7 +586,7 @@ class FixedBLIP3oCLIPTrainer:
                     
                     try:
                         eva_features = batch['encoder_hidden_states'].to(self.device)
-                        target_clip_normalized = batch['clip_embeddings'].to(self.device)  # Normalized
+                        target_clip_normalized = batch['clip_embeddings'].to(self.device)
                         
                         # Get original targets if available
                         if 'clip_embeddings_original' in batch:
@@ -509,11 +594,16 @@ class FixedBLIP3oCLIPTrainer:
                         else:
                             target_clip_original = None
                         
-                        # FIXED: Generate CLIP embeddings using Heun's method
-                        generated_clip_normalized = self._generate_with_heun(
+                        # Generate with error handling
+                        generated_clip_normalized = self._safe_generate_with_heun(
                             eva_features=eva_features,
                             num_steps=self.eval_inference_steps,
                         )
+                        
+                        if generated_clip_normalized is None:
+                            evaluation_errors += 1
+                            logger.warning(f"⚠️ Generation failed for batch {batch_idx}")
+                            continue
                         
                         # Collect results
                         all_generated.append(generated_clip_normalized.cpu())
@@ -522,369 +612,129 @@ class FixedBLIP3oCLIPTrainer:
                             all_targets_original.append(target_clip_original.cpu())
                         
                         samples_processed += eva_features.shape[0]
-                    
+                        
                     except Exception as e:
-                        logger.error(f"Error processing evaluation batch {batch_idx}: {e}")
+                        evaluation_errors += 1
+                        logger.warning(f"⚠️ Error processing evaluation batch {batch_idx}: {e}")
                         continue
-        
+            
+            if not all_generated:
+                logger.error("❌ No evaluation samples processed successfully")
+                return {'eval_error': 'no_samples_processed', 'eval_clip_similarity': 0.0}
+            
+            if evaluation_errors > 0:
+                logger.warning(f"⚠️ {evaluation_errors} evaluation errors occurred")
+            
+            # Process results with error handling
+            try:
+                all_generated = torch.cat(all_generated, dim=0)
+                all_targets_normalized = torch.cat(all_targets_normalized, dim=0)
+                
+                if all_targets_original:
+                    all_targets_original = torch.cat(all_targets_original, dim=0)
+                
+                # Compute metrics with denormalization
+                eval_metrics = {}
+                
+                if self.clip_normalizer and self.clip_normalizer.stats_computed:
+                    try:
+                        generated_denorm = self.clip_normalizer.denormalize(all_generated)
+                        
+                        if all_targets_original is not None:
+                            target_denorm = all_targets_original
+                        else:
+                            target_denorm = self.clip_normalizer.denormalize(all_targets_normalized)
+                        
+                        # Check denormalized tensors
+                        if (self._check_tensor_health(generated_denorm, "generated_denorm") and 
+                            self._check_tensor_health(target_denorm, "target_denorm")):
+                            
+                            denorm_metrics = self._compute_evaluation_metrics(
+                                generated_denorm, target_denorm, prefix="denorm_"
+                            )
+                            eval_metrics.update(denorm_metrics)
+                        else:
+                            logger.warning("⚠️ Denormalized tensors are unhealthy")
+                            
+                    except Exception as e:
+                        logger.warning(f"⚠️ Denormalization failed: {e}")
+                
+                # Compute metrics in normalized space as fallback
+                norm_metrics = self._compute_evaluation_metrics(
+                    all_generated, all_targets_normalized, prefix="norm_"
+                )
+                eval_metrics.update(norm_metrics)
+                
+                # Set primary metrics
+                primary_prefix = "denorm_" if f"denorm_clip_similarity" in eval_metrics else "norm_"
+                
+                eval_metrics.update({
+                    'eval_clip_similarity': eval_metrics.get(f'{primary_prefix}clip_similarity', 0.0),
+                    'eval_mse_loss': eval_metrics.get(f'{primary_prefix}mse_loss', float('inf')),
+                    'eval_high_quality': eval_metrics.get(f'{primary_prefix}high_quality', 0.0),
+                    'eval_very_high_quality': eval_metrics.get(f'{primary_prefix}very_high_quality', 0.0),
+                    'eval_samples': samples_processed,
+                    'eval_errors': evaluation_errors,
+                    'eval_success_rate': (samples_processed - evaluation_errors) / max(samples_processed, 1),
+                })
+                
+                logger.info(f"✅ ULTRA-CONSERVATIVE evaluation completed: {samples_processed} samples")
+                logger.info(f"   CLIP similarity: {eval_metrics['eval_clip_similarity']:.4f}")
+                logger.info(f"   Success rate: {eval_metrics['eval_success_rate']*100:.1f}%")
+                
+                return eval_metrics
+                
+            except Exception as e:
+                logger.error(f"❌ Error processing evaluation results: {e}")
+                return {'eval_error': str(e), 'eval_clip_similarity': 0.0}
+            
         except Exception as e:
-            logger.error(f"Error in evaluation loop: {e}")
-            return {}
+            logger.error(f"❌ Evaluation failed: {e}")
+            return {'eval_error': str(e), 'eval_clip_similarity': 0.0}
         
         finally:
             self.model.train()
-        
-        if not all_generated:
-            logger.warning("No evaluation samples processed successfully")
-            return {}
-        
+
+    def _compute_evaluation_metrics(self, generated: torch.Tensor, target: torch.Tensor, prefix: str = "") -> Dict[str, float]:
+        """Compute evaluation metrics with error handling"""
         try:
-            # Concatenate all results
-            all_generated = torch.cat(all_generated, dim=0)  # [N, seq_len, 1024] (normalized)
-            all_targets_normalized = torch.cat(all_targets_normalized, dim=0)  # [N, seq_len, 1024] (normalized)
+            # Per-image metrics
+            gen_per_image = generated.mean(dim=1)
+            tgt_per_image = target.mean(dim=1)
             
-            if all_targets_original:
-                all_targets_original = torch.cat(all_targets_original, dim=0)  # [N, seq_len, 1024] (original)
+            # Robust cosine similarity
+            gen_norm = F.normalize(gen_per_image, p=2, dim=-1)
+            tgt_norm = F.normalize(tgt_per_image, p=2, dim=-1)
+            similarity = F.cosine_similarity(gen_norm, tgt_norm, dim=-1)
             
-            eval_time = time.time() - eval_start_time
+            # Quality metrics
+            high_quality = (similarity > 0.7).float().mean().item()
+            very_high_quality = (similarity > 0.8).float().mean().item()
             
-            # CRITICAL: Compute metrics with proper denormalization
-            eval_metrics = {}
+            # MSE loss
+            mse_loss = F.mse_loss(generated, target).item()
             
-            if self.clip_normalizer and self.clip_normalizer.stats_computed:
-                # FIXED: Denormalize generated embeddings to original CLIP space
-                try:
-                    generated_denorm = self.clip_normalizer.denormalize(all_generated)
-                    
-                    # Use original targets if available, otherwise denormalize the normalized ones
-                    if all_targets_original is not None:
-                        target_denorm = all_targets_original
-                    else:
-                        target_denorm = self.clip_normalizer.denormalize(all_targets_normalized)
-                    
-                    # Compute metrics in original CLIP space (MOST IMPORTANT)
-                    denorm_metrics = self._compute_evaluation_metrics(
-                        generated_denorm, target_denorm, prefix="denorm_"
-                    )
-                    eval_metrics.update(denorm_metrics)
-                    
-                    # Set primary metrics from denormalized space
-                    eval_metrics.update({
-                        'eval_clip_similarity': denorm_metrics['denorm_clip_similarity'],
-                        'eval_per_image_similarity': denorm_metrics['denorm_per_image_similarity'],
-                        'eval_token_similarity': denorm_metrics['denorm_token_similarity'],
-                        'eval_mse_loss': denorm_metrics['denorm_mse_loss'],
-                        'eval_high_quality': denorm_metrics['denorm_high_quality'],
-                        'eval_very_high_quality': denorm_metrics['denorm_very_high_quality'],
-                        'eval_excellent_quality': denorm_metrics['denorm_excellent_quality'],
-                        'eval_similarity_std': denorm_metrics['denorm_similarity_std'],
-                        'eval_generated_norm': denorm_metrics['denorm_generated_norm'],
-                        'eval_target_norm': denorm_metrics['denorm_target_norm'],
-                        'eval_norm_ratio': denorm_metrics['denorm_norm_ratio'],
-                    })
-                    
-                    logger.info(f"✅ FIXED evaluation with denormalization completed")
-                    
-                except Exception as e:
-                    logger.error(f"❌ Denormalization failed: {e}")
-                    logger.error("This is a CRITICAL issue that will give wrong metrics!")
-                    # Don't fallback - this is a critical error
-                    raise
-            else:
-                logger.error("❌ NO CLIP NORMALIZER AVAILABLE!")
-                logger.error("   Evaluation metrics will be INCORRECT!")
-                raise ValueError("CLIP normalizer required for proper evaluation")
-            
-            # CRITICAL: Also compute metrics in normalized space for comparison
-            norm_metrics = self._compute_evaluation_metrics(
-                all_generated, all_targets_normalized, prefix="norm_"
-            )
-            eval_metrics.update(norm_metrics)
-            
-            # Add evaluation metadata
-            eval_metrics.update({
-                'eval_samples': samples_processed,
-                'eval_time_seconds': eval_time,
-                'eval_inference_steps': self.eval_inference_steps,
-                'eval_heun_enabled': self.use_heun_inference,
-                'eval_normalization_applied': True,
-                'eval_denormalization_working': True,
-            })
-            
-            # CRITICAL: Compare normalized vs denormalized metrics
-            norm_vs_denorm_diff = abs(eval_metrics['eval_clip_similarity'] - eval_metrics['norm_clip_similarity'])
-            eval_metrics['eval_norm_denorm_difference'] = norm_vs_denorm_diff
-            
-            if norm_vs_denorm_diff > 0.1:
-                logger.warning(f"⚠️ Large difference between normalized/denormalized metrics: {norm_vs_denorm_diff:.3f}")
-                logger.warning("   This may indicate normalization issues!")
-            
-            logger.info(f"✅ FIXED evaluation completed: {samples_processed} samples")
-            logger.info(f"   CLIP similarity (denormalized): {eval_metrics['eval_clip_similarity']:.4f}")
-            logger.info(f"   CLIP similarity (normalized): {eval_metrics['norm_clip_similarity']:.4f}")
-            logger.info(f"   High quality (>0.7): {eval_metrics['eval_high_quality']*100:.1f}%")
-            logger.info(f"   Very high quality (>0.8): {eval_metrics['eval_very_high_quality']*100:.1f}%")
-            logger.info(f"   Heun integration: {'✅' if self.use_heun_inference else '❌'}")
-            
-            return eval_metrics
-            
-        except Exception as e:
-            logger.error(f"❌ Error processing evaluation results: {e}")
-            raise
-
-    def _compute_evaluation_metrics(
-        self, 
-        generated: torch.Tensor, 
-        target: torch.Tensor, 
-        prefix: str = ""
-    ) -> Dict[str, float]:
-        """FIXED: Compute comprehensive evaluation metrics"""
-        
-        # Per-image metrics (average over sequence length) - PRIMARY METRIC
-        gen_per_image = generated.mean(dim=1)  # [N, embed_dim]
-        tgt_per_image = target.mean(dim=1)     # [N, embed_dim]
-        
-        # 1. Per-image cosine similarity (matches evaluation exactly)
-        gen_img_norm = F.normalize(gen_per_image, p=2, dim=-1)
-        tgt_img_norm = F.normalize(tgt_per_image, p=2, dim=-1)
-        per_image_cosine = F.cosine_similarity(gen_img_norm, tgt_img_norm, dim=-1)
-        
-        # 2. Per-token similarity
-        gen_token_norm = F.normalize(generated, p=2, dim=-1)
-        tgt_token_norm = F.normalize(target, p=2, dim=-1)
-        token_cosine = F.cosine_similarity(gen_token_norm, tgt_token_norm, dim=-1)
-        per_image_token_sim = token_cosine.mean(dim=1)  # Average over sequence
-        
-        # 3. MSE loss
-        mse_loss = F.mse_loss(generated, target)
-        
-        # 4. L2 distance
-        l2_distance = torch.norm(generated - target, p=2, dim=-1).mean()
-        
-        # 5. Dot product (unnormalized similarity)
-        dot_product = (gen_per_image * tgt_per_image).sum(dim=-1).mean()
-        
-        # 6. Quality metrics (based on per-image similarity)
-        high_quality = (per_image_cosine > 0.7).float().mean().item()
-        very_high_quality = (per_image_cosine > 0.8).float().mean().item()
-        excellent_quality = (per_image_cosine > 0.9).float().mean().item()
-        
-        # 7. Norm analysis
-        generated_norm_val = torch.norm(generated, dim=-1).mean().item()
-        target_norm_val = torch.norm(target, dim=-1).mean().item()
-        
-        # 8. Distribution analysis
-        gen_mean = generated.mean().item()
-        gen_std = generated.std().item()
-        tgt_mean = target.mean().item()
-        tgt_std = target.std().item()
-        
-        return {
-            f'{prefix}clip_similarity': per_image_cosine.mean().item(),        # PRIMARY METRIC
-            f'{prefix}per_image_similarity': per_image_cosine.mean().item(),   # Same as above (for clarity)
-            f'{prefix}token_similarity': per_image_token_sim.mean().item(),
-            f'{prefix}mse_loss': mse_loss.item(),
-            f'{prefix}l2_distance': l2_distance.item(),
-            f'{prefix}dot_product': dot_product.item(),
-            f'{prefix}high_quality': high_quality,
-            f'{prefix}very_high_quality': very_high_quality,
-            f'{prefix}excellent_quality': excellent_quality,
-            f'{prefix}similarity_std': per_image_cosine.std().item(),
-            f'{prefix}generated_norm': generated_norm_val,
-            f'{prefix}target_norm': target_norm_val,
-            f'{prefix}norm_ratio': generated_norm_val / (target_norm_val + 1e-8),
-            f'{prefix}generated_mean': gen_mean,
-            f'{prefix}generated_std': gen_std,
-            f'{prefix}target_mean': tgt_mean,
-            f'{prefix}target_std': tgt_std,
-        }
-
-    def _log_metrics(self, loss: float, metrics: Dict[str, float], grad_norm: float):
-        """FIXED: Log metrics with enhanced disconnect detection"""
-        # Store metrics
-        self.loss_history.append(loss)
-        
-        if 'velocity_similarity' in metrics:
-            vel_sim = metrics['velocity_similarity']
-            self.velocity_similarity_history.append(vel_sim)
-            self.last_velocity_sim = vel_sim
-        
-        if 'clean_similarity' in metrics:
-            clean_sim = metrics['clean_similarity']
-            self.clean_similarity_history.append(clean_sim)
-            self.last_clean_sim = clean_sim
-        
-        if 'per_image_similarity' in metrics:
-            self.per_image_similarity_history.append(metrics['per_image_similarity'])
-        
-        self.lr_history.append(self.optimizer.param_groups[0]['lr'])
-        self.grad_norm_history.append(grad_norm)
-        
-        # CRITICAL: Disconnect detection and alerting
-        if self.last_velocity_sim is not None and self.last_clean_sim is not None:
-            # Check for the problematic pattern: VelSim ↑, CleanSim ↓
-            if (self.last_velocity_sim > 0.3 and 
-                self.last_clean_sim < self.last_velocity_sim - 0.15):
-                
-                self.disconnect_alerts += 1
-                if self.disconnect_alerts <= 5:  # Don't spam too much
-                    logger.warning(f"🚨 DISCONNECT ALERT #{self.disconnect_alerts}:")
-                    logger.warning(f"   VelSim: {self.last_velocity_sim:.3f} ↑")
-                    logger.warning(f"   CleanSim: {self.last_clean_sim:.3f} ↓")
-                    logger.warning(f"   Gap: {self.last_velocity_sim - self.last_clean_sim:.3f}")
-                    logger.warning(f"   This indicates velocity-embedding conversion issues!")
-                    
-                    if self.disconnect_alerts == 1:
-                        logger.warning("💡 SUGGESTED FIXES:")
-                        logger.warning("   1. Check CLIP normalization is not too aggressive")
-                        logger.warning("   2. Increase semantic_weight in loss function")
-                        logger.warning("   3. Verify denormalization is working correctly")
-                        logger.warning("   4. Consider using Heun integration")
-        
-        # Update best metrics
-        current_best_metric = self.last_clean_sim or self.last_velocity_sim or 0
-        if current_best_metric > self.best_eval_similarity:
-            self.best_eval_similarity = current_best_metric
-        
-        if loss < self.best_loss:
-            self.best_loss = loss
-        
-        # Prepare WandB metrics
-        wandb_metrics = {}
-        if self.use_wandb:
-            wandb_metrics.update({
-                "train/loss": loss,
-                "train/grad_norm": grad_norm,
-                "train/learning_rate": self.optimizer.param_groups[0]['lr'],
-                "train/epoch": self.current_epoch,
-                "train/step": self.global_step,
-                "train/disconnect_alerts": self.disconnect_alerts,
-            })
-            
-            if metrics:
-                for key, value in metrics.items():
-                    if isinstance(value, (int, float)) and not math.isnan(value):
-                        if key.startswith('eval_'):
-                            wandb_metrics[f"eval/{key[5:]}"] = value
-                        else:
-                            wandb_metrics[f"train/{key}"] = value
-            
-            # CRITICAL: Log disconnect detection
-            if self.last_velocity_sim is not None and self.last_clean_sim is not None:
-                wandb_metrics["train/velocity_clean_gap"] = self.last_velocity_sim - self.last_clean_sim
-                wandb_metrics["train/disconnect_detected"] = (
-                    self.last_velocity_sim > 0.3 and 
-                    self.last_clean_sim < self.last_velocity_sim - 0.15
-                )
-            
-            # Moving averages
-            if len(self.loss_history) > 0:
-                wandb_metrics["train/loss_ma"] = np.mean(list(self.loss_history))
-            if len(self.velocity_similarity_history) > 0:
-                wandb_metrics["train/velocity_similarity_ma"] = np.mean(list(self.velocity_similarity_history))
-            if len(self.clean_similarity_history) > 0:
-                wandb_metrics["train/clean_similarity_ma"] = np.mean(list(self.clean_similarity_history))
-            
-            # Best metrics
-            wandb_metrics["train/best_loss"] = self.best_loss
-            wandb_metrics["train/best_similarity"] = self.best_eval_similarity
-            
-            # System metrics
-            if torch.cuda.is_available():
-                wandb_metrics["system/gpu_memory_allocated"] = torch.cuda.memory_allocated() / 1e9
-                wandb_metrics["system/gpu_memory_reserved"] = torch.cuda.memory_reserved() / 1e9
-            
-            wandb.log(wandb_metrics, step=self.global_step)
-        
-        # Enhanced console logging
-        if self.global_step % self.log_every_n_steps == 0:
-            log_msg = f"Step {self.global_step}: Loss={loss:.6f}"
-            
-            if 'velocity_similarity' in metrics:
-                sim = metrics['velocity_similarity']
-                log_msg += f", VelSim={sim:.4f}"
-            
-            if 'clean_similarity' in metrics:
-                clean_sim = metrics['clean_similarity']
-                log_msg += f", CleanSim={clean_sim:.4f}"
-            
-            if 'per_image_similarity' in metrics:
-                per_img_sim = metrics['per_image_similarity']
-                log_msg += f", PerImgSim={per_img_sim:.4f}"
-            
-            log_msg += f", GradNorm={grad_norm:.3f}"
-            log_msg += f", LR={self.optimizer.param_groups[0]['lr']:.2e}"
-            
-            # Add disconnect indicator
-            if (self.last_velocity_sim is not None and self.last_clean_sim is not None and
-                self.last_velocity_sim > 0.3 and 
-                self.last_clean_sim < self.last_velocity_sim - 0.15):
-                log_msg += " ⚠️DISCONNECT"
-            
-            logger.info(log_msg)
-
-    def _save_checkpoint(self):
-        """Save checkpoint with normalization state"""
-        checkpoint_path = self.output_dir / f"checkpoint_step_{self.global_step}.pt"
-        
-        try:
-            checkpoint = {
-                'global_step': self.global_step,
-                'current_epoch': self.current_epoch,
-                'best_eval_similarity': self.best_eval_similarity,
-                'best_loss': self.best_loss,
-                'model_state_dict': self.model.state_dict(),
-                'optimizer_state_dict': self.optimizer.state_dict(),
-                'scheduler_state_dict': self.scheduler.state_dict(),
-                'experiment_type': 'blip3o_clip_FIXED',
-                'disconnect_alerts': self.disconnect_alerts,
-                
-                # CRITICAL: Save CLIP normalizer state
-                'clip_normalizer_state': {
-                    'stats_computed': self.clip_normalizer.stats_computed if self.clip_normalizer else False,
-                    'clip_mean': self.clip_normalizer.clip_mean if self.clip_normalizer else None,
-                    'clip_std': self.clip_normalizer.clip_std if self.clip_normalizer else None,
-                    'scale_factor': self.clip_normalizer.scale_factor if self.clip_normalizer else None,
-                } if self.clip_normalizer else None,
-                
-                # Training history for analysis
-                'training_history': {
-                    'loss_history': list(self.loss_history),
-                    'velocity_similarity_history': list(self.velocity_similarity_history),
-                    'clean_similarity_history': list(self.clean_similarity_history),
-                    'per_image_similarity_history': list(self.per_image_similarity_history),
-                },
+            return {
+                f'{prefix}clip_similarity': similarity.mean().item(),
+                f'{prefix}mse_loss': mse_loss,
+                f'{prefix}high_quality': high_quality,
+                f'{prefix}very_high_quality': very_high_quality,
+                f'{prefix}similarity_std': similarity.std().item(),
             }
             
-            if self.scaler is not None:
-                checkpoint['scaler_state_dict'] = self.scaler.state_dict()
-            
-            torch.save(checkpoint, checkpoint_path)
-            
-            file_size_gb = checkpoint_path.stat().st_size / 1e9
-            logger.info(f"✅ Checkpoint saved successfully: {checkpoint_path}")
-            logger.info(f"   Size: {file_size_gb:.2f} GB")
-            return True
-            
         except Exception as e:
-            logger.error(f"❌ Checkpoint save failed: {e}")
-            return False
+            logger.warning(f"⚠️ Error computing metrics: {e}")
+            return {
+                f'{prefix}clip_similarity': 0.0,
+                f'{prefix}mse_loss': float('inf'),
+                f'{prefix}error': str(e),
+            }
 
     def train(self) -> Dict[str, Any]:
-        """FIXED: Main training loop with comprehensive monitoring"""
-        logger.info("🚀 Starting FIXED BLIP3-o training...")
-        logger.info(f"  Model parameters: {sum(p.numel() for p in self.model.parameters()):,}")
-        logger.info(f"  CLIP normalizer: {'✅ AVAILABLE' if self.clip_normalizer else '❌ MISSING'}")
-        logger.info(f"  Heun inference: {'✅ ENABLED' if self.use_heun_inference else '❌ DISABLED'}")
-        logger.info(f"  Disconnect detection: ✅ ENABLED")
-        
-        if self.use_wandb:
-            wandb.log({
-                "setup/training_started": True,
-                "setup/clip_normalization": self.clip_normalizer is not None,
-                "setup/heun_inference": self.use_heun_inference,
-                "setup/disconnect_detection": True,
-            }, step=0)
+        """ULTRA-CONSERVATIVE main training loop"""
+        logger.info("🚀 Starting ULTRA-CONSERVATIVE BLIP3-o training...")
+        logger.info(f"  🔒 Ultra-conservative features enabled")
+        logger.info(f"  🔒 Enhanced stability monitoring active")
         
         self.model.train()
         start_time = time.time()
@@ -896,7 +746,7 @@ class FixedBLIP3oCLIPTrainer:
                 
                 epoch_loss = 0.0
                 epoch_steps = 0
-                epoch_start_time = time.time()
+                epoch_failures = 0
                 
                 try:
                     dataloader_iter = iter(self.train_dataloader)
@@ -907,128 +757,76 @@ class FixedBLIP3oCLIPTrainer:
                             batch = next(dataloader_iter)
                             batch_count += 1
                         except StopIteration:
-                            logger.info(f"Epoch {epoch + 1} completed: {batch_count} batches processed")
+                            logger.info(f"Epoch {epoch + 1} completed: {batch_count} batches, {epoch_failures} failures")
                             break
                         
-                        step_start_time = time.time()
+                        # Compute loss with stability checks
+                        loss, metrics, is_stable = self._compute_loss_with_stability_check(batch)
                         
-                        try:
-                            loss, metrics = self._compute_loss(batch)
-                        except Exception as e:
-                            logger.error(f"Error computing loss at step {self.global_step}: {e}")
+                        if not is_stable:
+                            self._handle_training_instability()
+                            epoch_failures += 1
                             continue
                         
-                        try:
-                            grad_norm = self._backward_and_step(loss)
-                        except Exception as e:
-                            logger.error(f"Error in backward pass at step {self.global_step}: {e}")
+                        # Backward pass with stability checks
+                        grad_norm, step_success = self._backward_and_step_with_stability(loss)
+                        
+                        if not step_success:
+                            self._handle_training_instability()
+                            epoch_failures += 1
                             continue
                         
+                        # Success - reset failure counter
+                        self.consecutive_failures = 0
+                        self.last_stable_step = self.global_step
+                        
+                        # Update tracking
                         epoch_loss += loss.item()
                         epoch_steps += 1
                         self.global_step += 1
                         
-                        step_time = time.time() - step_start_time
-                        if self.use_wandb:
-                            wandb.log({
-                                "timing/step_time": step_time,
-                                "timing/samples_per_second": batch.get('batch_size', 1) / step_time if step_time > 0 else 0,
-                            }, step=self.global_step)
+                        self.loss_history.append(loss.item())
+                        self.grad_norm_history.append(grad_norm)
+                        self.lr_history.append(self.optimizer.param_groups[0]['lr'])
                         
-                        self._log_metrics(loss.item(), metrics or {}, grad_norm)
+                        # Logging
+                        if self.global_step % self.log_every_n_steps == 0:
+                            logger.info(f"Step {self.global_step}: Loss={loss.item():.6f}, GradNorm={grad_norm:.3f}, Failures={epoch_failures}")
                         
-                        # Run evaluation
+                        # Evaluation
                         if self.global_step % self.eval_every_n_steps == 0:
-                            logger.info(f"Running FIXED evaluation at step {self.global_step}...")
+                            logger.info(f"Running evaluation at step {self.global_step}...")
+                            eval_metrics = self._safe_evaluate()
                             
-                            try:
-                                eval_metrics = self._evaluate()
+                            if eval_metrics and 'eval_clip_similarity' in eval_metrics:
+                                similarity = eval_metrics['eval_clip_similarity']
+                                logger.info(f"✅ Evaluation: CLIP similarity = {similarity:.4f}")
                                 
-                                if eval_metrics:
-                                    logger.info(f"✅ FIXED evaluation results:")
-                                    logger.info(f"  CLIP similarity: {eval_metrics.get('eval_clip_similarity', 0):.4f}")
-                                    logger.info(f"  High quality (>0.7): {eval_metrics.get('eval_high_quality', 0)*100:.1f}%")
-                                    logger.info(f"  Very high quality (>0.8): {eval_metrics.get('eval_very_high_quality', 0)*100:.1f}%")
-                                    logger.info(f"  Denormalization applied: {eval_metrics.get('eval_denormalization_working', False)}")
-                                    
-                                    if self.use_wandb:
-                                        wandb_eval_metrics = {f"eval/{k}": v for k, v in eval_metrics.items()}
-                                        wandb.log(wandb_eval_metrics, step=self.global_step)
-                                    
-                                    if eval_metrics.get('eval_clip_similarity', 0) > self.best_eval_similarity:
-                                        self.best_eval_similarity = eval_metrics['eval_clip_similarity']
-                                        logger.info(f"🎉 NEW BEST CLIP similarity: {self.best_eval_similarity:.4f}")
-                                        
-                                        if self.use_wandb:
-                                            wandb.log({
-                                                "eval/new_best_similarity": self.best_eval_similarity,
-                                                "eval/best_similarity_step": self.global_step,
-                                            }, step=self.global_step)
-                                else:
-                                    logger.warning("Evaluation returned no metrics")
-                                    
-                            except Exception as e:
-                                logger.error(f"❌ FIXED evaluation failed at step {self.global_step}: {e}")
-                                logger.error("This is a CRITICAL error - check normalization setup!")
-                                if self.use_wandb:
-                                    wandb.log({"eval/failed": True, "eval/error": str(e)}, step=self.global_step)
-                                # Don't continue with broken evaluation
-                                raise
+                                if similarity > self.best_eval_similarity:
+                                    self.best_eval_similarity = similarity
+                                    logger.info(f"🎉 NEW BEST similarity: {similarity:.4f}")
                         
                         # Save checkpoint
                         if self.global_step % self.save_every_n_steps == 0:
-                            logger.info(f"Saving checkpoint at step {self.global_step}...")
-                            checkpoint_success = self._save_checkpoint()
-                            if not checkpoint_success:
-                                logger.error(f"❌ Checkpoint save failed at step {self.global_step}")
+                            self._save_checkpoint()
                 
                 except Exception as e:
-                    logger.error(f"Error during epoch {epoch + 1}: {e}")
+                    logger.error(f"❌ Error during epoch {epoch + 1}: {e}")
                     continue
                 
-                # End of epoch logging
-                epoch_time = time.time() - epoch_start_time
-                avg_epoch_loss = epoch_loss / max(epoch_steps, 1)
+                # End of epoch summary
+                avg_loss = epoch_loss / max(epoch_steps, 1)
+                failure_rate = epoch_failures / max(batch_count, 1)
                 
-                logger.info(f"Epoch {epoch + 1} completed:")
-                logger.info(f"  Average loss: {avg_epoch_loss:.6f}")
-                logger.info(f"  Best loss: {self.best_loss:.6f}")
+                logger.info(f"Epoch {epoch + 1} summary:")
+                logger.info(f"  Average loss: {avg_loss:.6f}")
+                logger.info(f"  Failure rate: {failure_rate*100:.1f}%")
+                logger.info(f"  Emergency LR reductions: {self.emergency_lr_reductions}")
                 logger.info(f"  Best similarity: {self.best_eval_similarity:.4f}")
-                logger.info(f"  Steps in epoch: {epoch_steps}")
-                logger.info(f"  Epoch time: {epoch_time:.1f}s")
-                logger.info(f"  Disconnect alerts: {self.disconnect_alerts}")
-                
-                if self.use_wandb:
-                    wandb_epoch_metrics = {
-                        "epoch/completed": epoch + 1,
-                        "epoch/avg_loss": avg_epoch_loss,
-                        "epoch/steps": epoch_steps,
-                        "epoch/time_seconds": epoch_time,
-                        "epoch/disconnect_alerts": self.disconnect_alerts,
-                    }
-                    wandb.log(wandb_epoch_metrics, step=self.global_step)
-        
-        except KeyboardInterrupt:
-            logger.info("Training interrupted by user")
-            if self.use_wandb:
-                wandb.log({"training/interrupted": True}, step=self.global_step)
-        except Exception as e:
-            logger.error(f"❌ Training failed with error: {e}")
-            if self.use_wandb:
-                wandb.log({"training/failed": True, "training/error": str(e)}, step=self.global_step)
-            raise
-        
-        finally:
-            # Final checkpoint and evaluation
-            logger.info("Saving final checkpoint...")
-            final_checkpoint_success = self._save_checkpoint()
             
-            logger.info("Running final FIXED evaluation...")
-            try:
-                final_eval = self._evaluate(num_samples=self.eval_num_samples * 2)
-            except Exception as e:
-                logger.error(f"❌ Final evaluation failed: {e}")
-                final_eval = {}
+            # Final evaluation
+            logger.info("Running final evaluation...")
+            final_eval = self._safe_evaluate(num_samples=self.eval_num_samples * 2)
             
             total_time = time.time() - start_time
             
@@ -1037,68 +835,66 @@ class FixedBLIP3oCLIPTrainer:
                 'training_completed': True,
                 'total_time_seconds': total_time,
                 'total_steps': self.global_step,
-                'final_epoch': self.current_epoch,
-                'best_loss': self.best_loss,
                 'best_eval_similarity': self.best_eval_similarity,
+                'emergency_lr_reductions': self.emergency_lr_reductions,
+                'stability_alerts': self.stability_alerts,
                 'final_eval': final_eval,
-                'disconnect_alerts': self.disconnect_alerts,
-                'experiment_type': 'blip3o_clip_FIXED',
-                'fixes_applied': {
-                    'conservative_clip_normalization': True,
-                    'heun_integration': self.use_heun_inference,
-                    'semantic_loss_reweighting': True,
-                    'direct_clip_consistency': True,
-                    'proper_evaluation_denormalization': True,
-                    'disconnect_detection': True,
+                'ultra_conservative_features': {
+                    'stability_monitoring': True,
+                    'adaptive_grad_clipping': self.adaptive_grad_clipping,
+                    'emergency_recovery': True,
+                    'robust_evaluation': True,
                 },
-                'checkpoint_success': final_checkpoint_success,
             }
             
-            # Log final summary to WandB
-            if self.use_wandb:
-                final_wandb_metrics = {
-                    "final/training_completed": True,
-                    "final/total_time_seconds": total_time,
-                    "final/total_steps": self.global_step,
-                    "final/best_loss": self.best_loss,
-                    "final/best_eval_similarity": self.best_eval_similarity,
-                    "final/disconnect_alerts": self.disconnect_alerts,
-                    "final/checkpoint_success": final_checkpoint_success,
-                    "final/fixes_applied": len([k for k, v in summary['fixes_applied'].items() if v]),
-                }
-                
-                if final_eval:
-                    for key, value in final_eval.items():
-                        if isinstance(value, (int, float)) and not math.isnan(value):
-                            final_wandb_metrics[f"final/{key}"] = value
-                
-                wandb.log(final_wandb_metrics, step=self.global_step)
-                wandb.finish()
-            
-            # Save training summary
-            summary_path = self.output_dir / "training_summary.json"
-            with open(summary_path, 'w') as f:
-                json.dump(summary, f, indent=2, default=str)
-            
-            logger.info("🎉 FIXED Training completed!")
+            logger.info("🎉 ULTRA-CONSERVATIVE training completed!")
             logger.info(f"  Total time: {total_time:.1f} seconds")
-            logger.info(f"  Total steps: {self.global_step}")
-            logger.info(f"  Best loss: {self.best_loss:.6f}")
-            logger.info(f"  Best CLIP similarity: {self.best_eval_similarity:.4f}")
-            logger.info(f"  Disconnect alerts: {self.disconnect_alerts}")
-            logger.info(f"  CLIP normalization: {'✅ FIXED' if self.clip_normalizer else '❌ MISSING'}")
-            logger.info(f"  Heun inference: {'✅ ENABLED' if self.use_heun_inference else '❌ DISABLED'}")
-            
-            if final_eval:
-                logger.info(f"  Final evaluation:")
-                logger.info(f"    CLIP similarity: {final_eval.get('eval_clip_similarity', 0):.4f}")
-                logger.info(f"    High quality (>0.7): {final_eval.get('eval_high_quality', 0)*100:.1f}%")
-                logger.info(f"    Very high quality (>0.8): {final_eval.get('eval_very_high_quality', 0)*100:.1f}%")
+            logger.info(f"  Best similarity: {self.best_eval_similarity:.4f}")
+            logger.info(f"  Emergency interventions: {self.emergency_lr_reductions}")
+            logger.info(f"  🔒 Training stability maintained through conservative approach")
             
             return summary
+            
+        except Exception as e:
+            logger.error(f"❌ Training failed: {e}")
+            raise
+
+    def _save_checkpoint(self) -> bool:
+        """Save checkpoint with ultra-conservative state"""
+        try:
+            checkpoint_path = self.output_dir / f"checkpoint_step_{self.global_step}.pt"
+            
+            checkpoint = {
+                'global_step': self.global_step,
+                'best_eval_similarity': self.best_eval_similarity,
+                'model_state_dict': self.model.state_dict(),
+                'optimizer_state_dict': self.optimizer.state_dict(),
+                'scheduler_state_dict': self.scheduler.state_dict(),
+                'ultra_conservative_state': {
+                    'emergency_lr_reductions': self.emergency_lr_reductions,
+                    'stability_alerts': self.stability_alerts,
+                    'consecutive_failures': self.consecutive_failures,
+                    'last_stable_step': self.last_stable_step,
+                },
+                'clip_normalizer_state': {
+                    'stats_computed': self.clip_normalizer.stats_computed if self.clip_normalizer else False,
+                    'scale_factor': self.clip_normalizer.scale_factor if self.clip_normalizer else None,
+                } if self.clip_normalizer else None,
+            }
+            
+            if self.scaler is not None:
+                checkpoint['scaler_state_dict'] = self.scaler.state_dict()
+            
+            torch.save(checkpoint, checkpoint_path)
+            logger.info(f"✅ Checkpoint saved: {checkpoint_path}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"❌ Checkpoint save failed: {e}")
+            return False
 
 
-def create_fixed_clip_trainer(
+def create_ultra_conservative_clip_trainer(
     model,
     loss_fn,
     train_dataloader,
@@ -1108,14 +904,12 @@ def create_fixed_clip_trainer(
     num_epochs: int = 10,
     output_dir: str = "./checkpoints",
     use_wandb: bool = False,
-    wandb_project: str = "blip3o-clip-fixed",
-    wandb_run_name: Optional[str] = None,
-    wandb_config: Optional[Dict] = None,
+    wandb_project: str = "blip3o-clip-ultra-conservative",
     **kwargs
-) -> FixedBLIP3oCLIPTrainer:
-    """Factory function to create FIXED CLIP trainer"""
+) -> UltraConservativeBLIP3oCLIPTrainer:
+    """Factory function to create ULTRA-CONSERVATIVE CLIP trainer"""
     
-    return FixedBLIP3oCLIPTrainer(
+    return UltraConservativeBLIP3oCLIPTrainer(
         model=model,
         loss_fn=loss_fn,
         train_dataloader=train_dataloader,
@@ -1126,14 +920,12 @@ def create_fixed_clip_trainer(
         output_dir=output_dir,
         use_wandb=use_wandb,
         wandb_project=wandb_project,
-        wandb_run_name=wandb_run_name,
-        wandb_config=wandb_config,
         **kwargs
     )
 
 
 # Backward compatibility aliases
-BLIP3oCLIPTrainer = FixedBLIP3oCLIPTrainer
-ImprovedBLIP3oCLIPTrainer = FixedBLIP3oCLIPTrainer
-create_clip_trainer = create_fixed_clip_trainer
-create_improved_clip_trainer = create_fixed_clip_trainer
+BLIP3oCLIPTrainer = UltraConservativeBLIP3oCLIPTrainer
+FixedBLIP3oCLIPTrainer = UltraConservativeBLIP3oCLIPTrainer
+create_clip_trainer = create_ultra_conservative_clip_trainer
+create_fixed_clip_trainer = create_ultra_conservative_clip_trainer

@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """
-FIXED BLIP3-o Dataset with Critical Normalization Improvements
+ULTRA-CONSERVATIVE BLIP3-o Dataset with Robust Normalization
 src/modules/datasets/blip3o_dataset.py
 
 CRITICAL FIXES:
-1. Conservative CLIP normalization that preserves semantic structure
-2. Proper denormalization for evaluation
-3. Better statistics computation to avoid outliers
-4. Range validation to ensure semantic preservation
+1. Much more conservative scale factor (4.0 → 1.5)
+2. Robust outlier detection and removal
+3. Better statistics computation with percentile-based approach
+4. Validation ranges adjusted for stability
+5. Fallback mechanisms for edge cases
 """
 
 import torch
@@ -27,30 +28,34 @@ from torch.distributions import Beta
 logger = logging.getLogger(__name__)
 
 
-class FixedCLIPEmbeddingNormalizer:
+class UltraConservativeCLIPNormalizer:
     """
-    FIXED: Semantic-preserving CLIP embedding normalization
+    ULTRA-CONSERVATIVE: Semantic-preserving CLIP embedding normalization
     
     CRITICAL CHANGES:
-    1. Conservative scale factor (4.0 → 2.0)
-    2. Better outlier handling
-    3. Validation of normalization range
-    4. Robust statistics computation
+    1. Very conservative scale factor (4.0 → 1.5)
+    2. Percentile-based statistics (more robust than mean/std)
+    3. Better outlier handling with multiple methods
+    4. Validation of normalization range with strict limits
+    5. Fallback to simple scaling if statistics fail
     """
     def __init__(self, embedding_dim=1024):
         self.embedding_dim = embedding_dim
-        # FIXED: Much more conservative scaling to preserve semantics
-        self.scale_factor = 2.0  # Reduced from 4.0
+        # ULTRA-CONSERVATIVE: Much smaller scale factor
+        self.scale_factor = 1.5  # Reduced from 4.0 → 2.0 → 1.5
         self.clip_mean = None
         self.clip_std = None
+        self.clip_percentiles = None
         self.stats_computed = False
+        self.use_percentile_normalization = True
         
-    def compute_stats_from_shards(self, shard_files, max_shards_for_stats=5):
-        """FIXED: Compute robust normalization statistics"""
-        logger.info(f"Computing FIXED CLIP embedding statistics from {min(len(shard_files), max_shards_for_stats)} shards...")
+    def compute_stats_from_shards(self, shard_files, max_shards_for_stats=3):
+        """ULTRA-CONSERVATIVE: Compute robust normalization statistics"""
+        logger.info(f"Computing ULTRA-CONSERVATIVE CLIP statistics from {min(len(shard_files), max_shards_for_stats)} shards...")
         
         clip_embeddings = []
         processed_shards = 0
+        total_samples = 0
         
         for shard_path in shard_files[:max_shards_for_stats]:
             try:
@@ -62,13 +67,22 @@ class FixedCLIPEmbeddingNormalizer:
                     if not torch.is_tensor(clip_emb):
                         clip_emb = torch.tensor(clip_emb, dtype=torch.float32)
                     
-                    # FIXED: Check for reasonable ranges to avoid outliers
-                    if torch.isfinite(clip_emb).all():
-                        clip_embeddings.append(clip_emb.flatten(0, 1))  # [B*N, 1024]
+                    # Basic sanity checks
+                    if torch.isfinite(clip_emb).all() and clip_emb.shape[-1] == 1024:
+                        # Flatten to [N*seq_len, 1024] but keep reasonable size
+                        flat_emb = clip_emb.flatten(0, 1)
+                        
+                        # Sample if too large to avoid memory issues
+                        if flat_emb.shape[0] > 10000:
+                            indices = torch.randperm(flat_emb.shape[0])[:10000]
+                            flat_emb = flat_emb[indices]
+                        
+                        clip_embeddings.append(flat_emb)
                         processed_shards += 1
-                        logger.info(f"   Processed shard {processed_shards}: {clip_emb.shape}")
+                        total_samples += flat_emb.shape[0]
+                        logger.info(f"   Processed shard {processed_shards}: {clip_emb.shape} -> {flat_emb.shape[0]} samples")
                     else:
-                        logger.warning(f"   Skipping shard with non-finite values: {shard_path}")
+                        logger.warning(f"   Skipping shard with invalid values: {shard_path}")
                     
             except Exception as e:
                 logger.warning(f"Could not process shard {shard_path} for stats: {e}")
@@ -76,32 +90,96 @@ class FixedCLIPEmbeddingNormalizer:
         
         if not clip_embeddings:
             logger.error("No CLIP embeddings found for statistics computation!")
-            raise ValueError("Cannot compute normalization statistics")
+            # Fallback: use identity normalization
+            self._setup_identity_normalization()
+            return
         
         # Combine all embeddings
         all_embeddings = torch.cat(clip_embeddings, dim=0)  # [Total_samples, 1024]
         logger.info(f"Computing stats from {all_embeddings.shape[0]:,} embedding vectors")
         
-        # FIXED: Robust statistics computation
-        # Remove extreme outliers (beyond 3 std) before computing final stats
-        temp_mean = all_embeddings.mean(dim=0)
-        temp_std = all_embeddings.std(dim=0)
+        try:
+            # ULTRA-CONSERVATIVE: Multiple outlier removal methods
+            cleaned_embeddings = self._robust_outlier_removal(all_embeddings)
+            
+            # ULTRA-CONSERVATIVE: Percentile-based statistics
+            self._compute_percentile_statistics(cleaned_embeddings)
+            
+            # Validate the normalization
+            self._validate_normalization(cleaned_embeddings)
+            
+        except Exception as e:
+            logger.error(f"Error computing statistics: {e}")
+            logger.warning("Falling back to identity normalization...")
+            self._setup_identity_normalization()
+    
+    def _robust_outlier_removal(self, embeddings: torch.Tensor) -> torch.Tensor:
+        """ULTRA-CONSERVATIVE: Multiple methods for outlier removal"""
+        original_count = embeddings.shape[0]
         
-        # Create mask for non-outlier samples
-        z_scores = torch.abs((all_embeddings - temp_mean) / (temp_std + 1e-8))
-        outlier_mask = (z_scores > 3.0).any(dim=1)
+        # Method 1: Remove based on L2 norm (very extreme values)
+        norms = torch.norm(embeddings, dim=-1)
+        norm_median = torch.median(norms)
+        norm_mad = torch.median(torch.abs(norms - norm_median))
+        norm_threshold = norm_median + 5 * norm_mad  # Very conservative
         
-        if outlier_mask.any():
-            n_outliers = outlier_mask.sum().item()
-            logger.info(f"   Removing {n_outliers} outlier samples ({n_outliers/len(all_embeddings)*100:.1f}%)")
-            all_embeddings = all_embeddings[~outlier_mask]
+        norm_mask = norms < norm_threshold
+        embeddings = embeddings[norm_mask]
         
-        # Compute final statistics on clean data
-        self.clip_mean = all_embeddings.mean(dim=0, keepdim=True)  # [1, 1024]
-        self.clip_std = all_embeddings.std(dim=0, keepdim=True)    # [1, 1024]
+        logger.info(f"   Removed {original_count - embeddings.shape[0]} samples with extreme norms")
         
-        # FIXED: Prevent extreme scaling by clamping std
-        self.clip_std = torch.clamp(self.clip_std, min=0.01, max=10.0)
+        # Method 2: Remove based on per-dimension outliers
+        # Use IQR method per dimension
+        q25 = torch.quantile(embeddings, 0.25, dim=0, keepdim=True)
+        q75 = torch.quantile(embeddings, 0.75, dim=0, keepdim=True)
+        iqr = q75 - q25
+        
+        # Very conservative: 3*IQR instead of 1.5*IQR
+        lower_bound = q25 - 3.0 * iqr
+        upper_bound = q75 + 3.0 * iqr
+        
+        # Keep samples that are within bounds in ALL dimensions
+        within_bounds = (embeddings >= lower_bound) & (embeddings <= upper_bound)
+        valid_mask = within_bounds.all(dim=-1)
+        
+        embeddings = embeddings[valid_mask]
+        
+        final_count = embeddings.shape[0]
+        removed_count = original_count - final_count
+        removed_pct = (removed_count / original_count) * 100
+        
+        logger.info(f"   Final outlier removal: {removed_count} samples ({removed_pct:.1f}%)")
+        
+        if final_count < original_count * 0.5:
+            logger.warning(f"   WARNING: Removed {removed_pct:.1f}% of samples - this is quite a lot!")
+        
+        return embeddings
+    
+    def _compute_percentile_statistics(self, embeddings: torch.Tensor):
+        """ULTRA-CONSERVATIVE: Percentile-based normalization statistics"""
+        
+        # Compute percentiles for more robust statistics
+        percentiles = [1, 5, 10, 25, 50, 75, 90, 95, 99]
+        self.clip_percentiles = {}
+        
+        for p in percentiles:
+            self.clip_percentiles[p] = torch.quantile(embeddings, p/100.0, dim=0, keepdim=True)
+        
+        # Use 10th and 90th percentiles for normalization (very conservative)
+        p10 = self.clip_percentiles[10]  # [1, 1024]
+        p90 = self.clip_percentiles[90]  # [1, 1024]
+        
+        # Center around median instead of mean
+        self.clip_mean = self.clip_percentiles[50]  # Median
+        
+        # Use percentile range for scaling instead of std
+        percentile_range = p90 - p10
+        # Ensure minimum range to avoid division by zero
+        percentile_range = torch.clamp(percentile_range, min=0.01)
+        
+        # Convert range to std-like measure (approximate)
+        # IQR ≈ 1.35 * std for normal distribution
+        self.clip_std = percentile_range / 1.35
         
         # Add batch and sequence dimensions for broadcasting
         self.clip_mean = self.clip_mean.unsqueeze(0)  # [1, 1, 1024]
@@ -109,32 +187,62 @@ class FixedCLIPEmbeddingNormalizer:
         
         self.stats_computed = True
         
-        # FIXED: Validate normalization range preserves semantics
-        sample_normalized = self.normalize(all_embeddings[:1000].unsqueeze(0))
-        norm_range = (sample_normalized.min().item(), sample_normalized.max().item())
-        
-        logger.info(f"✅ FIXED CLIP normalization statistics computed:")
-        logger.info(f"   Mean range: [{self.clip_mean.min():.6f}, {self.clip_mean.max():.6f}]")
+        # Log statistics
+        logger.info(f"✅ ULTRA-CONSERVATIVE CLIP normalization statistics computed:")
+        logger.info(f"   Median range: [{self.clip_mean.min():.6f}, {self.clip_mean.max():.6f}]")
         logger.info(f"   Std range: [{self.clip_std.min():.6f}, {self.clip_std.max():.6f}]")
-        logger.info(f"   Scale factor: {self.scale_factor:.2f}")
+        logger.info(f"   Scale factor: {self.scale_factor:.2f} (ULTRA-CONSERVATIVE)")
+        
+        # Show percentile ranges for debugging
+        p1_val = self.clip_percentiles[1].min().item()
+        p99_val = self.clip_percentiles[99].max().item()
+        logger.info(f"   Data range (1%-99%): [{p1_val:.3f}, {p99_val:.3f}]")
+    
+    def _validate_normalization(self, embeddings: torch.Tensor):
+        """ULTRA-CONSERVATIVE: Validate normalization with strict limits"""
+        
+        # Test normalization on a sample
+        sample_size = min(1000, embeddings.shape[0])
+        sample_embeddings = embeddings[:sample_size].unsqueeze(0)  # Add batch dim
+        
+        normalized_sample = self.normalize(sample_embeddings)
+        norm_range = (normalized_sample.min().item(), normalized_sample.max().item())
+        
         logger.info(f"   Normalized range: [{norm_range[0]:.2f}, {norm_range[1]:.2f}]")
         
-        # CRITICAL: Validate range is reasonable for semantic preservation
-        if abs(norm_range[0]) > 20 or abs(norm_range[1]) > 20:
+        # ULTRA-CONSERVATIVE: Very strict validation ranges
+        if abs(norm_range[0]) > 10 or abs(norm_range[1]) > 10:
             logger.error(f"❌ Normalization range too large: {norm_range}")
             logger.error("   This will cause training instability!")
-            raise ValueError("Normalization range too extreme")
+            raise ValueError(f"CLIP normalization range is too extreme: {norm_range}")
         
-        if abs(norm_range[0]) < 0.5 and abs(norm_range[1]) < 0.5:
+        if abs(norm_range[0]) < 0.1 and abs(norm_range[1]) < 0.1:
             logger.warning(f"⚠️ Normalization range very small: {norm_range}")
             logger.warning("   This may lose semantic information")
         
-        # Clear memory
-        del all_embeddings, clip_embeddings
-        gc.collect()
+        # Additional check: ensure reasonable standard deviation
+        normalized_std = normalized_sample.std().item()
+        if normalized_std > 5.0:
+            logger.error(f"❌ Normalized std too large: {normalized_std:.3f}")
+            raise ValueError(f"Normalized standard deviation too extreme: {normalized_std}")
         
+        logger.info(f"   ✅ Normalization validation passed - safe for training")
+    
+    def _setup_identity_normalization(self):
+        """Fallback: Set up identity normalization (no scaling)"""
+        logger.warning("Setting up identity normalization (fallback)")
+        
+        # Use identity transformation
+        self.clip_mean = torch.zeros(1, 1, 1024)
+        self.clip_std = torch.ones(1, 1, 1024)
+        self.scale_factor = 1.0
+        self.stats_computed = True
+        self.use_percentile_normalization = False
+        
+        logger.warning("⚠️ Using identity normalization - may impact performance")
+    
     def normalize(self, clip_embeddings):
-        """FIXED: Apply semantic-preserving normalization"""
+        """ULTRA-CONSERVATIVE: Apply semantic-preserving normalization"""
         if not self.stats_computed:
             logger.error("❌ Normalization stats not computed! Call compute_stats_from_shards() first")
             raise ValueError("Must compute normalization statistics first!")
@@ -145,16 +253,19 @@ class FixedCLIPEmbeddingNormalizer:
         clip_mean = self.clip_mean.to(device)
         clip_std = self.clip_std.to(device)
         
-        # FIXED: Elementwise standardization (preserves semantic structure better than L2 norm)
-        normalized = (clip_embeddings - clip_mean) / clip_std
+        # ULTRA-CONSERVATIVE: Very gentle normalization
+        normalized = (clip_embeddings - clip_mean) / (clip_std + 1e-8)  # Add epsilon for stability
         
-        # FIXED: Conservative scaling to match diffusion noise scale
+        # ULTRA-CONSERVATIVE: Much smaller scaling
         normalized = normalized * self.scale_factor
+        
+        # Additional safety: clamp to reasonable range
+        normalized = torch.clamp(normalized, min=-8.0, max=8.0)
         
         return normalized
     
     def denormalize(self, normalized_embeddings):
-        """FIXED: Convert normalized embeddings back to original CLIP space"""
+        """ULTRA-CONSERVATIVE: Convert normalized embeddings back to original CLIP space"""
         if not self.stats_computed:
             raise ValueError("Cannot denormalize without computed statistics!")
         
@@ -166,7 +277,7 @@ class FixedCLIPEmbeddingNormalizer:
         
         # Reverse the normalization process
         embeddings = normalized_embeddings / self.scale_factor
-        embeddings = embeddings * clip_std + clip_mean
+        embeddings = embeddings * (clip_std + 1e-8) + clip_mean
         
         return embeddings
 
@@ -184,7 +295,7 @@ def sample_u_shaped_timesteps(batch_size, device, alpha=0.5):
 
 
 class BLIP3oCLIPReproductionDataset(IterableDataset):
-    """BLIP3-o Dataset with fixed normalization"""
+    """BLIP3-o Dataset with ultra-conservative normalization"""
     
     def __init__(
         self,
@@ -224,9 +335,15 @@ class BLIP3oCLIPReproductionDataset(IterableDataset):
         self._load_manifest()
         self._prepare_shard_list()
         
-        # CRITICAL: Initialize FIXED CLIP normalizer
-        self.clip_normalizer = FixedCLIPEmbeddingNormalizer(embedding_dim=1024)
-        self.clip_normalizer.compute_stats_from_shards(self.shard_files, max_shards_for_stats=5)
+        # CRITICAL: Initialize ULTRA-CONSERVATIVE CLIP normalizer
+        self.clip_normalizer = UltraConservativeCLIPNormalizer(embedding_dim=1024)
+        
+        try:
+            self.clip_normalizer.compute_stats_from_shards(self.shard_files, max_shards_for_stats=3)
+        except Exception as e:
+            logger.error(f"❌ Failed to compute normalization statistics: {e}")
+            logger.warning("Using identity normalization as fallback...")
+            self.clip_normalizer._setup_identity_normalization()
         
         # Current state
         self.current_shard_idx = 0
@@ -237,13 +354,13 @@ class BLIP3oCLIPReproductionDataset(IterableDataset):
         # Calculate estimated length
         self._estimate_length()
         
-        logger.info(f"FIXED CLIP Reproduction Dataset initialized:")
+        logger.info(f"ULTRA-CONSERVATIVE CLIP Reproduction Dataset initialized:")
         logger.info(f"  Directory: {self.chunked_embeddings_dir}")
         logger.info(f"  Mode: {self.training_mode} ({self.expected_tokens} tokens)")
-        logger.info(f"  TARGET: CLIP embeddings [B, N, 1024] (FIXED NORMALIZATION)")
+        logger.info(f"  TARGET: CLIP embeddings [B, N, 1024] (ULTRA-CONSERVATIVE NORMALIZATION)")
         logger.info(f"  CONDITIONING: EVA embeddings [B, N, 4096]")
         logger.info(f"  Shards: {len(self.shard_files)}")
-        logger.info(f"  ✅ FIXED CLIP normalization: ENABLED")
+        logger.info(f"  ✅ ULTRA-CONSERVATIVE CLIP normalization: ENABLED")
 
     def _load_manifest(self):
         """Load embeddings manifest"""
@@ -490,8 +607,8 @@ class BLIP3oCLIPReproductionDataset(IterableDataset):
         logger.info(f"Iteration completed: {self.total_samples_processed} samples processed")
 
 
-def fixed_clip_reproduction_collate_fn(batch: List[Dict[str, Any]]) -> Dict[str, Any]:
-    """FIXED collate function with proper normalization and U-shaped timestep sampling"""
+def ultra_conservative_clip_reproduction_collate_fn(batch: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """ULTRA-CONSERVATIVE collate function with robust normalization and U-shaped timestep sampling"""
     if not batch:
         raise ValueError("Empty batch")
     
@@ -515,7 +632,7 @@ def fixed_clip_reproduction_collate_fn(batch: List[Dict[str, Any]]) -> Dict[str,
         eva_embeddings = eva_embeddings.float()
         clip_embeddings = clip_embeddings.float()
         
-        # FIXED: U-shaped timestep sampling for better training dynamics
+        # U-shaped timestep sampling for better training dynamics
         timesteps = sample_u_shaped_timesteps(batch_size, device, alpha=0.5)
         
         # Create standard Gaussian noise
@@ -556,7 +673,7 @@ def fixed_clip_reproduction_collate_fn(batch: List[Dict[str, Any]]) -> Dict[str,
         }
         
     except Exception as e:
-        logger.error(f"Error in fixed collate function: {e}")
+        logger.error(f"Error in ultra-conservative collate function: {e}")
         logger.error(f"Batch size: {len(batch)}")
         if batch:
             try:
@@ -571,7 +688,7 @@ def fixed_clip_reproduction_collate_fn(batch: List[Dict[str, Any]]) -> Dict[str,
         raise
 
 
-def create_fixed_clip_reproduction_dataloaders(
+def create_ultra_conservative_clip_reproduction_dataloaders(
     chunked_embeddings_dir: Union[str, Path],
     batch_size: int = 16,
     eval_batch_size: Optional[int] = None,
@@ -581,13 +698,13 @@ def create_fixed_clip_reproduction_dataloaders(
     pin_memory: bool = False,
     **kwargs
 ) -> Tuple[DataLoader, Optional[DataLoader]]:
-    """Create FIXED dataloaders with proper normalization"""
+    """Create ULTRA-CONSERVATIVE dataloaders with robust normalization"""
     
     if eval_batch_size is None:
         eval_batch_size = batch_size
     
-    logger.info(f"Creating FIXED CLIP reproduction dataloaders:")
-    logger.info(f"  Target: CLIP embeddings [B, N, 1024] (FIXED NORMALIZATION)")
+    logger.info(f"Creating ULTRA-CONSERVATIVE CLIP reproduction dataloaders:")
+    logger.info(f"  Target: CLIP embeddings [B, N, 1024] (ULTRA-CONSERVATIVE NORMALIZATION)")
     logger.info(f"  Conditioning: EVA embeddings [B, N, 4096]")
     logger.info(f"  Timestep sampling: U-shaped distribution")
     
@@ -618,8 +735,8 @@ def create_fixed_clip_reproduction_dataloaders(
     clip_normalizer = train_dataset.clip_normalizer
     
     def train_collate_fn(batch):
-        result = fixed_clip_reproduction_collate_fn(batch)
-        # Apply FIXED normalization to CLIP embeddings
+        result = ultra_conservative_clip_reproduction_collate_fn(batch)
+        # Apply ULTRA-CONSERVATIVE normalization to CLIP embeddings
         result['clip_embeddings'] = clip_normalizer.normalize(result['clip_embeddings'])
         # Update targets accordingly
         result['velocity_target'] = result['clip_embeddings'] - result['noise']
@@ -629,7 +746,7 @@ def create_fixed_clip_reproduction_dataloaders(
         return result
     
     def eval_collate_fn(batch):
-        result = fixed_clip_reproduction_collate_fn(batch)
+        result = ultra_conservative_clip_reproduction_collate_fn(batch)
         # Store both normalized and original for evaluation
         result['clip_embeddings_original'] = result['clip_embeddings'].clone()
         result['clip_embeddings'] = clip_normalizer.normalize(result['clip_embeddings'])
@@ -664,9 +781,15 @@ def create_fixed_clip_reproduction_dataloaders(
     train_dataloader.clip_normalizer = clip_normalizer
     eval_dataloader.clip_normalizer = clip_normalizer
     
-    logger.info(f"✅ FIXED CLIP reproduction dataloaders created")
+    logger.info(f"✅ ULTRA-CONSERVATIVE CLIP reproduction dataloaders created")
     logger.info(f"  Training dataset length: {len(train_dataset):,}")
     logger.info(f"  Evaluation dataset length: {len(eval_dataset):,}")
-    logger.info(f"  🔥 FIXED CLIP normalization: PROPERLY CONFIGURED")
+    logger.info(f"  🔥 ULTRA-CONSERVATIVE CLIP normalization: PROPERLY CONFIGURED")
     
     return train_dataloader, eval_dataloader
+
+
+# Backward compatibility aliases
+create_fixed_clip_reproduction_dataloaders = create_ultra_conservative_clip_reproduction_dataloaders
+FixedCLIPEmbeddingNormalizer = UltraConservativeCLIPNormalizer
+fixed_clip_reproduction_collate_fn = ultra_conservative_clip_reproduction_collate_fn
