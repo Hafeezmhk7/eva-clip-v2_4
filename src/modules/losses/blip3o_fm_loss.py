@@ -353,7 +353,7 @@ class RobustSemanticPreservingFlowMatchingLoss(nn.Module):
         
         # TOTAL LOSS COMBINATION
         total_loss = scale_factor * (
-            self.velocity_weight * velocity_loss + 
+            self.velocity_weight * velocity_loss +
             self.semantic_weight * semantic_loss +
             self.cosine_weight * cosine_loss +
             self.consistency_weight * consistency_loss

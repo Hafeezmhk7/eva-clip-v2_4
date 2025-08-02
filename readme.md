@@ -352,6 +352,7 @@ python train_dit.py \
 ```
 
 ### Inference
+
 ```python
 model = load_trained_model()
 eva_features = extract_eva_features(images)
