@@ -36,7 +36,7 @@ class CLIPEmbeddingNormalizer:
     """
     def __init__(self, embedding_dim=1024):
         self.embedding_dim = embedding_dim
-        self.scale_factor = math.sqrt(embedding_dim)  # Match Gaussian noise scale
+        self.scale_factor = math.sqrt(embedding_dim)/8  # Match Gaussian noise scale
         self.clip_mean = None
         self.clip_std = None
         self.stats_computed = False

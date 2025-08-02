@@ -33,6 +33,17 @@ module load Miniconda3/24.7.1-0
 module load CUDA/12.6.0
 source activate eva_clip_env
 
+# # ✅ FIXED: Set WandB API key
+# export WANDB_API_KEY="0d9895af249ee18e4fa141e8a2350e0f4adb920f"
+# export WANDB_MODE="online"  # Ensure online mode
+# export WANDB_CACHE_DIR="${TMPDIR}/wandb_cache"  # Use temp dir for cache
+# mkdir -p "${WANDB_CACHE_DIR}"
+
+# # Verify WandB login
+# echo "🔐 Verifying WandB authentication..."
+# python -c "import wandb; wandb.login(key='$WANDB_API_KEY'); print('✅ WandB login successful')"
+
+
 # Configuration
 EMBEDDINGS_DIR="/scratch-shared/azadaianchuk1/blip3o_workspace/embeddings/patch_only_256_tokens"
 OUTPUT_DIR="./checkpoints/blip3o_clean_$(date +%Y%m%d_%H%M%S)"
@@ -41,19 +52,19 @@ MODEL_SIZE="base"
 
 # Training hyperparameters
 NUM_EPOCHS=10
-BATCH_SIZE=128
-LEARNING_RATE=8e-4
+BATCH_SIZE=64
+LEARNING_RATE=1e-4
 WEIGHT_DECAY=0.01
-WARMUP_STEPS=500
+WARMUP_STEPS=100
 MAX_GRAD_NORM=1.0
 
 # Evaluation parameters
-EVAL_EVERY_N_STEPS=100
-EVAL_NUM_SAMPLES=500
+EVAL_EVERY_N_STEPS=50
+EVAL_NUM_SAMPLES=100
 EVAL_INFERENCE_STEPS=50
 
 # Data configuration
-MAX_SHARDS=5
+MAX_SHARDS=3
 
 # Create output directory
 mkdir -p "${OUTPUT_DIR}"

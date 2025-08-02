@@ -472,8 +472,8 @@ def create_improved_clip_reproduction_loss(
     prediction_type: str = "velocity",
     flow_type: str = "rectified", 
     velocity_weight: float = 1.0,
-    semantic_weight: float = 0.1,
-    cosine_weight: float = 0.05,
+    semantic_weight: float = 0.5,
+    cosine_weight: float = 0.2,
     use_timestep_weighting: bool = True,
     **kwargs
 ) -> SemanticPreservingFlowMatchingLoss:
