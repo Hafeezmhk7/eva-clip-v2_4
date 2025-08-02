@@ -1,0 +1,163 @@
+2025-08-02 19:54:25,414 - INFO - 🚀 FIXED BLIP3-o CLIP Reproduction Training
+2025-08-02 19:54:25,414 - INFO - ================================================================================
+2025-08-02 19:54:25,414 - INFO - 📋 Task: Reproduce CLIP embeddings from EVA embeddings
+2025-08-02 19:54:25,414 - INFO - 🧠 Model: BLIP3-o DiT with CRITICAL FIXES
+2025-08-02 19:54:25,414 - INFO - 🌊 Method: Rectified Flow Matching + FIXED Enhancements
+2025-08-02 19:54:25,414 - INFO - 🎯 Target: CLIP embeddings [B, N, 1024] (FIXED NORMALIZATION)
+2025-08-02 19:54:25,414 - INFO - 🎮 Conditioning: EVA embeddings [B, N, 4096] (ADAPTED)
+2025-08-02 19:54:25,414 - INFO - 🔥 Expected: CLIP similarity 0.46 → 0.65+ 🚀
+2025-08-02 19:54:25,414 - INFO - ================================================================================
+2025-08-02 19:54:25,414 - INFO - 🛠️ CRITICAL FIXES APPLIED:
+2025-08-02 19:54:25,414 - INFO -    ✅ 1. Conservative CLIP normalization (scale 4.0→2.0)
+2025-08-02 19:54:25,414 - INFO -    ✅ 2. Increased semantic weights (0.1→0.5, 0.05→0.2)
+2025-08-02 19:54:25,414 - INFO -    ✅ 3. New direct CLIP consistency loss (0.3 weight)
+2025-08-02 19:54:25,414 - INFO -    ✅ 4. Heun's solver for O(h²) integration
+2025-08-02 19:54:25,414 - INFO -    ✅ 5. Proper evaluation denormalization
+2025-08-02 19:54:25,415 - INFO -    ✅ 6. Comprehensive disconnect detection
+2025-08-02 19:54:25,415 - INFO -    ✅ 7. Earlier semantic loss application (0.7→0.5)
+2025-08-02 19:54:25,415 - INFO - ================================================================================
+2025-08-02 19:54:25,416 - INFO - FIXED Configuration:
+2025-08-02 19:54:25,416 - INFO -   Model size: base
+2025-08-02 19:54:25,417 - INFO -   Training mode: patch_only
+2025-08-02 19:54:25,417 - INFO -   Embeddings dir: /scratch-shared/azadaianchuk1/blip3o_workspace/embeddings/patch_only_256_tokens
+2025-08-02 19:54:25,417 - INFO -   Output dir: ./checkpoints/blip3o_clean_20250802_195422
+2025-08-02 19:54:25,417 - INFO -   Learning rate: 0.0001
+2025-08-02 19:54:25,417 - INFO -   Batch size: 64
+2025-08-02 19:54:25,417 - INFO -   Epochs: 10
+2025-08-02 19:54:25,417 - INFO -   Max shards: 3
+2025-08-02 19:54:25,417 - INFO -   FIXED Loss weights:
+2025-08-02 19:54:25,417 - INFO -     Velocity: 1.0
+2025-08-02 19:54:25,417 - INFO -     Semantic: 0.5 (INCREASED from 0.1)
+2025-08-02 19:54:25,417 - INFO -     Cosine: 0.2 (INCREASED from 0.05)
+2025-08-02 19:54:25,417 - INFO -     Consistency: 0.3 (NEW)
+2025-08-02 19:54:25,417 - INFO -   EVA adapter: ✅ ENABLED
+2025-08-02 19:54:25,417 - INFO -   Heun inference: ✅ ENABLED
+2025-08-02 19:54:25,891 - INFO - Using GPU: NVIDIA H100
+2025-08-02 19:54:25,891 - INFO - GPU Memory: 100.0 GB
+2025-08-02 19:54:25,891 - INFO - PyTorch version: 2.7.1+cu126
+2025-08-02 19:54:32,994 - INFO - ✅ CLIP DiT model loaded successfully
+2025-08-02 19:54:33,004 - INFO - ✅ Flow matching loss loaded successfully
+2025-08-02 19:54:34,514 - INFO - ✅ CLIP trainer loaded successfully
+2025-08-02 19:54:34,525 - WARNING - ⚠️ Failed to import dataset: cannot import name 'create_clip_reproduction_dataloaders' from 'src.modules.datasets.blip3o_dataset' (/gpfs/home4/azadaianchuk1/eva-clip-v6_2/src/modules/datasets/blip3o_dataset.py)
+2025-08-02 19:54:34,533 - INFO - ✅ Configuration loaded successfully
+2025-08-02 19:54:34,533 - WARNING - ⚠️ Missing components: ['dataset']
+2025-08-02 19:54:34,534 - WARNING - ⚠️ Partial initialization. Missing: ['dataset']
+2025-08-02 19:54:34,534 - INFO - ✅ All FIXED modules imported successfully
+2025-08-02 19:54:34,534 - INFO - ✅ Environment check passed
+2025-08-02 19:54:34,534 - INFO - ✅ Output directory ready: checkpoints/blip3o_clean_20250802_195422
+2025-08-02 19:54:34,534 - INFO - 🏗️ Creating model...
+2025-08-02 19:54:34,534 - INFO - ✅ Configuration validation passed
+2025-08-02 19:54:34,963 - INFO - ✅ EVA-CLIP Adapter initialized: 4096 → 768
+2025-08-02 19:54:34,963 - INFO -    Layers: 6, Dropout: 0.1, Residual: True
+2025-08-02 19:54:36,407 - INFO - ✅ Stable initialization applied with depth scale: 0.2887
+2025-08-02 19:54:36,409 - INFO - ✅ IMPROVED BLIP3-o CLIP DiT model initialized: 227,474,014 parameters
+2025-08-02 19:54:36,409 - INFO -   🔥 EVA adapter: ENABLED
+2025-08-02 19:54:36,409 - INFO -   🚀 Heun solver: ENABLED
+2025-08-02 19:54:36,409 - INFO -   ⚡ Attention caching: Available
+2025-08-02 19:54:36,409 - INFO - ✅ IMPROVED BLIP3-o model created:
+2025-08-02 19:54:36,409 - INFO -    Size: base
+2025-08-02 19:54:36,410 - INFO -    Parameters: 227,474,014
+2025-08-02 19:54:36,410 - INFO -    EVA adapter: ✅
+2025-08-02 19:54:36,410 - INFO -    Heun solver: ✅
+2025-08-02 19:54:36,410 - INFO -    3D RoPE: ✅
+2025-08-02 19:54:36,410 - INFO -    Sandwich norm: ✅
+2025-08-02 19:54:36,636 - INFO - ✅ Model created with 227,474,014 parameters
+2025-08-02 19:54:36,636 - INFO -   Model size: base
+2025-08-02 19:54:36,636 - INFO -   Training mode: patch_only
+2025-08-02 19:54:36,636 - INFO -   3D RoPE: ✅ ENABLED
+2025-08-02 19:54:36,636 - INFO -   Sandwich Norm: ✅ ENABLED
+2025-08-02 19:54:36,636 - INFO -   EVA Adapter: ✅ ENABLED
+2025-08-02 19:54:36,636 - INFO -   Heun Solver: ✅ ENABLED
+2025-08-02 19:54:36,636 - INFO - 🌊 Creating FIXED loss function...
+2025-08-02 19:54:36,636 - INFO - ✅ FIXED Flow Matching Loss initialized:
+2025-08-02 19:54:36,636 - INFO -   Prediction type: velocity
+2025-08-02 19:54:36,636 - INFO -   Flow type: rectified
+2025-08-02 19:54:36,636 - INFO -   FIXED Weights - Velocity: 1.0, Semantic: 0.5, Cosine: 0.2
+2025-08-02 19:54:36,636 - INFO -   NEW Consistency weight: 0.3
+2025-08-02 19:54:36,636 - INFO -   FIXED Semantic threshold: 0.5 (was 0.7)
+2025-08-02 19:54:36,636 - INFO - ✅ FIXED loss function created:
+2025-08-02 19:54:36,636 - INFO -   Prediction type: velocity
+2025-08-02 19:54:36,636 - INFO -   Flow type: rectified
+2025-08-02 19:54:36,636 - INFO -   FIXED Weights - Velocity: 1.0, Semantic: 0.5, Cosine: 0.2
+2025-08-02 19:54:36,636 - INFO -   NEW Consistency weight: 0.3
+2025-08-02 19:54:36,636 - INFO -   Timestep weighting: ✅ ENABLED
+2025-08-02 19:54:36,636 - INFO -   🔥 Semantic weight INCREASED to 0.5 (was 0.1)
+2025-08-02 19:54:36,636 - INFO -   🔥 Cosine weight INCREASED to 0.2 (was 0.05)
+2025-08-02 19:54:36,636 - INFO - 📊 Creating FIXED dataloaders...
+2025-08-02 19:54:36,637 - INFO - Loading embeddings from: /scratch-shared/azadaianchuk1/blip3o_workspace/embeddings/patch_only_256_tokens
+2025-08-02 19:54:36,637 - INFO - Found 35 .pkl files in embeddings directory
+2025-08-02 19:54:36,637 - INFO - Creating FIXED CLIP reproduction dataloaders:
+2025-08-02 19:54:36,637 - INFO -   Target: CLIP embeddings [B, N, 1024] (FIXED NORMALIZATION)
+2025-08-02 19:54:36,637 - INFO -   Conditioning: EVA embeddings [B, N, 4096]
+2025-08-02 19:54:36,637 - INFO -   Timestep sampling: U-shaped distribution
+2025-08-02 19:54:36,654 - INFO - Loaded manifest: 35 shards, 91,333 samples
+2025-08-02 19:54:36,654 - INFO - Found 35 files with pattern: embeddings_shard_*_patch_only.pkl
+2025-08-02 19:54:36,656 - INFO - Prepared 3 shard files
+2025-08-02 19:54:36,656 - INFO - Computing FIXED CLIP embedding statistics from 3 shards...
+2025-08-02 19:54:41,243 - INFO -    Processed shard 1: torch.Size([2601, 256, 1024])
+2025-08-02 19:54:46,191 - INFO -    Processed shard 2: torch.Size([2646, 256, 1024])
+2025-08-02 19:54:50,751 - INFO -    Processed shard 3: torch.Size([2585, 256, 1024])
+2025-08-02 19:54:50,913 - INFO - Computing stats from 2,004,992 embedding vectors
+2025-08-02 19:54:55,053 - INFO -    Removing 1349017 outlier samples (67.3%)
+2025-08-02 19:54:56,220 - INFO - ✅ FIXED CLIP normalization statistics computed:
+2025-08-02 19:54:56,220 - INFO -    Mean range: [-7.179070, 6.377367]
+2025-08-02 19:54:56,220 - INFO -    Std range: [0.417606, 3.495508]
+2025-08-02 19:54:56,220 - INFO -    Scale factor: 2.00
+2025-08-02 19:54:56,220 - INFO -    Normalized range: [-10.88, 12.09]
+2025-08-02 19:54:56,397 - INFO - Using manifest for length estimation: 7,828 samples
+2025-08-02 19:54:56,397 - INFO - FIXED CLIP Reproduction Dataset initialized:
+2025-08-02 19:54:56,397 - INFO -   Directory: /scratch-shared/azadaianchuk1/blip3o_workspace/embeddings/patch_only_256_tokens
+2025-08-02 19:54:56,397 - INFO -   Mode: patch_only (256 tokens)
+2025-08-02 19:54:56,397 - INFO -   TARGET: CLIP embeddings [B, N, 1024] (FIXED NORMALIZATION)
+2025-08-02 19:54:56,397 - INFO -   CONDITIONING: EVA embeddings [B, N, 4096]
+2025-08-02 19:54:56,398 - INFO -   Shards: 3
+2025-08-02 19:54:56,398 - INFO -   ✅ FIXED CLIP normalization: ENABLED
+2025-08-02 19:54:56,398 - INFO - Loaded manifest: 35 shards, 91,333 samples
+2025-08-02 19:54:56,398 - INFO - Found 35 files with pattern: embeddings_shard_*_patch_only.pkl
+2025-08-02 19:54:56,398 - INFO - Prepared 3 shard files
+2025-08-02 19:54:56,398 - INFO - Computing FIXED CLIP embedding statistics from 3 shards...
+2025-08-02 19:55:01,201 - INFO -    Processed shard 1: torch.Size([2646, 256, 1024])
+2025-08-02 19:55:05,788 - INFO -    Processed shard 2: torch.Size([2601, 256, 1024])
+2025-08-02 19:55:10,554 - INFO -    Processed shard 3: torch.Size([2585, 256, 1024])
+2025-08-02 19:55:10,705 - INFO - Computing stats from 2,004,992 embedding vectors
+2025-08-02 19:55:14,828 - INFO -    Removing 1349017 outlier samples (67.3%)
+2025-08-02 19:55:15,993 - INFO - ✅ FIXED CLIP normalization statistics computed:
+2025-08-02 19:55:15,993 - INFO -    Mean range: [-7.179070, 6.377367]
+2025-08-02 19:55:15,993 - INFO -    Std range: [0.417606, 3.495508]
+2025-08-02 19:55:15,993 - INFO -    Scale factor: 2.00
+2025-08-02 19:55:15,993 - INFO -    Normalized range: [-8.54, 13.68]
+2025-08-02 19:55:16,146 - INFO - Using manifest for length estimation: 7,828 samples
+2025-08-02 19:55:16,146 - INFO - FIXED CLIP Reproduction Dataset initialized:
+2025-08-02 19:55:16,146 - INFO -   Directory: /scratch-shared/azadaianchuk1/blip3o_workspace/embeddings/patch_only_256_tokens
+2025-08-02 19:55:16,146 - INFO -   Mode: patch_only (256 tokens)
+2025-08-02 19:55:16,146 - INFO -   TARGET: CLIP embeddings [B, N, 1024] (FIXED NORMALIZATION)
+2025-08-02 19:55:16,146 - INFO -   CONDITIONING: EVA embeddings [B, N, 4096]
+2025-08-02 19:55:16,146 - INFO -   Shards: 3
+2025-08-02 19:55:16,146 - INFO -   ✅ FIXED CLIP normalization: ENABLED
+2025-08-02 19:55:16,146 - INFO - ✅ FIXED CLIP reproduction dataloaders created
+2025-08-02 19:55:16,147 - INFO -   Training dataset length: 7,828
+2025-08-02 19:55:16,147 - INFO -   Evaluation dataset length: 7,828
+2025-08-02 19:55:16,147 - INFO -   🔥 FIXED CLIP normalization: PROPERLY CONFIGURED
+2025-08-02 19:55:16,147 - INFO - ✅ FIXED dataloaders created successfully:
+2025-08-02 19:55:16,148 - INFO -   Training mode: patch_only
+2025-08-02 19:55:16,148 - INFO -   Batch size: 64
+2025-08-02 19:55:16,149 - INFO -   Max shards: 3
+2025-08-02 19:55:16,149 - INFO -   🔥 FIXED CLIP normalization: ✅ PROPERLY CONFIGURED
+2025-08-02 19:55:16,150 - INFO -   🔥 U-shaped timestep sampling: ✅ ENABLED
+2025-08-02 19:55:20,793 - INFO - ✅ Dataloader test successful:
+2025-08-02 19:55:20,795 - INFO -   Batch size: 64
+2025-08-02 19:55:20,795 - INFO -   CLIP embeddings shape: torch.Size([64, 256, 1024])
+2025-08-02 19:55:20,795 - INFO -   EVA embeddings shape: torch.Size([64, 256, 4096])
+2025-08-02 19:55:20,795 - INFO -   🔥 CLIP normalizer: ✅ AVAILABLE
+2025-08-02 19:55:20,795 - INFO -      Stats computed: True
+2025-08-02 19:55:20,795 - INFO -      Scale factor: 2.00 (FIXED: reduced from 4.0)
+2025-08-02 19:55:20,796 - INFO -      Normalized range: [-63.08, 124.56]
+2025-08-02 19:55:20,796 - ERROR - ❌ NORMALIZATION RANGE TOO LARGE: (-63.076175689697266, 124.55777740478516)
+2025-08-02 19:55:20,796 - ERROR -    This will cause training instability!
+2025-08-02 19:55:20,796 - ERROR - ❌ Error creating FIXED dataloaders: CLIP normalization range is too extreme
+2025-08-02 19:55:20,796 - ERROR - ❌ FIXED training failed with error: CLIP normalization range is too extreme
+2025-08-02 19:55:20,797 - ERROR - ==================================================
+2025-08-02 19:55:20,797 - ERROR - FULL ERROR TRACEBACK:
+2025-08-02 19:55:20,800 - ERROR - ==================================================
+2025-08-02 19:55:20,800 - ERROR - 🔍 NORMALIZATION ERROR:
+2025-08-02 19:55:20,800 - ERROR -    Check CLIP embeddings format and FIXED normalizer

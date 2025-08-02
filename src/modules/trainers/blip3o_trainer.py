@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """
-UPDATED BLIP3-o Trainer with Improved Evaluation and Normalization Handling
+FIXED BLIP3-o Trainer with Critical Evaluation and Monitoring Improvements
 src/modules/trainers/blip3o_trainer.py
 
-Key improvements:
-1. Proper CLIP embedding denormalization for evaluation
-2. Enhanced similarity computation with multiple metrics
-3. Better checkpoint handling with normalization state
-4. Improved loss computation with semantic components
-5. Comprehensive evaluation metrics tracking
+CRITICAL FIXES:
+1. Proper CLIP embedding denormalization during evaluation
+2. Heun's method for better integration accuracy  
+3. Comprehensive disconnect detection and monitoring
+4. Better checkpoint handling with normalization state
+5. Enhanced similarity computation with multiple metrics
 """
 
 import torch
@@ -25,9 +25,6 @@ import gc
 from collections import deque
 import math
 import os
-import shutil
-import tempfile
-import psutil
 
 # WandB import with error handling
 try:
@@ -40,16 +37,16 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
-class ImprovedBLIP3oCLIPTrainer:
+class FixedBLIP3oCLIPTrainer:
     """
-    IMPROVED Trainer for BLIP3-o CLIP Reproduction
+    FIXED Trainer for BLIP3-o CLIP Reproduction
     
-    Key improvements:
+    CRITICAL FIXES:
     1. Proper CLIP embedding denormalization for evaluation
-    2. Enhanced evaluation with multiple similarity metrics
-    3. Better loss computation with semantic components
-    4. Comprehensive metrics tracking
-    5. Robust checkpoint handling
+    2. Heun's method for superior integration accuracy
+    3. Comprehensive disconnect detection and alerting
+    4. Enhanced evaluation with multiple similarity metrics
+    5. Better loss computation monitoring
     """
     
     def __init__(
@@ -58,7 +55,7 @@ class ImprovedBLIP3oCLIPTrainer:
         loss_fn,
         train_dataloader,
         eval_dataloader=None,
-        clip_normalizer=None,  # NEW: CLIP normalizer for denormalization
+        clip_normalizer=None,  # CRITICAL: CLIP normalizer for denormalization
         
         # Training configuration
         learning_rate: float = 1e-4,
@@ -72,7 +69,7 @@ class ImprovedBLIP3oCLIPTrainer:
         eval_every_n_steps: int = 100,
         eval_num_samples: int = 500,
         eval_inference_steps: int = 50,
-        use_heun_inference: bool = True,  # NEW: Use Heun solver for evaluation
+        use_heun_inference: bool = True,  # FIXED: Use Heun solver for evaluation
         
         # Logging
         log_every_n_steps: int = 10,
@@ -86,22 +83,19 @@ class ImprovedBLIP3oCLIPTrainer:
         
         # WandB configuration
         use_wandb: bool = False,
-        wandb_project: str = "blip3o-clip-improved",
+        wandb_project: str = "blip3o-clip-fixed",
         wandb_run_name: Optional[str] = None,
         wandb_config: Optional[Dict] = None,
         wandb_api_key: Optional[str] = None,
         
-        # Checkpoint configuration
-        max_checkpoint_size_gb: float = 2.0,
-        checkpoint_save_retries: int = 3,
-        enable_checkpoint_compression: bool = True,
+        **kwargs
     ):
         self.model = model
         self.loss_fn = loss_fn
         self.train_dataloader = train_dataloader
         self.eval_dataloader = eval_dataloader
         
-        # NEW: CLIP normalizer for proper evaluation
+        # CRITICAL: CLIP normalizer for proper evaluation
         self.clip_normalizer = clip_normalizer
         if self.clip_normalizer is None:
             # Try to get from dataloader
@@ -109,7 +103,9 @@ class ImprovedBLIP3oCLIPTrainer:
                 self.clip_normalizer = train_dataloader.clip_normalizer
                 logger.info("✅ CLIP normalizer obtained from train dataloader")
             else:
-                logger.warning("⚠️ No CLIP normalizer provided - evaluation may be incorrect!")
+                logger.error("❌ NO CLIP NORMALIZER PROVIDED!")
+                logger.error("   This will result in incorrect evaluation metrics!")
+                raise ValueError("CLIP normalizer is required for proper evaluation")
         
         # Training config
         self.learning_rate = learning_rate
@@ -133,11 +129,6 @@ class ImprovedBLIP3oCLIPTrainer:
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
         
-        # Checkpoint configuration
-        self.max_checkpoint_size_gb = max_checkpoint_size_gb
-        self.checkpoint_save_retries = checkpoint_save_retries
-        self.enable_checkpoint_compression = enable_checkpoint_compression
-        
         # Device
         self.device = device or (torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu"))
         self.model = self.model.to(self.device)
@@ -155,12 +146,18 @@ class ImprovedBLIP3oCLIPTrainer:
         self.best_eval_similarity = 0.0
         self.best_loss = float('inf')
         
-        # Metrics tracking
+        # FIXED: Enhanced metrics tracking for disconnect detection
         self.loss_history = deque(maxlen=1000)
-        self.similarity_history = deque(maxlen=1000)
-        self.clean_similarity_history = deque(maxlen=1000)  # NEW: Track clean embedding similarity
+        self.velocity_similarity_history = deque(maxlen=1000)
+        self.clean_similarity_history = deque(maxlen=1000)
+        self.per_image_similarity_history = deque(maxlen=1000)  # NEW
         self.lr_history = deque(maxlen=1000)
         self.grad_norm_history = deque(maxlen=1000)
+        
+        # CRITICAL: Disconnect detection tracking
+        self.disconnect_alerts = 0
+        self.last_clean_sim = None
+        self.last_velocity_sim = None
         
         # Estimate steps per epoch BEFORE WandB setup
         self.estimated_steps_per_epoch = self._estimate_steps_per_epoch()
@@ -180,7 +177,7 @@ class ImprovedBLIP3oCLIPTrainer:
         elif use_wandb and not WANDB_AVAILABLE:
             logger.warning("WandB requested but not available. Install with: pip install wandb")
         
-        logger.info("✅ IMPROVED BLIP3-o CLIP Trainer initialized")
+        logger.info("✅ FIXED BLIP3-o CLIP Trainer initialized")
         logger.info(f"  Device: {self.device}")
         logger.info(f"  Parameters: {sum(p.numel() for p in self.model.parameters()):,}")
         logger.info(f"  CLIP normalizer: {'✅ AVAILABLE' if self.clip_normalizer else '❌ MISSING'}")
@@ -274,10 +271,18 @@ class ImprovedBLIP3oCLIPTrainer:
                 'eval_num_samples': self.eval_num_samples,
                 'eval_inference_steps': self.eval_inference_steps,
                 'use_heun_inference': self.use_heun_inference,
-                'experiment_type': 'blip3o_clip_improved',
+                'experiment_type': 'blip3o_clip_FIXED',
                 'task': 'EVA_to_CLIP_embedding_reproduction',
-                'method': 'BLIP3o_DiT_with_improvements',
-                'clip_normalization': 'ENABLED' if self.clip_normalizer else 'DISABLED',
+                'method': 'BLIP3o_DiT_with_CRITICAL_FIXES',
+                'clip_normalization': 'FIXED' if self.clip_normalizer else 'MISSING',
+                'fixes_applied': [
+                    'conservative_clip_normalization',
+                    'heun_integration',
+                    'semantic_loss_reweighting',
+                    'direct_clip_consistency',
+                    'proper_evaluation_denormalization',
+                    'disconnect_detection'
+                ],
                 **model_config,
                 **self.wandb_config,
             }
@@ -288,7 +293,7 @@ class ImprovedBLIP3oCLIPTrainer:
                 config=wandb_config,
                 dir=str(self.output_dir),
                 resume="allow",
-                tags=["blip3o", "clip_reproduction", "improved", "semantic_preserving"]
+                tags=["blip3o", "clip_reproduction", "FIXED", "disconnect_resolved"]
             )
             
             if hasattr(self.model, 'get_num_parameters'):
@@ -304,7 +309,7 @@ class ImprovedBLIP3oCLIPTrainer:
             self.use_wandb = False
 
     def _compute_loss(self, batch: Dict[str, Any]) -> Tuple[torch.Tensor, Dict[str, float]]:
-        """Compute improved loss for a batch"""
+        """Compute loss for a batch with enhanced monitoring"""
         for key, value in batch.items():
             if torch.is_tensor(value):
                 batch[key] = value.to(self.device)
@@ -325,7 +330,7 @@ class ImprovedBLIP3oCLIPTrainer:
                     return_dict=False
                 )
                 
-                # Use improved loss function
+                # Use FIXED loss function
                 loss, metrics = self.loss_fn(
                     model_output=model_output,
                     target_samples=clip_embeddings,
@@ -343,7 +348,7 @@ class ImprovedBLIP3oCLIPTrainer:
                 return_dict=False
             )
             
-            # Use improved loss function
+            # Use FIXED loss function
             loss, metrics = self.loss_fn(
                 model_output=model_output,
                 target_samples=clip_embeddings,
@@ -387,22 +392,103 @@ class ImprovedBLIP3oCLIPTrainer:
         
         return grad_norm
 
+    def _generate_with_heun(
+        self,
+        eva_features: torch.Tensor,
+        num_steps: int = 50,
+    ) -> torch.Tensor:
+        """
+        FIXED: Generate using Heun's method for O(h²) accuracy
+        This is critical for proper evaluation results
+        """
+        batch_size, seq_len, _ = eva_features.shape
+        
+        # Start from standard Gaussian noise
+        x = torch.randn(
+            batch_size, seq_len, 1024,
+            device=self.device, dtype=eva_features.dtype
+        )
+        
+        # Linear timestep schedule (1.0 → 0.0) for rectified flow
+        timesteps = torch.linspace(1.0, 0.0, num_steps + 1, device=self.device)[:-1]
+        
+        for i, t in enumerate(timesteps):
+            t_batch = torch.full((batch_size,), t.item(), device=self.device, dtype=eva_features.dtype)
+            
+            # Compute step size
+            if i < len(timesteps) - 1:
+                dt = timesteps[i] - timesteps[i + 1]
+            else:
+                dt = timesteps[i]
+            
+            dt = dt.item()
+            
+            if self.use_heun_inference:
+                # HEUN'S METHOD (O(h²) accuracy)
+                
+                # First velocity prediction (Euler predictor)
+                v1 = self.model(
+                    hidden_states=x,
+                    timestep=t_batch,
+                    encoder_hidden_states=eva_features,
+                    return_dict=False
+                )
+                if isinstance(v1, dict):
+                    v1 = v1.get('velocity_prediction', v1.get('prediction', list(v1.values())[0]))
+                
+                # Predict intermediate point
+                x_mid = x + dt * v1
+                t_mid = torch.full((batch_size,), (t - dt).item(), device=self.device, dtype=eva_features.dtype)
+                t_mid = torch.clamp(t_mid, min=0.0)
+                
+                # Second velocity prediction at midpoint
+                v2 = self.model(
+                    hidden_states=x_mid,
+                    timestep=t_mid,
+                    encoder_hidden_states=eva_features,
+                    return_dict=False
+                )
+                if isinstance(v2, dict):
+                    v2 = v2.get('velocity_prediction', v2.get('prediction', list(v2.values())[0]))
+                
+                # Heun's corrector: average the two velocities
+                v_avg = (v1 + v2) / 2.0
+                x = x + dt * v_avg
+                
+            else:
+                # EULER METHOD (O(h) accuracy - fallback)
+                velocity = self.model(
+                    hidden_states=x,
+                    timestep=t_batch,
+                    encoder_hidden_states=eva_features,
+                    return_dict=False
+                )
+                if isinstance(velocity, dict):
+                    velocity = velocity.get('velocity_prediction', velocity.get('prediction', list(velocity.values())[0]))
+                
+                x = x + dt * velocity
+            
+            # FIXED: Less aggressive clamping to preserve semantic structure
+            x = torch.clamp(x, min=-20.0, max=20.0)
+        
+        return x
+
     def _evaluate(self, num_samples: Optional[int] = None) -> Dict[str, float]:
-        """IMPROVED evaluation with proper denormalization and multiple metrics"""
+        """FIXED: Evaluation with proper denormalization and Heun integration"""
         if self.eval_dataloader is None:
             return {}
         
         if num_samples is None:
             num_samples = self.eval_num_samples
         
-        logger.info(f"Starting IMPROVED evaluation with {num_samples} samples")
+        logger.info(f"Starting FIXED evaluation with {num_samples} samples")
         
         self.model.eval()
         
         # Collect all results for comprehensive analysis
         all_generated = []
-        all_targets = []
-        all_targets_original = []  # Store original (denormalized) targets if available
+        all_targets_normalized = []
+        all_targets_original = []
         samples_processed = 0
         
         eval_start_time = time.time()
@@ -423,24 +509,15 @@ class ImprovedBLIP3oCLIPTrainer:
                         else:
                             target_clip_original = None
                         
-                        # Generate CLIP embeddings using improved inference
-                        if hasattr(self.model, 'generate') and self.use_heun_inference:
-                            generated_clip = self.model.generate(
-                                eva_features=eva_features,
-                                num_inference_steps=self.eval_inference_steps,
-                                use_heun=True,  # Use Heun solver for better accuracy
-                            )
-                        else:
-                            # Fallback to model inference
-                            generated_clip = self.model.generate(
-                                eva_features=eva_features,
-                                num_inference_steps=self.eval_inference_steps,
-                                use_heun=False,
-                            )
+                        # FIXED: Generate CLIP embeddings using Heun's method
+                        generated_clip_normalized = self._generate_with_heun(
+                            eva_features=eva_features,
+                            num_steps=self.eval_inference_steps,
+                        )
                         
                         # Collect results
-                        all_generated.append(generated_clip.cpu())
-                        all_targets.append(target_clip_normalized.cpu())
+                        all_generated.append(generated_clip_normalized.cpu())
+                        all_targets_normalized.append(target_clip_normalized.cpu())
                         if target_clip_original is not None:
                             all_targets_original.append(target_clip_original.cpu())
                         
@@ -463,8 +540,8 @@ class ImprovedBLIP3oCLIPTrainer:
         
         try:
             # Concatenate all results
-            all_generated = torch.cat(all_generated, dim=0)  # [N, seq_len, 1024]
-            all_targets = torch.cat(all_targets, dim=0)      # [N, seq_len, 1024] (normalized)
+            all_generated = torch.cat(all_generated, dim=0)  # [N, seq_len, 1024] (normalized)
+            all_targets_normalized = torch.cat(all_targets_normalized, dim=0)  # [N, seq_len, 1024] (normalized)
             
             if all_targets_original:
                 all_targets_original = torch.cat(all_targets_original, dim=0)  # [N, seq_len, 1024] (original)
@@ -475,7 +552,7 @@ class ImprovedBLIP3oCLIPTrainer:
             eval_metrics = {}
             
             if self.clip_normalizer and self.clip_normalizer.stats_computed:
-                # Denormalize generated embeddings to original CLIP space
+                # FIXED: Denormalize generated embeddings to original CLIP space
                 try:
                     generated_denorm = self.clip_normalizer.denormalize(all_generated)
                     
@@ -483,7 +560,7 @@ class ImprovedBLIP3oCLIPTrainer:
                     if all_targets_original is not None:
                         target_denorm = all_targets_original
                     else:
-                        target_denorm = self.clip_normalizer.denormalize(all_targets)
+                        target_denorm = self.clip_normalizer.denormalize(all_targets_normalized)
                     
                     # Compute metrics in original CLIP space (MOST IMPORTANT)
                     denorm_metrics = self._compute_evaluation_metrics(
@@ -494,6 +571,8 @@ class ImprovedBLIP3oCLIPTrainer:
                     # Set primary metrics from denormalized space
                     eval_metrics.update({
                         'eval_clip_similarity': denorm_metrics['denorm_clip_similarity'],
+                        'eval_per_image_similarity': denorm_metrics['denorm_per_image_similarity'],
+                        'eval_token_similarity': denorm_metrics['denorm_token_similarity'],
                         'eval_mse_loss': denorm_metrics['denorm_mse_loss'],
                         'eval_high_quality': denorm_metrics['denorm_high_quality'],
                         'eval_very_high_quality': denorm_metrics['denorm_very_high_quality'],
@@ -504,48 +583,23 @@ class ImprovedBLIP3oCLIPTrainer:
                         'eval_norm_ratio': denorm_metrics['denorm_norm_ratio'],
                     })
                     
-                    logger.info(f"✅ Evaluation with denormalization completed")
+                    logger.info(f"✅ FIXED evaluation with denormalization completed")
                     
                 except Exception as e:
-                    logger.error(f"Denormalization failed: {e}, using normalized metrics")
-                    # Fallback to normalized metrics
-                    norm_metrics = self._compute_evaluation_metrics(
-                        all_generated, all_targets, prefix="norm_"
-                    )
-                    eval_metrics.update(norm_metrics)
-                    
-                    # Set primary metrics from normalized space
-                    eval_metrics.update({
-                        'eval_clip_similarity': norm_metrics['norm_clip_similarity'],
-                        'eval_mse_loss': norm_metrics['norm_mse_loss'],
-                        'eval_high_quality': norm_metrics['norm_high_quality'],
-                        'eval_very_high_quality': norm_metrics['norm_very_high_quality'],
-                        'eval_excellent_quality': norm_metrics['norm_excellent_quality'],
-                        'eval_similarity_std': norm_metrics['norm_similarity_std'],
-                        'eval_generated_norm': norm_metrics['norm_generated_norm'],
-                        'eval_target_norm': norm_metrics['norm_target_norm'],
-                        'eval_norm_ratio': norm_metrics['norm_norm_ratio'],
-                    })
+                    logger.error(f"❌ Denormalization failed: {e}")
+                    logger.error("This is a CRITICAL issue that will give wrong metrics!")
+                    # Don't fallback - this is a critical error
+                    raise
             else:
-                # No normalizer available - compute metrics in current space
-                logger.warning("No CLIP normalizer available - evaluation metrics may be incorrect!")
-                norm_metrics = self._compute_evaluation_metrics(
-                    all_generated, all_targets, prefix="norm_"
-                )
-                eval_metrics.update(norm_metrics)
-                
-                # Set primary metrics
-                eval_metrics.update({
-                    'eval_clip_similarity': norm_metrics['norm_clip_similarity'],
-                    'eval_mse_loss': norm_metrics['norm_mse_loss'],
-                    'eval_high_quality': norm_metrics['norm_high_quality'],
-                    'eval_very_high_quality': norm_metrics['norm_very_high_quality'],
-                    'eval_excellent_quality': norm_metrics['norm_excellent_quality'],
-                    'eval_similarity_std': norm_metrics['norm_similarity_std'],
-                    'eval_generated_norm': norm_metrics['norm_generated_norm'],
-                    'eval_target_norm': norm_metrics['norm_target_norm'],
-                    'eval_norm_ratio': norm_metrics['norm_norm_ratio'],
-                })
+                logger.error("❌ NO CLIP NORMALIZER AVAILABLE!")
+                logger.error("   Evaluation metrics will be INCORRECT!")
+                raise ValueError("CLIP normalizer required for proper evaluation")
+            
+            # CRITICAL: Also compute metrics in normalized space for comparison
+            norm_metrics = self._compute_evaluation_metrics(
+                all_generated, all_targets_normalized, prefix="norm_"
+            )
+            eval_metrics.update(norm_metrics)
             
             # Add evaluation metadata
             eval_metrics.update({
@@ -553,19 +607,30 @@ class ImprovedBLIP3oCLIPTrainer:
                 'eval_time_seconds': eval_time,
                 'eval_inference_steps': self.eval_inference_steps,
                 'eval_heun_enabled': self.use_heun_inference,
-                'eval_normalization_applied': self.clip_normalizer is not None and self.clip_normalizer.stats_computed,
+                'eval_normalization_applied': True,
+                'eval_denormalization_working': True,
             })
             
-            logger.info(f"✅ IMPROVED evaluation completed: {samples_processed} samples")
-            logger.info(f"   CLIP similarity: {eval_metrics['eval_clip_similarity']:.4f}")
+            # CRITICAL: Compare normalized vs denormalized metrics
+            norm_vs_denorm_diff = abs(eval_metrics['eval_clip_similarity'] - eval_metrics['norm_clip_similarity'])
+            eval_metrics['eval_norm_denorm_difference'] = norm_vs_denorm_diff
+            
+            if norm_vs_denorm_diff > 0.1:
+                logger.warning(f"⚠️ Large difference between normalized/denormalized metrics: {norm_vs_denorm_diff:.3f}")
+                logger.warning("   This may indicate normalization issues!")
+            
+            logger.info(f"✅ FIXED evaluation completed: {samples_processed} samples")
+            logger.info(f"   CLIP similarity (denormalized): {eval_metrics['eval_clip_similarity']:.4f}")
+            logger.info(f"   CLIP similarity (normalized): {eval_metrics['norm_clip_similarity']:.4f}")
             logger.info(f"   High quality (>0.7): {eval_metrics['eval_high_quality']*100:.1f}%")
             logger.info(f"   Very high quality (>0.8): {eval_metrics['eval_very_high_quality']*100:.1f}%")
+            logger.info(f"   Heun integration: {'✅' if self.use_heun_inference else '❌'}")
             
             return eval_metrics
             
         except Exception as e:
-            logger.error(f"Error processing evaluation results: {e}")
-            return {}
+            logger.error(f"❌ Error processing evaluation results: {e}")
+            raise
 
     def _compute_evaluation_metrics(
         self, 
@@ -573,26 +638,22 @@ class ImprovedBLIP3oCLIPTrainer:
         target: torch.Tensor, 
         prefix: str = ""
     ) -> Dict[str, float]:
-        """Compute comprehensive evaluation metrics"""
+        """FIXED: Compute comprehensive evaluation metrics"""
         
-        # Flatten to per-token level for comprehensive analysis
-        gen_flat = generated.flatten(0, 1)  # [N*seq_len, embed_dim]
-        tgt_flat = target.flatten(0, 1)     # [N*seq_len, embed_dim]
-        
-        # Per-image metrics (average over sequence length)
+        # Per-image metrics (average over sequence length) - PRIMARY METRIC
         gen_per_image = generated.mean(dim=1)  # [N, embed_dim]
         tgt_per_image = target.mean(dim=1)     # [N, embed_dim]
         
-        # 1. Cosine similarity (most important)
-        gen_norm = F.normalize(generated, p=2, dim=-1)
-        tgt_norm = F.normalize(target, p=2, dim=-1)
-        cosine_sim = F.cosine_similarity(gen_norm, tgt_norm, dim=-1)
-        per_image_sim = cosine_sim.mean(dim=1)  # Average over sequence
-        
-        # 2. Per-image cosine similarity
+        # 1. Per-image cosine similarity (matches evaluation exactly)
         gen_img_norm = F.normalize(gen_per_image, p=2, dim=-1)
         tgt_img_norm = F.normalize(tgt_per_image, p=2, dim=-1)
         per_image_cosine = F.cosine_similarity(gen_img_norm, tgt_img_norm, dim=-1)
+        
+        # 2. Per-token similarity
+        gen_token_norm = F.normalize(generated, p=2, dim=-1)
+        tgt_token_norm = F.normalize(target, p=2, dim=-1)
+        token_cosine = F.cosine_similarity(gen_token_norm, tgt_token_norm, dim=-1)
+        per_image_token_sim = token_cosine.mean(dim=1)  # Average over sequence
         
         # 3. MSE loss
         mse_loss = F.mse_loss(generated, target)
@@ -603,10 +664,10 @@ class ImprovedBLIP3oCLIPTrainer:
         # 5. Dot product (unnormalized similarity)
         dot_product = (gen_per_image * tgt_per_image).sum(dim=-1).mean()
         
-        # 6. Quality metrics
-        high_quality = (per_image_sim > 0.7).float().mean().item()
-        very_high_quality = (per_image_sim > 0.8).float().mean().item()
-        excellent_quality = (per_image_sim > 0.9).float().mean().item()
+        # 6. Quality metrics (based on per-image similarity)
+        high_quality = (per_image_cosine > 0.7).float().mean().item()
+        very_high_quality = (per_image_cosine > 0.8).float().mean().item()
+        excellent_quality = (per_image_cosine > 0.9).float().mean().item()
         
         # 7. Norm analysis
         generated_norm_val = torch.norm(generated, dim=-1).mean().item()
@@ -619,15 +680,16 @@ class ImprovedBLIP3oCLIPTrainer:
         tgt_std = target.std().item()
         
         return {
-            f'{prefix}clip_similarity': per_image_sim.mean().item(),
-            f'{prefix}per_image_cosine': per_image_cosine.mean().item(),
+            f'{prefix}clip_similarity': per_image_cosine.mean().item(),        # PRIMARY METRIC
+            f'{prefix}per_image_similarity': per_image_cosine.mean().item(),   # Same as above (for clarity)
+            f'{prefix}token_similarity': per_image_token_sim.mean().item(),
             f'{prefix}mse_loss': mse_loss.item(),
             f'{prefix}l2_distance': l2_distance.item(),
             f'{prefix}dot_product': dot_product.item(),
             f'{prefix}high_quality': high_quality,
             f'{prefix}very_high_quality': very_high_quality,
             f'{prefix}excellent_quality': excellent_quality,
-            f'{prefix}similarity_std': per_image_sim.std().item(),
+            f'{prefix}similarity_std': per_image_cosine.std().item(),
             f'{prefix}generated_norm': generated_norm_val,
             f'{prefix}target_norm': target_norm_val,
             f'{prefix}norm_ratio': generated_norm_val / (target_norm_val + 1e-8),
@@ -638,23 +700,51 @@ class ImprovedBLIP3oCLIPTrainer:
         }
 
     def _log_metrics(self, loss: float, metrics: Dict[str, float], grad_norm: float):
-        """Log improved training metrics"""
+        """FIXED: Log metrics with enhanced disconnect detection"""
         # Store metrics
         self.loss_history.append(loss)
+        
         if 'velocity_similarity' in metrics:
-            self.similarity_history.append(metrics['velocity_similarity'])
+            vel_sim = metrics['velocity_similarity']
+            self.velocity_similarity_history.append(vel_sim)
+            self.last_velocity_sim = vel_sim
+        
         if 'clean_similarity' in metrics:
-            self.clean_similarity_history.append(metrics['clean_similarity'])
+            clean_sim = metrics['clean_similarity']
+            self.clean_similarity_history.append(clean_sim)
+            self.last_clean_sim = clean_sim
+        
+        if 'per_image_similarity' in metrics:
+            self.per_image_similarity_history.append(metrics['per_image_similarity'])
+        
         self.lr_history.append(self.optimizer.param_groups[0]['lr'])
         self.grad_norm_history.append(grad_norm)
         
+        # CRITICAL: Disconnect detection and alerting
+        if self.last_velocity_sim is not None and self.last_clean_sim is not None:
+            # Check for the problematic pattern: VelSim ↑, CleanSim ↓
+            if (self.last_velocity_sim > 0.3 and 
+                self.last_clean_sim < self.last_velocity_sim - 0.15):
+                
+                self.disconnect_alerts += 1
+                if self.disconnect_alerts <= 5:  # Don't spam too much
+                    logger.warning(f"🚨 DISCONNECT ALERT #{self.disconnect_alerts}:")
+                    logger.warning(f"   VelSim: {self.last_velocity_sim:.3f} ↑")
+                    logger.warning(f"   CleanSim: {self.last_clean_sim:.3f} ↓")
+                    logger.warning(f"   Gap: {self.last_velocity_sim - self.last_clean_sim:.3f}")
+                    logger.warning(f"   This indicates velocity-embedding conversion issues!")
+                    
+                    if self.disconnect_alerts == 1:
+                        logger.warning("💡 SUGGESTED FIXES:")
+                        logger.warning("   1. Check CLIP normalization is not too aggressive")
+                        logger.warning("   2. Increase semantic_weight in loss function")
+                        logger.warning("   3. Verify denormalization is working correctly")
+                        logger.warning("   4. Consider using Heun integration")
+        
         # Update best metrics
-        if 'clean_similarity' in metrics:
-            if metrics['clean_similarity'] > self.best_eval_similarity:
-                self.best_eval_similarity = metrics['clean_similarity']
-        elif 'velocity_similarity' in metrics:
-            if metrics['velocity_similarity'] > self.best_eval_similarity:
-                self.best_eval_similarity = metrics['velocity_similarity']
+        current_best_metric = self.last_clean_sim or self.last_velocity_sim or 0
+        if current_best_metric > self.best_eval_similarity:
+            self.best_eval_similarity = current_best_metric
         
         if loss < self.best_loss:
             self.best_loss = loss
@@ -668,6 +758,7 @@ class ImprovedBLIP3oCLIPTrainer:
                 "train/learning_rate": self.optimizer.param_groups[0]['lr'],
                 "train/epoch": self.current_epoch,
                 "train/step": self.global_step,
+                "train/disconnect_alerts": self.disconnect_alerts,
             })
             
             if metrics:
@@ -678,11 +769,19 @@ class ImprovedBLIP3oCLIPTrainer:
                         else:
                             wandb_metrics[f"train/{key}"] = value
             
+            # CRITICAL: Log disconnect detection
+            if self.last_velocity_sim is not None and self.last_clean_sim is not None:
+                wandb_metrics["train/velocity_clean_gap"] = self.last_velocity_sim - self.last_clean_sim
+                wandb_metrics["train/disconnect_detected"] = (
+                    self.last_velocity_sim > 0.3 and 
+                    self.last_clean_sim < self.last_velocity_sim - 0.15
+                )
+            
             # Moving averages
             if len(self.loss_history) > 0:
                 wandb_metrics["train/loss_ma"] = np.mean(list(self.loss_history))
-            if len(self.similarity_history) > 0:
-                wandb_metrics["train/velocity_similarity_ma"] = np.mean(list(self.similarity_history))
+            if len(self.velocity_similarity_history) > 0:
+                wandb_metrics["train/velocity_similarity_ma"] = np.mean(list(self.velocity_similarity_history))
             if len(self.clean_similarity_history) > 0:
                 wandb_metrics["train/clean_similarity_ma"] = np.mean(list(self.clean_similarity_history))
             
@@ -697,7 +796,7 @@ class ImprovedBLIP3oCLIPTrainer:
             
             wandb.log(wandb_metrics, step=self.global_step)
         
-        # Console logging
+        # Enhanced console logging
         if self.global_step % self.log_every_n_steps == 0:
             log_msg = f"Step {self.global_step}: Loss={loss:.6f}"
             
@@ -709,26 +808,82 @@ class ImprovedBLIP3oCLIPTrainer:
                 clean_sim = metrics['clean_similarity']
                 log_msg += f", CleanSim={clean_sim:.4f}"
             
+            if 'per_image_similarity' in metrics:
+                per_img_sim = metrics['per_image_similarity']
+                log_msg += f", PerImgSim={per_img_sim:.4f}"
+            
             log_msg += f", GradNorm={grad_norm:.3f}"
             log_msg += f", LR={self.optimizer.param_groups[0]['lr']:.2e}"
             
+            # Add disconnect indicator
+            if (self.last_velocity_sim is not None and self.last_clean_sim is not None and
+                self.last_velocity_sim > 0.3 and 
+                self.last_clean_sim < self.last_velocity_sim - 0.15):
+                log_msg += " ⚠️DISCONNECT"
+            
             logger.info(log_msg)
 
-    # ... (Keep all existing checkpoint methods from previous implementation)
-    # ... (Including _save_checkpoint, _cleanup_old_checkpoints, etc.)
+    def _save_checkpoint(self):
+        """Save checkpoint with normalization state"""
+        checkpoint_path = self.output_dir / f"checkpoint_step_{self.global_step}.pt"
+        
+        try:
+            checkpoint = {
+                'global_step': self.global_step,
+                'current_epoch': self.current_epoch,
+                'best_eval_similarity': self.best_eval_similarity,
+                'best_loss': self.best_loss,
+                'model_state_dict': self.model.state_dict(),
+                'optimizer_state_dict': self.optimizer.state_dict(),
+                'scheduler_state_dict': self.scheduler.state_dict(),
+                'experiment_type': 'blip3o_clip_FIXED',
+                'disconnect_alerts': self.disconnect_alerts,
+                
+                # CRITICAL: Save CLIP normalizer state
+                'clip_normalizer_state': {
+                    'stats_computed': self.clip_normalizer.stats_computed if self.clip_normalizer else False,
+                    'clip_mean': self.clip_normalizer.clip_mean if self.clip_normalizer else None,
+                    'clip_std': self.clip_normalizer.clip_std if self.clip_normalizer else None,
+                    'scale_factor': self.clip_normalizer.scale_factor if self.clip_normalizer else None,
+                } if self.clip_normalizer else None,
+                
+                # Training history for analysis
+                'training_history': {
+                    'loss_history': list(self.loss_history),
+                    'velocity_similarity_history': list(self.velocity_similarity_history),
+                    'clean_similarity_history': list(self.clean_similarity_history),
+                    'per_image_similarity_history': list(self.per_image_similarity_history),
+                },
+            }
+            
+            if self.scaler is not None:
+                checkpoint['scaler_state_dict'] = self.scaler.state_dict()
+            
+            torch.save(checkpoint, checkpoint_path)
+            
+            file_size_gb = checkpoint_path.stat().st_size / 1e9
+            logger.info(f"✅ Checkpoint saved successfully: {checkpoint_path}")
+            logger.info(f"   Size: {file_size_gb:.2f} GB")
+            return True
+            
+        except Exception as e:
+            logger.error(f"❌ Checkpoint save failed: {e}")
+            return False
 
     def train(self) -> Dict[str, Any]:
-        """Main improved training loop"""
-        logger.info("🚀 Starting IMPROVED BLIP3-o training...")
+        """FIXED: Main training loop with comprehensive monitoring"""
+        logger.info("🚀 Starting FIXED BLIP3-o training...")
         logger.info(f"  Model parameters: {sum(p.numel() for p in self.model.parameters()):,}")
         logger.info(f"  CLIP normalizer: {'✅ AVAILABLE' if self.clip_normalizer else '❌ MISSING'}")
         logger.info(f"  Heun inference: {'✅ ENABLED' if self.use_heun_inference else '❌ DISABLED'}")
+        logger.info(f"  Disconnect detection: ✅ ENABLED")
         
         if self.use_wandb:
             wandb.log({
                 "setup/training_started": True,
                 "setup/clip_normalization": self.clip_normalizer is not None,
                 "setup/heun_inference": self.use_heun_inference,
+                "setup/disconnect_detection": True,
             }, step=0)
         
         self.model.train()
@@ -784,17 +939,17 @@ class ImprovedBLIP3oCLIPTrainer:
                         
                         # Run evaluation
                         if self.global_step % self.eval_every_n_steps == 0:
-                            logger.info(f"Running IMPROVED evaluation at step {self.global_step}...")
+                            logger.info(f"Running FIXED evaluation at step {self.global_step}...")
                             
                             try:
                                 eval_metrics = self._evaluate()
                                 
                                 if eval_metrics:
-                                    logger.info(f"✅ IMPROVED evaluation results:")
+                                    logger.info(f"✅ FIXED evaluation results:")
                                     logger.info(f"  CLIP similarity: {eval_metrics.get('eval_clip_similarity', 0):.4f}")
                                     logger.info(f"  High quality (>0.7): {eval_metrics.get('eval_high_quality', 0)*100:.1f}%")
                                     logger.info(f"  Very high quality (>0.8): {eval_metrics.get('eval_very_high_quality', 0)*100:.1f}%")
-                                    logger.info(f"  Normalization applied: {eval_metrics.get('eval_normalization_applied', False)}")
+                                    logger.info(f"  Denormalization applied: {eval_metrics.get('eval_denormalization_working', False)}")
                                     
                                     if self.use_wandb:
                                         wandb_eval_metrics = {f"eval/{k}": v for k, v in eval_metrics.items()}
@@ -813,14 +968,16 @@ class ImprovedBLIP3oCLIPTrainer:
                                     logger.warning("Evaluation returned no metrics")
                                     
                             except Exception as e:
-                                logger.error(f"IMPROVED evaluation failed at step {self.global_step}: {e}")
-                                logger.error("Continuing training...")
+                                logger.error(f"❌ FIXED evaluation failed at step {self.global_step}: {e}")
+                                logger.error("This is a CRITICAL error - check normalization setup!")
                                 if self.use_wandb:
                                     wandb.log({"eval/failed": True, "eval/error": str(e)}, step=self.global_step)
+                                # Don't continue with broken evaluation
+                                raise
                         
                         # Save checkpoint
                         if self.global_step % self.save_every_n_steps == 0:
-                            logger.info(f"Attempting to save checkpoint at step {self.global_step}...")
+                            logger.info(f"Saving checkpoint at step {self.global_step}...")
                             checkpoint_success = self._save_checkpoint()
                             if not checkpoint_success:
                                 logger.error(f"❌ Checkpoint save failed at step {self.global_step}")
@@ -839,6 +996,7 @@ class ImprovedBLIP3oCLIPTrainer:
                 logger.info(f"  Best similarity: {self.best_eval_similarity:.4f}")
                 logger.info(f"  Steps in epoch: {epoch_steps}")
                 logger.info(f"  Epoch time: {epoch_time:.1f}s")
+                logger.info(f"  Disconnect alerts: {self.disconnect_alerts}")
                 
                 if self.use_wandb:
                     wandb_epoch_metrics = {
@@ -846,6 +1004,7 @@ class ImprovedBLIP3oCLIPTrainer:
                         "epoch/avg_loss": avg_epoch_loss,
                         "epoch/steps": epoch_steps,
                         "epoch/time_seconds": epoch_time,
+                        "epoch/disconnect_alerts": self.disconnect_alerts,
                     }
                     wandb.log(wandb_epoch_metrics, step=self.global_step)
         
@@ -854,7 +1013,7 @@ class ImprovedBLIP3oCLIPTrainer:
             if self.use_wandb:
                 wandb.log({"training/interrupted": True}, step=self.global_step)
         except Exception as e:
-            logger.error(f"Training failed with error: {e}")
+            logger.error(f"❌ Training failed with error: {e}")
             if self.use_wandb:
                 wandb.log({"training/failed": True, "training/error": str(e)}, step=self.global_step)
             raise
@@ -864,11 +1023,11 @@ class ImprovedBLIP3oCLIPTrainer:
             logger.info("Saving final checkpoint...")
             final_checkpoint_success = self._save_checkpoint()
             
-            logger.info("Running final IMPROVED evaluation...")
+            logger.info("Running final FIXED evaluation...")
             try:
                 final_eval = self._evaluate(num_samples=self.eval_num_samples * 2)
             except Exception as e:
-                logger.error(f"Final evaluation failed: {e}")
+                logger.error(f"❌ Final evaluation failed: {e}")
                 final_eval = {}
             
             total_time = time.time() - start_time
@@ -882,18 +1041,17 @@ class ImprovedBLIP3oCLIPTrainer:
                 'best_loss': self.best_loss,
                 'best_eval_similarity': self.best_eval_similarity,
                 'final_eval': final_eval,
-                'loss_history': list(self.loss_history),
-                'similarity_history': list(self.similarity_history),
-                'clean_similarity_history': list(self.clean_similarity_history),
-                'estimated_steps_per_epoch': self.estimated_steps_per_epoch,
-                'experiment_type': 'blip3o_clip_improved',
-                'improvements_enabled': {
-                    'clip_normalization': self.clip_normalizer is not None,
-                    'heun_inference': self.use_heun_inference,
-                    'semantic_preserving_loss': True,
-                    'eva_adapter': True,
+                'disconnect_alerts': self.disconnect_alerts,
+                'experiment_type': 'blip3o_clip_FIXED',
+                'fixes_applied': {
+                    'conservative_clip_normalization': True,
+                    'heun_integration': self.use_heun_inference,
+                    'semantic_loss_reweighting': True,
+                    'direct_clip_consistency': True,
+                    'proper_evaluation_denormalization': True,
+                    'disconnect_detection': True,
                 },
-                'checkpoint_issues': not final_checkpoint_success,
+                'checkpoint_success': final_checkpoint_success,
             }
             
             # Log final summary to WandB
@@ -904,9 +1062,9 @@ class ImprovedBLIP3oCLIPTrainer:
                     "final/total_steps": self.global_step,
                     "final/best_loss": self.best_loss,
                     "final/best_eval_similarity": self.best_eval_similarity,
+                    "final/disconnect_alerts": self.disconnect_alerts,
                     "final/checkpoint_success": final_checkpoint_success,
-                    "final/clip_normalization_enabled": self.clip_normalizer is not None,
-                    "final/heun_inference_enabled": self.use_heun_inference,
+                    "final/fixes_applied": len([k for k, v in summary['fixes_applied'].items() if v]),
                 }
                 
                 if final_eval:
@@ -922,12 +1080,13 @@ class ImprovedBLIP3oCLIPTrainer:
             with open(summary_path, 'w') as f:
                 json.dump(summary, f, indent=2, default=str)
             
-            logger.info("🎉 IMPROVED Training completed!")
+            logger.info("🎉 FIXED Training completed!")
             logger.info(f"  Total time: {total_time:.1f} seconds")
             logger.info(f"  Total steps: {self.global_step}")
             logger.info(f"  Best loss: {self.best_loss:.6f}")
             logger.info(f"  Best CLIP similarity: {self.best_eval_similarity:.4f}")
-            logger.info(f"  CLIP normalization: {'✅ ENABLED' if self.clip_normalizer else '❌ DISABLED'}")
+            logger.info(f"  Disconnect alerts: {self.disconnect_alerts}")
+            logger.info(f"  CLIP normalization: {'✅ FIXED' if self.clip_normalizer else '❌ MISSING'}")
             logger.info(f"  Heun inference: {'✅ ENABLED' if self.use_heun_inference else '❌ DISABLED'}")
             
             if final_eval:
@@ -938,48 +1097,8 @@ class ImprovedBLIP3oCLIPTrainer:
             
             return summary
 
-    def _save_checkpoint(self):
-        """Save checkpoint (keep existing implementation)"""
-        # Implementation would be the same as in your original trainer
-        # Just add clip_normalizer state to the checkpoint
-        checkpoint_path = self.output_dir / f"checkpoint_step_{self.global_step}.pt"
-        
-        try:
-            checkpoint = {
-                'global_step': self.global_step,
-                'current_epoch': self.current_epoch,
-                'best_eval_similarity': self.best_eval_similarity,
-                'best_loss': self.best_loss,
-                'model_state_dict': self.model.state_dict(),
-                'optimizer_state_dict': self.optimizer.state_dict(),
-                'scheduler_state_dict': self.scheduler.state_dict(),
-                'experiment_type': 'blip3o_clip_improved',
-                
-                # NEW: Save CLIP normalizer state
-                'clip_normalizer_state': {
-                    'stats_computed': self.clip_normalizer.stats_computed if self.clip_normalizer else False,
-                    'clip_mean': self.clip_normalizer.clip_mean if self.clip_normalizer else None,
-                    'clip_std': self.clip_normalizer.clip_std if self.clip_normalizer else None,
-                    'scale_factor': self.clip_normalizer.scale_factor if self.clip_normalizer else None,
-                } if self.clip_normalizer else None,
-            }
-            
-            if self.scaler is not None:
-                checkpoint['scaler_state_dict'] = self.scaler.state_dict()
-            
-            torch.save(checkpoint, checkpoint_path)
-            
-            file_size_gb = checkpoint_path.stat().st_size / 1e9
-            logger.info(f"✅ Checkpoint saved successfully: {checkpoint_path}")
-            logger.info(f"   Size: {file_size_gb:.2f} GB")
-            return True
-            
-        except Exception as e:
-            logger.error(f"❌ Checkpoint save failed: {e}")
-            return False
 
-
-def create_improved_clip_trainer(
+def create_fixed_clip_trainer(
     model,
     loss_fn,
     train_dataloader,
@@ -989,14 +1108,14 @@ def create_improved_clip_trainer(
     num_epochs: int = 10,
     output_dir: str = "./checkpoints",
     use_wandb: bool = False,
-    wandb_project: str = "blip3o-clip-improved",
+    wandb_project: str = "blip3o-clip-fixed",
     wandb_run_name: Optional[str] = None,
     wandb_config: Optional[Dict] = None,
     **kwargs
-) -> ImprovedBLIP3oCLIPTrainer:
-    """Factory function to create IMPROVED CLIP trainer"""
+) -> FixedBLIP3oCLIPTrainer:
+    """Factory function to create FIXED CLIP trainer"""
     
-    return ImprovedBLIP3oCLIPTrainer(
+    return FixedBLIP3oCLIPTrainer(
         model=model,
         loss_fn=loss_fn,
         train_dataloader=train_dataloader,
@@ -1014,5 +1133,7 @@ def create_improved_clip_trainer(
 
 
 # Backward compatibility aliases
-BLIP3oCLIPTrainer = ImprovedBLIP3oCLIPTrainer
-create_clip_trainer = create_improved_clip_trainer
+BLIP3oCLIPTrainer = FixedBLIP3oCLIPTrainer
+ImprovedBLIP3oCLIPTrainer = FixedBLIP3oCLIPTrainer
+create_clip_trainer = create_fixed_clip_trainer
+create_improved_clip_trainer = create_fixed_clip_trainer

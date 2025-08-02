@@ -1,21 +1,21 @@
 #!/usr/bin/env python3
 """
-COMPLETE UPDATED BLIP3-o Training Script with All Critical Improvements
-train_dit_improved.py
+FIXED BLIP3-o Training Script with All Critical Improvements
+train_dit.py
 
-CRITICAL IMPROVEMENTS IMPLEMENTED:
-1. ✅ Proper CLIP embedding normalization (HIGHEST IMPACT)
-2. ✅ EVA-CLIP adaptation layers for cross-modal alignment
-3. ✅ Heun's solver for O(h²) integration accuracy
-4. ✅ U-shaped timestep sampling for better training dynamics
-5. ✅ Multi-component loss with semantic preservation
-6. ✅ Improved evaluation with denormalization
-7. ✅ Comprehensive metrics tracking
+🔥 CRITICAL FIXES IMPLEMENTED:
+1. ✅ Conservative CLIP embedding normalization (scale 4.0→2.0)
+2. ✅ Increased semantic loss weights (0.1→0.5, 0.05→0.2)
+3. ✅ New direct CLIP consistency loss (0.3 weight)
+4. ✅ Heun's solver for O(h²) integration accuracy
+5. ✅ Proper evaluation denormalization
+6. ✅ Comprehensive disconnect detection and monitoring
+7. ✅ Earlier semantic loss application (threshold 0.7→0.5)
 
-Expected improvement: CLIP similarity 0.21 → 0.6+ 🚀
+Expected improvement: CLIP similarity 0.46 → 0.65+ 🚀
 
 Usage:
-    python train_dit_improved.py --chunked_embeddings_dir /path/to/embeddings --output_dir ./checkpoints
+    python train_dit.py --chunked_embeddings_dir /path/to/embeddings --output_dir ./checkpoints_fixed
 """
 
 import os
@@ -39,15 +39,15 @@ def setup_logging():
         format='%(asctime)s - %(levelname)s - %(message)s',
         handlers=[
             logging.StreamHandler(sys.stdout),
-            logging.FileHandler('improved_clip_training.log', mode='w')
+            logging.FileHandler('fixed_clip_training.log', mode='w')
         ]
     )
     return logging.getLogger(__name__)
 
 def parse_arguments():
-    """Parse command line arguments with improved options"""
+    """Parse command line arguments with FIXED defaults"""
     parser = argparse.ArgumentParser(
-        description="IMPROVED BLIP3-o CLIP Reproduction Training with Critical Fixes",
+        description="FIXED BLIP3-o CLIP Reproduction Training with Critical Improvements",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
     
@@ -79,13 +79,15 @@ def parse_arguments():
     parser.add_argument("--max_grad_norm", type=float, default=1.0,
                        help="Max gradient norm")
     
-    # NEW: Loss component weights
+    # FIXED: Much higher loss component weights
     parser.add_argument("--velocity_weight", type=float, default=1.0,
                        help="Weight for velocity prediction loss")
-    parser.add_argument("--semantic_weight", type=float, default=0.1,
-                       help="Weight for semantic consistency loss")
-    parser.add_argument("--cosine_weight", type=float, default=0.05,
-                       help="Weight for cosine similarity loss")
+    parser.add_argument("--semantic_weight", type=float, default=0.5,  # FIXED: 5x increase
+                       help="Weight for semantic consistency loss (INCREASED)")
+    parser.add_argument("--cosine_weight", type=float, default=0.2,    # FIXED: 4x increase
+                       help="Weight for cosine similarity loss (INCREASED)")
+    parser.add_argument("--consistency_weight", type=float, default=0.3,  # NEW
+                       help="Weight for direct CLIP consistency loss (NEW)")
     
     # Evaluation
     parser.add_argument("--eval_every_n_steps", type=int, default=50,
@@ -107,7 +109,7 @@ def parse_arguments():
     parser.add_argument("--num_workers", type=int, default=0,
                        help="Number of dataloader workers")
     
-    # NEW: Architecture improvements
+    # Architecture improvements (all enabled by default)
     parser.add_argument("--use_eva_adapter", action="store_true", default=True,
                        help="Use EVA-CLIP adapter layers (RECOMMENDED)")
     parser.add_argument("--eva_adapter_layers", type=int, default=6,
@@ -118,9 +120,9 @@ def parse_arguments():
     # WandB configuration
     parser.add_argument("--use_wandb", action="store_true", default=False,
                        help="Enable WandB logging")
-    parser.add_argument("--wandb_project", type=str, default="blip3o-clip-improved",
+    parser.add_argument("--wandb_project", type=str, default="blip3o-clip-fixed",
                        help="WandB project name")
-    parser.add_argument("--wandb_run_name", type=str, default="standarization",
+    parser.add_argument("--wandb_run_name", type=str, default=None,
                        help="WandB run name")
     
     return parser.parse_args()
@@ -144,6 +146,15 @@ def validate_arguments(args, logger):
     # Validate weights
     if args.velocity_weight < 0 or args.semantic_weight < 0 or args.cosine_weight < 0:
         errors.append("All loss weights must be non-negative")
+    
+    # FIXED: Warn if using old problematic weights
+    if args.semantic_weight < 0.3:
+        logger.warning(f"⚠️ Semantic weight ({args.semantic_weight}) seems low!")
+        logger.warning("   Recommended: 0.5+ for better semantic preservation")
+    
+    if args.cosine_weight < 0.15:
+        logger.warning(f"⚠️ Cosine weight ({args.cosine_weight}) seems low!")
+        logger.warning("   Recommended: 0.2+ for better similarity preservation")
     
     if errors:
         logger.error("❌ Validation errors:")
@@ -171,15 +182,17 @@ def check_environment(logger):
     # Check PyTorch version
     logger.info(f"PyTorch version: {torch.__version__}")
     
-    # Check for required imports
+    # Check for FIXED imports
     try:
-        from src.modules.datasets.blip3o_dataset import create_improved_clip_reproduction_dataloaders
+        from src.modules.datasets.blip3o_dataset import create_fixed_clip_reproduction_dataloaders
         from src.modules.models.blip3o_dit import create_improved_clip_reproduction_model
-        from src.modules.losses.blip3o_fm_loss import create_improved_clip_reproduction_loss
-        from src.modules.trainers.blip3o_trainer import create_improved_clip_trainer
-        logger.info("✅ All improved modules imported successfully")
+        from src.modules.losses.blip3o_fm_loss import create_fixed_clip_reproduction_loss
+        from src.modules.trainers.blip3o_trainer import create_fixed_clip_trainer
+        logger.info("✅ All FIXED modules imported successfully")
     except ImportError as e:
-        issues.append(f"Failed to import required modules: {e}")
+        issues.append(f"Failed to import FIXED modules: {e}")
+        logger.error("❌ CRITICAL: Could not import fixed modules!")
+        logger.error("   Make sure you're using the updated files with FIXED implementations")
     
     if issues:
         logger.warning("Environment issues detected:")
@@ -190,8 +203,8 @@ def check_environment(logger):
     
     return len(issues) == 0
 
-def create_improved_model(args, logger):
-    """Create improved BLIP3-o model with all enhancements"""
+def create_model(args, logger):
+    """Create model with all enhancements"""
     try:
         from src.modules.models.blip3o_dit import create_improved_clip_reproduction_model
         
@@ -207,7 +220,7 @@ def create_improved_model(args, logger):
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         model = model.to(device)
         
-        logger.info(f"✅ IMPROVED model created with {model.get_num_parameters():,} parameters")
+        logger.info(f"✅ Model created with {model.get_num_parameters():,} parameters")
         logger.info(f"  Model size: {args.model_size}")
         logger.info(f"  Training mode: {args.training_mode}")
         logger.info(f"  3D RoPE: ✅ ENABLED")
@@ -218,47 +231,53 @@ def create_improved_model(args, logger):
         return model, device
         
     except ImportError as e:
-        logger.error(f"❌ Could not import improved model: {e}")
+        logger.error(f"❌ Could not import model: {e}")
         raise
     except Exception as e:
-        logger.error(f"❌ Error creating improved model: {e}")
+        logger.error(f"❌ Error creating model: {e}")
         raise
 
-def create_improved_loss_function(args, logger):
-    """Create improved loss function with semantic preservation"""
+def create_fixed_loss_function(args, logger):
+    """Create FIXED loss function with critical improvements"""
     try:
-        from src.modules.losses.blip3o_fm_loss import create_improved_clip_reproduction_loss
+        from src.modules.losses.blip3o_fm_loss import create_fixed_clip_reproduction_loss
         
-        loss_fn = create_improved_clip_reproduction_loss(
+        loss_fn = create_fixed_clip_reproduction_loss(
             prediction_type="velocity",
             flow_type="rectified",
             velocity_weight=args.velocity_weight,
-            semantic_weight=args.semantic_weight,
-            cosine_weight=args.cosine_weight,
+            semantic_weight=args.semantic_weight,      # FIXED: Much higher
+            cosine_weight=args.cosine_weight,          # FIXED: Much higher
+            consistency_weight=args.consistency_weight, # NEW: Direct CLIP loss
             use_timestep_weighting=args.use_timestep_weighting,
         )
         
-        logger.info("✅ IMPROVED loss function created:")
+        logger.info("✅ FIXED loss function created:")
         logger.info(f"  Prediction type: velocity")
         logger.info(f"  Flow type: rectified")
-        logger.info(f"  Velocity weight: {args.velocity_weight}")
-        logger.info(f"  Semantic weight: {args.semantic_weight}")
-        logger.info(f"  Cosine weight: {args.cosine_weight}")
+        logger.info(f"  FIXED Weights - Velocity: {args.velocity_weight}, Semantic: {args.semantic_weight}, Cosine: {args.cosine_weight}")
+        logger.info(f"  NEW Consistency weight: {args.consistency_weight}")
         logger.info(f"  Timestep weighting: {'✅ ENABLED' if args.use_timestep_weighting else '❌ DISABLED'}")
+        
+        # CRITICAL: Warn about weight increases
+        if args.semantic_weight >= 0.5:
+            logger.info(f"  🔥 Semantic weight INCREASED to {args.semantic_weight} (was 0.1)")
+        if args.cosine_weight >= 0.2:
+            logger.info(f"  🔥 Cosine weight INCREASED to {args.cosine_weight} (was 0.05)")
         
         return loss_fn
         
     except ImportError as e:
-        logger.error(f"❌ Could not import improved loss function: {e}")
+        logger.error(f"❌ Could not import FIXED loss function: {e}")
         raise
     except Exception as e:
-        logger.error(f"❌ Error creating improved loss function: {e}")
+        logger.error(f"❌ Error creating FIXED loss function: {e}")
         raise
 
-def create_improved_dataloaders(args, logger):
-    """Create improved data loaders with proper normalization"""
+def create_fixed_dataloaders(args, logger):
+    """Create FIXED data loaders with proper normalization"""
     try:
-        from src.modules.datasets.blip3o_dataset import create_improved_clip_reproduction_dataloaders
+        from src.modules.datasets.blip3o_dataset import create_fixed_clip_reproduction_dataloaders
         
         # Validate embeddings directory
         embeddings_dir = Path(args.chunked_embeddings_dir)
@@ -271,7 +290,7 @@ def create_improved_dataloaders(args, logger):
         
         logger.info(f"Found {len(pkl_files)} .pkl files in embeddings directory")
         
-        train_dataloader, eval_dataloader = create_improved_clip_reproduction_dataloaders(
+        train_dataloader, eval_dataloader = create_fixed_clip_reproduction_dataloaders(
             chunked_embeddings_dir=args.chunked_embeddings_dir,
             batch_size=args.batch_size,
             training_mode=args.training_mode,
@@ -282,11 +301,11 @@ def create_improved_dataloaders(args, logger):
             validate_tensor_shapes=True,
         )
         
-        logger.info("✅ IMPROVED dataloaders created successfully:")
+        logger.info("✅ FIXED dataloaders created successfully:")
         logger.info(f"  Training mode: {args.training_mode}")
         logger.info(f"  Batch size: {args.batch_size}")
         logger.info(f"  Max shards: {args.max_shards}")
-        logger.info(f"  🔥 CLIP normalization: ✅ PROPERLY CONFIGURED")
+        logger.info(f"  🔥 FIXED CLIP normalization: ✅ PROPERLY CONFIGURED")
         logger.info(f"  🔥 U-shaped timestep sampling: ✅ ENABLED")
         
         # Test dataloader
@@ -296,26 +315,46 @@ def create_improved_dataloaders(args, logger):
         logger.info(f"  CLIP embeddings shape: {test_batch['clip_embeddings'].shape}")
         logger.info(f"  EVA embeddings shape: {test_batch['encoder_hidden_states'].shape}")
         
-        # Check if CLIP normalizer is available
+        # CRITICAL: Check CLIP normalizer is available and working
         if hasattr(train_dataloader, 'clip_normalizer') and train_dataloader.clip_normalizer:
+            normalizer = train_dataloader.clip_normalizer
             logger.info(f"  🔥 CLIP normalizer: ✅ AVAILABLE")
-            logger.info(f"     Scale factor: {train_dataloader.clip_normalizer.scale_factor:.2f}")
+            logger.info(f"     Stats computed: {normalizer.stats_computed}")
+            logger.info(f"     Scale factor: {normalizer.scale_factor:.2f} (FIXED: reduced from 4.0)")
+            
+            # CRITICAL: Test normalization range
+            sample_clip = test_batch['clip_embeddings']
+            clip_range = (sample_clip.min().item(), sample_clip.max().item())
+            logger.info(f"     Normalized range: [{clip_range[0]:.2f}, {clip_range[1]:.2f}]")
+            
+            # Validate range is reasonable
+            if abs(clip_range[0]) > 15 or abs(clip_range[1]) > 15:
+                logger.error(f"❌ NORMALIZATION RANGE TOO LARGE: {clip_range}")
+                logger.error("   This will cause training instability!")
+                raise ValueError("CLIP normalization range is too extreme")
+            elif abs(clip_range[0]) < 0.5 and abs(clip_range[1]) < 0.5:
+                logger.warning(f"⚠️ Normalization range seems small: {clip_range}")
+                logger.warning("   This may limit semantic information")
+            else:
+                logger.info(f"     ✅ Normalization range looks good for semantic preservation")
         else:
-            logger.warning(f"  ⚠️ CLIP normalizer: MISSING - this will hurt performance!")
+            logger.error(f"❌ CLIP normalizer: MISSING!")
+            logger.error("   This is a CRITICAL issue that will cause poor performance!")
+            raise ValueError("CLIP normalizer is required but not found")
         
         return train_dataloader, eval_dataloader
         
     except ImportError as e:
-        logger.error(f"❌ Could not import improved dataset: {e}")
+        logger.error(f"❌ Could not import FIXED dataset: {e}")
         raise
     except Exception as e:
-        logger.error(f"❌ Error creating improved dataloaders: {e}")
+        logger.error(f"❌ Error creating FIXED dataloaders: {e}")
         raise
 
-def create_improved_trainer(model, loss_fn, train_dataloader, eval_dataloader, args, device, logger):
-    """Create improved trainer with all enhancements"""
+def create_fixed_trainer(model, loss_fn, train_dataloader, eval_dataloader, args, device, logger):
+    """Create FIXED trainer with all enhancements"""
     try:
-        from src.modules.trainers.blip3o_trainer import create_improved_clip_trainer
+        from src.modules.trainers.blip3o_trainer import create_fixed_clip_trainer
         
         # Create run name if not provided
         wandb_run_name = args.wandb_run_name
@@ -326,16 +365,17 @@ def create_improved_trainer(model, loss_fn, train_dataloader, eval_dataloader, a
                 improvements.append("eva_adapter")
             if args.use_heun_inference:
                 improvements.append("heun")
-            improvements_str = "_".join(improvements) if improvements else "baseline"
-            wandb_run_name = f"blip3o_{args.model_size}_{args.training_mode}_improved_{improvements_str}_{timestamp}"
+            improvements.append("FIXED")
+            improvements_str = "_".join(improvements)
+            wandb_run_name = f"blip3o_{args.model_size}_{args.training_mode}_{improvements_str}_{timestamp}"
         
-        # WandB config
+        # WandB config with FIXED parameters
         wandb_config = {
             "model_size": args.model_size,
             "training_mode": args.training_mode,
             "batch_size": args.batch_size,
             "max_shards": args.max_shards,
-            "experiment_version": "improved_v1",
+            "experiment_version": "FIXED_v1",
             "learning_rate": args.learning_rate,
             "weight_decay": args.weight_decay,
             "num_epochs": args.num_epochs,
@@ -343,33 +383,38 @@ def create_improved_trainer(model, loss_fn, train_dataloader, eval_dataloader, a
             "max_grad_norm": args.max_grad_norm,
             "fp16": args.fp16,
             
-            # NEW: Improvement flags
-            "clip_normalization": "ENABLED",
+            # CRITICAL: Fixed loss weights
+            "velocity_weight": args.velocity_weight,
+            "semantic_weight": args.semantic_weight,
+            "cosine_weight": args.cosine_weight, 
+            "consistency_weight": args.consistency_weight,
+            
+            # Architecture improvements
+            "clip_normalization": "FIXED_conservative_scaling",
             "eva_adapter": args.use_eva_adapter,
             "eva_adapter_layers": args.eva_adapter_layers,
             "heun_inference": args.use_heun_inference,
             "timestep_weighting": args.use_timestep_weighting,
             
-            # Loss weights
-            "velocity_weight": args.velocity_weight,
-            "semantic_weight": args.semantic_weight,
-            "cosine_weight": args.cosine_weight,
-            
             # Expected improvements
-            "expected_clip_similarity_improvement": "0.21 → 0.6+",
+            "expected_clip_similarity_improvement": "0.46 → 0.65+",
             "critical_fixes": [
-                "clip_embedding_normalization",
+                "conservative_clip_normalization",
+                "increased_semantic_weights",
+                "direct_clip_consistency_loss",
                 "heun_solver_integration", 
-                "eva_clip_adaptation",
-                "u_shaped_timestep_sampling",
-                "semantic_preserving_loss"
+                "proper_evaluation_denormalization",
+                "disconnect_detection_monitoring"
             ]
         }
         
         # Get CLIP normalizer from dataloader
         clip_normalizer = getattr(train_dataloader, 'clip_normalizer', None)
+        if clip_normalizer is None:
+            logger.error("❌ CRITICAL: No CLIP normalizer found in dataloader!")
+            raise ValueError("CLIP normalizer is required for proper training and evaluation")
         
-        trainer = create_improved_clip_trainer(
+        trainer = create_fixed_clip_trainer(
             model=model,
             loss_fn=loss_fn,
             train_dataloader=train_dataloader,
@@ -393,19 +438,20 @@ def create_improved_trainer(model, loss_fn, train_dataloader, eval_dataloader, a
             wandb_config=wandb_config,
         )
         
-        logger.info("✅ IMPROVED trainer created successfully:")
+        logger.info("✅ FIXED trainer created successfully:")
         logger.info(f"  Evaluation: Every {args.eval_every_n_steps} steps")
         logger.info(f"  WandB enabled: {args.use_wandb}")
         logger.info(f"  CLIP normalizer: {'✅ AVAILABLE' if clip_normalizer else '❌ MISSING'}")
         logger.info(f"  Heun inference: {'✅ ENABLED' if args.use_heun_inference else '❌ DISABLED'}")
+        logger.info(f"  Disconnect detection: ✅ ENABLED")
         
         return trainer
         
     except ImportError as e:
-        logger.error(f"❌ Could not import improved trainer: {e}")
+        logger.error(f"❌ Could not import FIXED trainer: {e}")
         raise
     except Exception as e:
-        logger.error(f"❌ Error creating improved trainer: {e}")
+        logger.error(f"❌ Error creating FIXED trainer: {e}")
         raise
 
 def save_experiment_config(args, model, output_dir, logger):
@@ -413,12 +459,12 @@ def save_experiment_config(args, model, output_dir, logger):
     try:
         config = {
             'experiment_info': {
-                'name': 'IMPROVED BLIP3-o CLIP Reproduction',
-                'version': 'improved_v1',
+                'name': 'FIXED BLIP3-o CLIP Reproduction',
+                'version': 'FIXED_v1',
                 'timestamp': datetime.now().isoformat(),
                 'task': 'Reproduce CLIP embeddings from EVA embeddings',
-                'method': 'BLIP3-o DiT with CRITICAL IMPROVEMENTS',
-                'expected_improvement': 'CLIP similarity 0.21 → 0.6+',
+                'method': 'BLIP3-o DiT with CRITICAL FIXES',
+                'expected_improvement': 'CLIP similarity 0.46 → 0.65+',
             },
             'args': vars(args),
             'model_config': model.config.to_dict() if hasattr(model.config, 'to_dict') else {},
@@ -426,42 +472,48 @@ def save_experiment_config(args, model, output_dir, logger):
                 'parameters': model.get_num_parameters() if hasattr(model, 'get_num_parameters') else 'unknown',
                 'model_class': model.__class__.__name__,
             },
-            'critical_improvements': {
-                'clip_embedding_normalization': {
+            'critical_fixes': {
+                'conservative_clip_normalization': {
                     'implemented': True,
-                    'description': 'Proper elementwise mean/std normalization + scaling',
-                    'expected_impact': 'HIGH (0.21 → 0.45+)',
+                    'change': 'Scale factor 4.0 → 2.0',
+                    'description': 'Preserve semantic structure in embeddings',
+                    'expected_impact': 'HIGH (0.46 → 0.55+)',
                 },
-                'eva_clip_adapter': {
-                    'implemented': args.use_eva_adapter,
-                    'layers': args.eva_adapter_layers,
-                    'description': 'Multi-layer adaptation between EVA-CLIP and CLIP spaces',
-                    'expected_impact': 'MEDIUM (+0.1 similarity)',
+                'increased_semantic_weights': {
+                    'implemented': True,
+                    'changes': {
+                        'semantic_weight': f'0.1 → {args.semantic_weight}',
+                        'cosine_weight': f'0.05 → {args.cosine_weight}',
+                    },
+                    'description': 'Much stronger semantic preservation during training',
+                    'expected_impact': 'HIGH (+0.1 similarity)',
+                },
+                'direct_clip_consistency': {
+                    'implemented': True,
+                    'weight': args.consistency_weight,
+                    'description': 'Direct optimization of evaluation metric',
+                    'expected_impact': 'MEDIUM (+0.05 similarity)',
                 },
                 'heun_solver': {
                     'implemented': args.use_heun_inference,
                     'description': 'O(h²) integration accuracy vs Euler O(h)',
-                    'expected_impact': 'MEDIUM (+0.1 similarity)',
+                    'expected_impact': 'MEDIUM (+0.05 similarity)',
                 },
-                'u_shaped_timestep_sampling': {
+                'proper_evaluation_denormalization': {
                     'implemented': True,
-                    'description': 'Better timestep distribution for training',
-                    'expected_impact': 'LOW-MEDIUM (+0.05 similarity)',
+                    'description': 'Evaluate in original CLIP space, not normalized',
+                    'expected_impact': 'CRITICAL (true performance measurement)',
                 },
-                'semantic_preserving_loss': {
+                'disconnect_detection': {
                     'implemented': True,
-                    'weights': {
-                        'velocity': args.velocity_weight,
-                        'semantic': args.semantic_weight,
-                        'cosine': args.cosine_weight,
-                    },
-                    'description': 'Multi-component loss addressing velocity-semantic disconnect',
-                    'expected_impact': 'MEDIUM (+0.1 similarity)',
+                    'description': 'Monitor velocity-embedding disconnect pattern',
+                    'expected_impact': 'DIAGNOSTIC (catch issues early)',
                 },
-                'timestep_weighting': {
-                    'implemented': args.use_timestep_weighting,
-                    'description': 'Timestep-dependent loss component weighting',
-                    'expected_impact': 'LOW (+0.05 similarity)',
+                'earlier_semantic_loss': {
+                    'implemented': True,
+                    'change': 'Threshold 0.7 → 0.5',
+                    'description': 'Apply semantic constraints earlier in training',
+                    'expected_impact': 'LOW-MEDIUM (+0.03 similarity)',
                 },
             },
             'architecture_features': {
@@ -471,6 +523,7 @@ def save_experiment_config(args, model, output_dir, logger):
                 'rectified_flow_matching': True,
                 'eva_adapter': args.use_eva_adapter,
                 'heun_solver': True,
+                'disconnect_monitoring': True,
             },
         }
         
@@ -478,7 +531,7 @@ def save_experiment_config(args, model, output_dir, logger):
         with open(config_path, 'w') as f:
             json.dump(config, f, indent=2, default=str)
         
-        logger.info(f"✅ IMPROVED configuration saved to {config_path}")
+        logger.info(f"✅ FIXED configuration saved to {config_path}")
         return config
         
     except Exception as e:
@@ -486,26 +539,27 @@ def save_experiment_config(args, model, output_dir, logger):
         return {}
 
 def main():
-    """Main improved training function"""
+    """Main FIXED training function"""
     # Setup logging
     logger = setup_logging()
     
-    logger.info("🚀 IMPROVED BLIP3-o CLIP Reproduction Training")
+    logger.info("🚀 FIXED BLIP3-o CLIP Reproduction Training")
     logger.info("=" * 80)
     logger.info("📋 Task: Reproduce CLIP embeddings from EVA embeddings")
-    logger.info("🧠 Model: BLIP3-o DiT with CRITICAL IMPROVEMENTS")
-    logger.info("🌊 Method: Rectified Flow Matching + Enhancements")
-    logger.info("🎯 Target: CLIP embeddings [B, N, 1024] (PROPERLY NORMALIZED)")
+    logger.info("🧠 Model: BLIP3-o DiT with CRITICAL FIXES")
+    logger.info("🌊 Method: Rectified Flow Matching + FIXED Enhancements")
+    logger.info("🎯 Target: CLIP embeddings [B, N, 1024] (FIXED NORMALIZATION)")
     logger.info("🎮 Conditioning: EVA embeddings [B, N, 4096] (ADAPTED)")
-    logger.info("🔥 Expected: CLIP similarity 0.21 → 0.6+ 🚀")
+    logger.info("🔥 Expected: CLIP similarity 0.46 → 0.65+ 🚀")
     logger.info("=" * 80)
-    logger.info("🛠️ CRITICAL IMPROVEMENTS:")
-    logger.info("   ✅ 1. CLIP embedding normalization (HIGHEST IMPACT)")
-    logger.info("   ✅ 2. EVA-CLIP adaptation layers")
-    logger.info("   ✅ 3. Heun's solver for O(h²) integration")
-    logger.info("   ✅ 4. U-shaped timestep sampling")
-    logger.info("   ✅ 5. Multi-component semantic-preserving loss")
-    logger.info("   ✅ 6. Improved evaluation with denormalization")
+    logger.info("🛠️ CRITICAL FIXES APPLIED:")
+    logger.info("   ✅ 1. Conservative CLIP normalization (scale 4.0→2.0)")
+    logger.info("   ✅ 2. Increased semantic weights (0.1→0.5, 0.05→0.2)")
+    logger.info("   ✅ 3. New direct CLIP consistency loss (0.3 weight)")
+    logger.info("   ✅ 4. Heun's solver for O(h²) integration")
+    logger.info("   ✅ 5. Proper evaluation denormalization")
+    logger.info("   ✅ 6. Comprehensive disconnect detection")
+    logger.info("   ✅ 7. Earlier semantic loss application (0.7→0.5)")
     logger.info("=" * 80)
     
     try:
@@ -516,7 +570,7 @@ def main():
         if not validate_arguments(args, logger):
             return 1
         
-        logger.info(f"Configuration:")
+        logger.info(f"FIXED Configuration:")
         logger.info(f"  Model size: {args.model_size}")
         logger.info(f"  Training mode: {args.training_mode}")
         logger.info(f"  Embeddings dir: {args.chunked_embeddings_dir}")
@@ -525,51 +579,64 @@ def main():
         logger.info(f"  Batch size: {args.batch_size}")
         logger.info(f"  Epochs: {args.num_epochs}")
         logger.info(f"  Max shards: {args.max_shards}")
+        logger.info(f"  FIXED Loss weights:")
+        logger.info(f"    Velocity: {args.velocity_weight}")
+        logger.info(f"    Semantic: {args.semantic_weight} (INCREASED from 0.1)")
+        logger.info(f"    Cosine: {args.cosine_weight} (INCREASED from 0.05)")
+        logger.info(f"    Consistency: {args.consistency_weight} (NEW)")
         logger.info(f"  EVA adapter: {'✅ ENABLED' if args.use_eva_adapter else '❌ DISABLED'}")
         logger.info(f"  Heun inference: {'✅ ENABLED' if args.use_heun_inference else '❌ DISABLED'}")
         
         # Check environment
         if not check_environment(logger):
-            logger.warning("Environment issues detected - proceeding with caution")
+            logger.error("❌ Environment check failed - cannot proceed!")
+            return 1
         
         # Create output directory
         output_dir = Path(args.output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
         logger.info(f"✅ Output directory ready: {output_dir}")
         
-        # Create improved model
-        logger.info("🏗️ Creating IMPROVED model...")
-        model, device = create_improved_model(args, logger)
+        # Create model
+        logger.info("🏗️ Creating model...")
+        model, device = create_model(args, logger)
         
-        # Create improved loss function
-        logger.info("🌊 Creating IMPROVED loss function...")
-        loss_fn = create_improved_loss_function(args, logger)
+        # Create FIXED loss function
+        logger.info("🌊 Creating FIXED loss function...")
+        loss_fn = create_fixed_loss_function(args, logger)
         
-        # Create improved dataloaders
-        logger.info("📊 Creating IMPROVED dataloaders...")
-        train_dataloader, eval_dataloader = create_improved_dataloaders(args, logger)
+        # Create FIXED dataloaders
+        logger.info("📊 Creating FIXED dataloaders...")
+        train_dataloader, eval_dataloader = create_fixed_dataloaders(args, logger)
         
-        # Create improved trainer
-        logger.info("🏃 Creating IMPROVED trainer...")
-        trainer = create_improved_trainer(model, loss_fn, train_dataloader, eval_dataloader, args, device, logger)
+        # Create FIXED trainer
+        logger.info("🏃 Creating FIXED trainer...")
+        trainer = create_fixed_trainer(model, loss_fn, train_dataloader, eval_dataloader, args, device, logger)
         
         # Save configuration
         logger.info("💾 Saving experiment configuration...")
         config = save_experiment_config(args, model, output_dir, logger)
         
         # Start training
-        logger.info(f"\n🚀 Starting IMPROVED BLIP3-o training...")
+        logger.info(f"\n🚀 Starting FIXED BLIP3-o training...")
         logger.info("=" * 80)
         logger.info("🔥 Expected Results Timeline:")
-        logger.info("   • After CLIP normalization fix: 0.21 → 0.45+ (IMMEDIATE)")
-        logger.info("   • After Heun solver: 0.45 → 0.55+")
-        logger.info("   • After EVA adapter: 0.55 → 0.65+")
-        logger.info("   • After all improvements: 0.65 → 0.70+")
+        logger.info("   • After normalization fix: IMMEDIATE improvement (0.46 → 0.55+)")
+        logger.info("   • After semantic weights: Better semantic preservation")
+        logger.info("   • After consistency loss: Direct eval metric optimization")
+        logger.info("   • After Heun solver: Improved integration accuracy")
+        logger.info("   • Combined effect: 0.65+ CLIP similarity")
+        logger.info("=" * 80)
+        logger.info("🚨 MONITOR FOR:")
+        logger.info("   • CleanSim should NOT decrease (if it does, normalization issue)")
+        logger.info("   • VelSim and CleanSim should both increase together")
+        logger.info("   • Eval similarity should improve quickly (within 500 steps)")
+        logger.info("   • Disconnect alerts should be minimal")
         logger.info("=" * 80)
         
         start_time = datetime.now()
         
-        # Run improved training
+        # Run FIXED training
         summary = trainer.train()
         
         end_time = datetime.now()
@@ -577,7 +644,7 @@ def main():
         
         # FINAL SUMMARY
         logger.info("\n" + "=" * 80)
-        logger.info("🎉 IMPROVED BLIP3-o TRAINING COMPLETED!")
+        logger.info("🎉 FIXED BLIP3-o TRAINING COMPLETED!")
         logger.info("=" * 80)
         
         logger.info(f"📊 RESULTS:")
@@ -585,36 +652,44 @@ def main():
         logger.info(f"  Total steps: {summary.get('total_steps', 0)}")
         logger.info(f"  Best loss: {summary.get('best_loss', float('inf')):.6f}")
         logger.info(f"  Best CLIP similarity: {summary.get('best_eval_similarity', 0):.4f}")
+        logger.info(f"  Disconnect alerts: {summary.get('disconnect_alerts', 0)}")
         
         # Enhanced results analysis
         best_sim = summary.get('best_eval_similarity', 0)
-        initial_sim = 0.21  # Original problematic similarity
+        initial_sim = 0.46  # Previous problematic similarity
         improvement = best_sim - initial_sim
         
         logger.info(f"📈 IMPROVEMENT ANALYSIS:")
-        logger.info(f"  Initial similarity: {initial_sim:.4f}")
-        logger.info(f"  Final similarity: {best_sim:.4f}")
+        logger.info(f"  Initial similarity (problematic): {initial_sim:.4f}")
+        logger.info(f"  Final similarity (FIXED): {best_sim:.4f}")
         logger.info(f"  Absolute improvement: +{improvement:.4f}")
         logger.info(f"  Relative improvement: {(improvement/initial_sim)*100:.1f}%")
         
+        # Success assessment
         if best_sim > 0.7:
-            logger.info(f"  🎉 EXCELLENT: Similarity >0.7 - Outstanding success!")
-            logger.info(f"  🔥 CRITICAL IMPROVEMENTS WORKED! 🔥")
+            logger.info(f"  🎉 EXCELLENT SUCCESS: Similarity >0.7!")
+            logger.info(f"  🔥 ALL CRITICAL FIXES WORKED PERFECTLY! 🔥")
+            success_level = "excellent"
         elif best_sim > 0.6:
-            logger.info(f"  🎉 VERY GOOD: Similarity >0.6 - Major success!")
-            logger.info(f"  ✅ Improvements significantly effective!")
+            logger.info(f"  🎉 MAJOR SUCCESS: Similarity >0.6!")
+            logger.info(f"  ✅ CRITICAL FIXES HIGHLY EFFECTIVE!")
+            success_level = "major"
+        elif best_sim > 0.55:
+            logger.info(f"  ✅ GOOD SUCCESS: Similarity >0.55!")
+            logger.info(f"  💡 Fixes working, consider longer training")
+            success_level = "good"
         elif best_sim > 0.5:
-            logger.info(f"  ✅ GOOD: Similarity >0.5 - Solid improvement!")
-            logger.info(f"  💡 Consider fine-tuning hyperparameters")
-        elif best_sim > 0.4:
-            logger.info(f"  ✅ FAIR: Similarity >0.4 - Noticeable improvement!")
-            logger.info(f"  💡 Some improvements working, check normalization")
-        elif best_sim > initial_sim + 0.1:
-            logger.info(f"  📈 PROGRESS: +{improvement:.3f} improvement detected")
-            logger.info(f"  💡 Partial success - verify all fixes are applied")
+            logger.info(f"  ✅ MODERATE SUCCESS: Similarity >0.5!")
+            logger.info(f"  💡 Some fixes working, check hyperparameters")
+            success_level = "moderate"
+        elif improvement > 0.05:
+            logger.info(f"  📈 PARTIAL SUCCESS: +{improvement:.3f} improvement")
+            logger.info(f"  🔍 Some fixes working, verify all implementations")
+            success_level = "partial"
         else:
             logger.info(f"  ⚠️ LIMITED IMPROVEMENT: Check implementation")
-            logger.info(f"  🔍 Debug: Verify CLIP normalization is working")
+            logger.info(f"  🔍 Debug: Verify fixes are properly applied")
+            success_level = "limited"
         
         # Final evaluation results
         final_eval = summary.get('final_eval', {})
@@ -624,14 +699,14 @@ def main():
             logger.info(f"  High quality (>0.7): {final_eval.get('eval_high_quality', 0)*100:.1f}%")
             logger.info(f"  Very high quality (>0.8): {final_eval.get('eval_very_high_quality', 0)*100:.1f}%")
             logger.info(f"  Excellent quality (>0.9): {final_eval.get('eval_excellent_quality', 0)*100:.1f}%")
-            logger.info(f"  Normalization applied: {final_eval.get('eval_normalization_applied', False)}")
+            logger.info(f"  Denormalization applied: {final_eval.get('eval_denormalization_working', False)}")
         
-        # Improvement verification
-        improvements_enabled = summary.get('improvements_enabled', {})
-        logger.info(f"🔧 Improvements Status:")
-        for improvement, enabled in improvements_enabled.items():
+        # Fixes verification
+        fixes_applied = summary.get('fixes_applied', {})
+        logger.info(f"🔧 FIXES STATUS:")
+        for fix_name, enabled in fixes_applied.items():
             status = "✅ ENABLED" if enabled else "❌ DISABLED"
-            logger.info(f"  {improvement}: {status}")
+            logger.info(f"  {fix_name}: {status}")
         
         # Save enhanced final summary
         summary['duration_seconds'] = duration
@@ -642,7 +717,7 @@ def main():
             'final_similarity': best_sim,
             'absolute_improvement': improvement,
             'relative_improvement_percent': (improvement/initial_sim)*100 if initial_sim > 0 else 0,
-            'success_level': 'excellent' if best_sim > 0.7 else 'very_good' if best_sim > 0.6 else 'good' if best_sim > 0.5 else 'fair' if best_sim > 0.4 else 'limited',
+            'success_level': success_level,
         }
         
         summary_path = output_dir / 'training_summary.json'
@@ -652,60 +727,73 @@ def main():
         logger.info(f"📁 Outputs:")
         logger.info(f"  Training summary: {summary_path}")
         logger.info(f"  Model checkpoints: {output_dir}")
-        logger.info(f"  Training logs: improved_clip_training.log")
+        logger.info(f"  Training logs: fixed_clip_training.log")
         
         logger.info("=" * 80)
         
+        # Final success message
         if best_sim > 0.6:
             logger.info("🎉 TRAINING COMPLETED WITH MAJOR SUCCESS!")
-            logger.info("🔥 CRITICAL IMPROVEMENTS PROVED EFFECTIVE! 🔥")
-        elif best_sim > 0.4:
+            logger.info("🔥 CRITICAL FIXES PROVED HIGHLY EFFECTIVE! 🔥")
+        elif best_sim > 0.5:
             logger.info("✅ TRAINING COMPLETED WITH GOOD PROGRESS!")
+            logger.info("💡 Fixes are working, consider longer training")
         else:
-            logger.info("📈 TRAINING COMPLETED - CHECK IMPROVEMENTS IMPLEMENTATION")
+            logger.info("📈 TRAINING COMPLETED - VERIFY ALL FIXES ARE APPLIED")
         
         logger.info("💡 Next Steps:")
-        if best_sim > 0.6:
-            logger.info("  • Excellent results! Consider:")
-            logger.info("    - Longer training for even better performance")
-            logger.info("    - Testing on larger datasets")
-            logger.info("    - Deploying for production use")
-        elif best_sim > 0.4:
-            logger.info("  • Good progress! To improve further:")
-            logger.info("    - Increase semantic_weight to 0.2")
-            logger.info("    - Try longer training (more epochs)")
-            logger.info("    - Verify all normalizers are working")
+        if best_sim > 0.65:
+            logger.info("  • Outstanding results! Ready for:")
+            logger.info("    - Production deployment")
+            logger.info("    - Scaling to larger datasets")
+            logger.info("    - Fine-tuning for specific tasks")
+        elif best_sim > 0.55:
+            logger.info("  • Great progress! To improve further:")
+            logger.info("    - Train longer (more epochs)")
+            logger.info("    - Try larger model size")
+            logger.info("    - Increase consistency_weight to 0.4")
+        elif best_sim > 0.5:
+            logger.info("  • Good foundation! To improve:")
+            logger.info("    - Increase semantic_weight to 0.7")
+            logger.info("    - Train with more data (increase max_shards)")
+            logger.info("    - Verify Heun solver is being used")
         else:
-            logger.info("  • Debug required:")
-            logger.info("    - Check CLIP normalization is properly applied")
-            logger.info("    - Verify EVA adapter is being used")
-            logger.info("    - Ensure Heun solver is enabled")
-            logger.info("    - Check for any import/configuration errors")
+            logger.info("  • Need investigation:")
+            logger.info("    - Check CLIP normalizer is working (scale_factor=2.0)")
+            logger.info("    - Verify semantic weights are increased")
+            logger.info("    - Ensure denormalization is working in evaluation")
+            logger.info("    - Check for disconnect alerts in logs")
         
-        return 0 if best_sim > 0.4 else 1
+        return 0 if best_sim > 0.5 else 1
         
     except Exception as e:
-        logger.error(f"❌ Training failed with error: {e}")
+        logger.error(f"❌ FIXED training failed with error: {e}")
         logger.error("=" * 50)
         logger.error("FULL ERROR TRACEBACK:")
         traceback.print_exc()
         logger.error("=" * 50)
         
-        # Provide debugging advice
+        # Provide debugging advice for FIXED version
         error_str = str(e)
         if "CUDA out of memory" in error_str:
             logger.error("🔍 GPU MEMORY ERROR:")
-            logger.error("   Try reducing --batch_size or --model_size")
-        elif "No module named" in error_str:
+            logger.error("   Try reducing --batch_size to 4 or --model_size to small")
+        elif "No module named" in error_str or "import" in error_str.lower():
             logger.error("🔍 IMPORT ERROR:")
-            logger.error("   Check that all improved files are in place")
-            logger.error("   Verify you're using the updated modules")
+            logger.error("   Make sure you're using the FIXED modules:")
+            logger.error("   - src/modules/datasets/blip3o_dataset.py (FIXED)")
+            logger.error("   - src/modules/losses/blip3o_fm_loss.py (FIXED)")  
+            logger.error("   - src/modules/trainers/blip3o_trainer.py (FIXED)")
         elif "FileNotFoundError" in error_str:
             logger.error("🔍 FILE NOT FOUND:")
-            logger.error("   Check --chunked_embeddings_dir path")
-        elif "normalization" in error_str.lower():
+            logger.error("   Check --chunked_embeddings_dir path exists")
+        elif "normaliz" in error_str.lower():
             logger.error("🔍 NORMALIZATION ERROR:")
-            logger.error("   Check CLIP embeddings format and statistics computation")
+            logger.error("   Check CLIP embeddings format and FIXED normalizer")
+        elif "disconnect" in error_str.lower():
+            logger.error("🔍 DISCONNECT DETECTED:")
+            logger.error("   The FIXED loss weights should prevent this")
+            logger.error("   Verify semantic_weight=0.5 and cosine_weight=0.2")
         
         return 1
 
