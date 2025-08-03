@@ -193,14 +193,22 @@ Where `c` is the EVA conditioning.
 ```mermaid
 graph LR
     subgraph "Inference"
-        A["Start: Random Noise (ε ~ N(0, I))"]
-        A --> B["Initial t = 1.0"]
-        B --> C["Compute velocity: v_θ(xₜ, t)"]
-        C --> D["Heun's Method Step"]
-        D --> E["Update t (Decreasing Schedule)"]
-        E --> F["Repeat until t = 0.0"]
-        F --> G["Final Output: x₀ (CLIP 1024-d)"]
-
+        A[Random Noise<br/>ε ~ N(0,I)] --> B[t=1.0]
+        B --> C[Velocity<br/>Prediction]
+        C --> D[Heun Step<br/>O(h²) accuracy]
+        D --> E[t=0.9]
+        E --> F[Velocity<br/>Prediction]
+        F --> G[Heun Step]
+        G --> H[...]
+        H --> I[t=0.0]
+        I --> J[Final CLIP<br/>Embedding]
+        
+        K[EVA Conditioning<br/>B×N×4096] --> C
+        K --> F
+        
+        style A fill:#ffebee
+        style J fill:#e8f5e8
+        style K fill:#e1f5fe
 ```
 
 ## Loss Function: Multi-Component Design
