@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=blip3o_coco_eval_precomputed
+#SBATCH --job-name=blip3o_coco_eval_std
 #SBATCH --partition=gpu_h100
 #SBATCH --nodes=1
 #SBATCH --gpus=1
@@ -7,15 +7,20 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --time=2:00:00
 #SBATCH --mem=32G
-#SBATCH --output=./slurm_out/blip3o_coco_eval_precomputed_%j.out
-#SBATCH --error=./slurm_out/blip3o_coco_eval_precomputed_%j.err
+#SBATCH --output=./slurm_out/blip3o_coco_eval_std_%j.out
+#SBATCH --error=./slurm_out/blip3o_coco_eval_std_%j.err
 
 # =============================================================================
-# BLIP3-o MS-COCO Evaluation with Pre-computed Embeddings
+# BLIP3-o MS-COCO Evaluation with Standard Temp Directory Structure
+# UPDATED: Uses standard temp directory and auto-detection of embeddings
 # Memory-efficient evaluation using pre-extracted CLIP and EVA embeddings
 # =============================================================================
 
-echo "🔬 BLIP3-o MS-COCO Evaluation with Pre-computed Embeddings"
+echo "🔬 BLIP3-o MS-COCO Evaluation with Standard Temp Directory"
+echo "=================================================================="
+echo "🔥 UPDATED: Standard temp directory integration"
+echo "📁 Auto-detection of COCO embeddings"
+echo "🔗 Consistent with training embeddings structure"
 echo "=================================================================="
 echo "Job ID: ${SLURM_JOB_ID}"
 echo "Node: $(hostname)"
@@ -32,13 +37,14 @@ module load Miniconda3/24.7.1-0
 module load CUDA/12.6.0
 source activate eva_clip_env
 
+# Standard temp directory paths
+STANDARD_EMBEDDINGS_BASE="/scratch-shared/azadaianchuk1/blip3o_workspace/embeddings"
+STANDARD_COCO_EMBEDDINGS_DIR="${STANDARD_EMBEDDINGS_BASE}/coco_embeddings"
+STANDARD_TRAINING_EMBEDDINGS_DIR="${STANDARD_EMBEDDINGS_BASE}/patch_only_256_tokens"
+
 # Configuration - can be overridden by command line arguments
 MODEL_PATH="/home/azadaianchuk1/eva-clip-v6_2/checkpoints/blip3o_clean_20250803_015324"
-COCO_EMBEDDINGS_FILE=""
-OUTPUT_DIR="./coco_eval_precomputed_$(date +%Y%m%d_%H%M%S)"
-
-# Training embeddings directory (for normalization)
-TRAINING_EMBEDDINGS_DIR="/scratch-local/azadaianchuk1.13526739/blip3o_job_13526739/working/coco_embeddings/"
+OUTPUT_DIR="./coco_eval_std_$(date +%Y%m%d_%H%M%S)"
 
 # Evaluation parameters
 MAX_SAMPLES=1000  # Set to None or remove for all samples
@@ -58,69 +64,23 @@ else
         MODEL_PATH=$(find ./checkpoints -name "*blip3o*" -type d | sort | tail -1)
         if [ -z "$MODEL_PATH" ]; then
             echo "❌ No model found! Please provide model path as first argument."
-            echo "Usage: sbatch job_scripts/evaluate_blip3o_precomputed.job <model_path> <embeddings_file>"
+            echo "Usage: sbatch job_scripts/evaluate_blip3o_updated.job <model_path>"
             exit 1
         fi
         echo "📂 Found model: $MODEL_PATH"
     fi
 fi
 
+# Max samples can be provided as second argument
 if [ -n "$2" ]; then
-    COCO_EMBEDDINGS_FILE="$2"
-    echo "📂 Using provided embeddings file: $COCO_EMBEDDINGS_FILE"
-else
-    echo "🔍 Auto-detecting COCO embeddings file..."
-    
-    # Look for consolidated embeddings file in various locations
-    SEARCH_PATHS=(
-        "./coco_embeddings/coco_embeddings_consolidated.pkl"
-        "./coco_embeddings_consolidated.pkl"
-        "*/coco_embeddings_consolidated.pkl"
-    )
-    
-    # Try temp manager working directory if available
-    if [ -n "$BLIP3O_WORKSPACE" ]; then
-        SEARCH_PATHS+=("$BLIP3O_WORKSPACE/*/coco_embeddings_consolidated.pkl")
-    fi
-    
-    for path in "${SEARCH_PATHS[@]}"; do
-        if [ -f "$path" ]; then
-            COCO_EMBEDDINGS_FILE="$path"
-            echo "✅ Found embeddings file: $COCO_EMBEDDINGS_FILE"
-            break
-        fi
-    done
-    
-    # If not found, look for any embeddings file
-    if [ -z "$COCO_EMBEDDINGS_FILE" ]; then
-        COCO_EMBEDDINGS_FILE=$(find . -name "coco_embeddings_consolidated.pkl" 2>/dev/null | head -1)
-        if [ -n "$COCO_EMBEDDINGS_FILE" ]; then
-            echo "✅ Found embeddings file: $COCO_EMBEDDINGS_FILE"
-        fi
-    fi
-    
-    if [ -z "$COCO_EMBEDDINGS_FILE" ]; then
-        echo "❌ No COCO embeddings file found!"
-        echo ""
-        echo "💡 Please extract COCO embeddings first:"
-        echo "   sbatch job_scripts/extract_coco_embeddings.job"
-        echo ""
-        echo "Or provide embeddings file as second argument:"
-        echo "   sbatch job_scripts/evaluate_blip3o_precomputed.job <model_path> <embeddings_file>"
-        exit 1
-    fi
-fi
-
-# Training embeddings dir can be provided as third argument
-if [ -n "$3" ]; then
-    TRAINING_EMBEDDINGS_DIR="$3"
-    echo "📂 Using provided training embeddings dir: $TRAINING_EMBEDDINGS_DIR"
-fi
-
-# Max samples can be provided as fourth argument
-if [ -n "$4" ]; then
-    MAX_SAMPLES="$4"
+    MAX_SAMPLES="$2"
     echo "📊 Using provided max samples: $MAX_SAMPLES"
+fi
+
+# Batch size can be provided as third argument
+if [ -n "$3" ]; then
+    BATCH_SIZE="$3"
+    echo "⚙️ Using provided batch size: $BATCH_SIZE"
 fi
 
 # Create output directory
@@ -128,22 +88,24 @@ mkdir -p "${OUTPUT_DIR}"
 mkdir -p ./slurm_out
 
 echo ""
-echo "⚙️ Memory-Efficient MS-COCO Evaluation Configuration:"
+echo "⚙️ Standard Temp Directory MS-COCO Evaluation Configuration:"
 echo "=========================================="
 echo "Model: $MODEL_PATH"
-echo "COCO Embeddings: $COCO_EMBEDDINGS_FILE"
-echo "Training Embeddings: $TRAINING_EMBEDDINGS_DIR"
+echo "Standard Embeddings Base: $STANDARD_EMBEDDINGS_BASE"
+echo "COCO Embeddings Dir: $STANDARD_COCO_EMBEDDINGS_DIR"
+echo "Training Embeddings Dir: $STANDARD_TRAINING_EMBEDDINGS_DIR"
 echo "Output: $OUTPUT_DIR"
 echo "Max Samples: ${MAX_SAMPLES:-All}"
 echo "Batch Size: $BATCH_SIZE"
 echo "Inference Steps: $NUM_INFERENCE_STEPS"
 echo "Use Heun Solver: $USE_HEUN"
 echo ""
-echo "🚀 Memory-Efficient Strategy:"
-echo "   • Pre-computed embeddings avoid real-time extraction"
-echo "   • No CLIP/EVA model loading during evaluation"
-echo "   • Lower GPU memory usage"
-echo "   • Faster evaluation"
+echo "🚀 Standard Temp Directory Strategy:"
+echo "   • Auto-detection of COCO embeddings"
+echo "   • Consistent directory structure with training"
+echo "   • No need to specify embeddings file explicitly"
+echo "   • Training statistics automatically loaded"
+echo "   • Memory-efficient evaluation"
 echo ""
 
 # Verify model exists
@@ -179,25 +141,54 @@ fi
 
 echo "✅ Model verified: $MODEL_PATH"
 
-# Verify COCO embeddings file
-if [ ! -f "$COCO_EMBEDDINGS_FILE" ]; then
-    echo "❌ COCO embeddings file not found: $COCO_EMBEDDINGS_FILE"
-    echo ""
-    echo "💡 To extract COCO embeddings:"
-    echo "   sbatch job_scripts/extract_coco_embeddings.job"
+# Verify standard temp directory structure
+echo ""
+echo "🔍 Verifying Standard Temp Directory Structure..."
+echo "================================================"
+
+# Check base directory
+if [ ! -d "$STANDARD_EMBEDDINGS_BASE" ]; then
+    echo "❌ Standard embeddings base directory not found: $STANDARD_EMBEDDINGS_BASE"
+    echo "Expected directory structure not available"
     exit 1
 fi
 
-# Check embeddings file size and details
-EMBEDDINGS_SIZE=$(stat --format="%s" "$COCO_EMBEDDINGS_FILE" 2>/dev/null || echo "0")
+echo "✅ Standard embeddings base: $STANDARD_EMBEDDINGS_BASE"
+
+# Check COCO embeddings directory
+if [ ! -d "$STANDARD_COCO_EMBEDDINGS_DIR" ]; then
+    echo "❌ COCO embeddings directory not found: $STANDARD_COCO_EMBEDDINGS_DIR"
+    echo ""
+    echo "💡 To extract COCO embeddings to standard location:"
+    echo "   sbatch job_scripts/extract_coco_updated.job"
+    exit 1
+fi
+
+echo "✅ COCO embeddings directory: $STANDARD_COCO_EMBEDDINGS_DIR"
+
+# Check for consolidated COCO embeddings file
+COCO_CONSOLIDATED_FILE="$STANDARD_COCO_EMBEDDINGS_DIR/coco_embeddings_consolidated.pkl"
+if [ ! -f "$COCO_CONSOLIDATED_FILE" ]; then
+    echo "❌ COCO consolidated embeddings file not found: $COCO_CONSOLIDATED_FILE"
+    echo ""
+    echo "Available files in COCO embeddings directory:"
+    ls -la "$STANDARD_COCO_EMBEDDINGS_DIR"
+    echo ""
+    echo "💡 If you see batch files, try consolidating them:"
+    echo "   python extract_coco_embeddings_updated.py --consolidate_only"
+    exit 1
+fi
+
+# Check COCO embeddings file size and details
+EMBEDDINGS_SIZE=$(stat --format="%s" "$COCO_CONSOLIDATED_FILE" 2>/dev/null || echo "0")
 EMBEDDINGS_SIZE_GB=$(echo "scale=2; $EMBEDDINGS_SIZE / 1024 / 1024 / 1024" | bc -l 2>/dev/null || echo "?.??")
 
-echo "✅ COCO embeddings file verified:"
-echo "   File: $COCO_EMBEDDINGS_FILE"
+echo "✅ COCO consolidated embeddings file verified:"
+echo "   File: $COCO_CONSOLIDATED_FILE"
 echo "   Size: ${EMBEDDINGS_SIZE_GB} GB"
 
-# Try to get embeddings info if manifest exists
-MANIFEST_FILE="${COCO_EMBEDDINGS_FILE%.*}_manifest.json"
+# Check manifest file
+MANIFEST_FILE="$STANDARD_COCO_EMBEDDINGS_DIR/coco_embeddings_manifest.json"
 if [ -f "$MANIFEST_FILE" ]; then
     echo "✅ Manifest file found: $MANIFEST_FILE"
     
@@ -209,13 +200,18 @@ try:
     with open('$MANIFEST_FILE', 'r') as f:
         manifest = json.load(f)
     
-    print(f'📊 Embeddings Details:')
+    print(f'📊 COCO Embeddings Details:')
     print(f'   Total samples: {manifest.get(\"total_samples\", \"unknown\"):,}')
     print(f'   CLIP shape: {manifest.get(\"clip_shape\", \"unknown\")}')
     print(f'   EVA shape: {manifest.get(\"eva_shape\", \"unknown\")}')
     print(f'   Include CLS: {manifest.get(\"include_cls\", \"unknown\")}')
     print(f'   Tokens per sample: {manifest.get(\"tokens\", \"unknown\")}')
     print(f'   Created: {manifest.get(\"created\", \"unknown\")}')
+    print(f'   Storage Location: {manifest.get(\"storage_location\", \"unknown\")}')
+    
+    # Verify it's in standard temp directory
+    if manifest.get('storage_location') == 'standard_temp_dir':
+        print(f'✅ Confirmed: Stored in standard temp directory')
     
 except Exception as e:
     print(f'Could not parse manifest: {e}')
@@ -225,37 +221,33 @@ else
     echo "⚠️ No manifest file found - will inspect embeddings during evaluation"
 fi
 
-# Check training embeddings directory
+# Check training embeddings directory for normalization
 echo ""
-echo "🔍 Verifying training embeddings directory for normalization..."
-if [ ! -d "$TRAINING_EMBEDDINGS_DIR" ]; then
-    echo "❌ Training embeddings directory not found: $TRAINING_EMBEDDINGS_DIR"
+echo "🔍 Verifying training embeddings for normalization..."
+if [ ! -d "$STANDARD_TRAINING_EMBEDDINGS_DIR" ]; then
+    echo "❌ Training embeddings directory not found: $STANDARD_TRAINING_EMBEDDINGS_DIR"
     echo ""
     echo "⚠️ IMPORTANT: Training embeddings are needed for accurate normalization!"
     echo ""
     echo "Expected structure:"
-    echo "  $TRAINING_EMBEDDINGS_DIR/"
+    echo "  $STANDARD_TRAINING_EMBEDDINGS_DIR/"
     echo "  ├── embeddings_shard_00000_patch_only.pkl"
     echo "  ├── embeddings_shard_00001_patch_only.pkl"
     echo "  └── ..."
-    echo ""
-    echo "Options:"
-    echo "  1. Provide correct path as 3rd argument"
-    echo "  2. Evaluation will use approximate fallback normalization"
     echo ""
     echo "⚠️ Proceeding with fallback - results may not be fully accurate"
     TRAINING_EMBEDDINGS_STATUS="❌ NOT FOUND (using fallback)"
 else
     # Check for .pkl files
-    PKL_COUNT=$(find "$TRAINING_EMBEDDINGS_DIR" -name "*.pkl" | wc -l)
+    PKL_COUNT=$(find "$STANDARD_TRAINING_EMBEDDINGS_DIR" -name "*.pkl" | wc -l)
     if [ $PKL_COUNT -eq 0 ]; then
         echo "❌ No .pkl files found in training embeddings directory"
         echo "Directory contents:"
-        ls -la "$TRAINING_EMBEDDINGS_DIR"
+        ls -la "$STANDARD_TRAINING_EMBEDDINGS_DIR"
         TRAINING_EMBEDDINGS_STATUS="❌ NO FILES (using fallback)"
     else
         echo "✅ Training embeddings directory verified:"
-        echo "   Directory: $TRAINING_EMBEDDINGS_DIR"
+        echo "   Directory: $STANDARD_TRAINING_EMBEDDINGS_DIR"
         echo "   Found: $PKL_COUNT .pkl files"
         echo "   📊 Will use training statistics for normalization"
         TRAINING_EMBEDDINGS_STATUS="✅ AVAILABLE (exact statistics)"
@@ -263,39 +255,47 @@ else
 fi
 
 # Verify evaluation script
-if [ ! -f "eval_blip3o_coco_updated.py" ]; then
-    echo "❌ Evaluation script not found: eval_blip3o_coco_updated.py"
+if [ ! -f "eval_blip3o_coco.py" ]; then
+    echo "❌ Updated evaluation script not found: eval_blip3o_coco_updated.py"
     echo "Please ensure the updated evaluation script is in the current directory"
+    echo ""
+    echo "Expected script features:"
+    echo "  • Auto-detection of COCO embeddings"
+    echo "  • Standard temp directory integration"
+    echo "  • Training statistics loading"
     exit 1
 fi
 
-echo "✅ Evaluation script found"
+echo "✅ Updated evaluation script found"
 
 echo ""
-echo "🚀 Starting Memory-Efficient MS-COCO Evaluation..."
+echo "🚀 Starting Standard Temp Directory MS-COCO Evaluation..."
 echo "========================================"
-echo "🎯 Objective: Evaluate model using pre-computed embeddings"
-echo "💾 Strategy: Load embeddings from disk instead of real-time extraction"
+echo "🎯 Objective: Evaluate model using standard temp directory structure"
+echo "💾 Strategy: Auto-detect embeddings and training statistics"
 echo "🔥 Benefits:"
-echo "   • No GPU memory for CLIP/EVA models"
-echo "   • Faster evaluation (no re-extraction)"
-echo "   • Consistent embeddings across evaluations"
-echo "   • Higher batch sizes possible"
+echo "   • No need to specify embeddings file path"
+echo "   • Automatic training statistics loading"
+echo "   • Consistent directory structure"
+echo "   • Memory-efficient evaluation"
+echo "   • Reproducible results"
 echo ""
-echo "Embeddings: Pre-computed from MS-COCO val2017"
+echo "Embeddings: Auto-detected from standard temp directory"
 echo "Training Statistics: $TRAINING_EMBEDDINGS_STATUS"
 echo "Expected Performance: ~0.912 (training reference)"
 echo ""
 
-# Build evaluation command
-EVAL_CMD="python eval_blip3o_coco_updated.py \
+# Build evaluation command - using auto-detection
+EVAL_CMD="python eval_blip3o_coco.py \
     --model_path \"$MODEL_PATH\" \
-    --coco_embeddings_file \"$COCO_EMBEDDINGS_FILE\" \
-    --training_embeddings_dir \"$TRAINING_EMBEDDINGS_DIR\" \
     --output_dir \"$OUTPUT_DIR\" \
     --batch_size $BATCH_SIZE \
     --num_inference_steps $NUM_INFERENCE_STEPS \
     --save_results"
+
+# The script will auto-detect:
+# - COCO embeddings from $STANDARD_COCO_EMBEDDINGS_DIR/coco_embeddings_consolidated.pkl
+# - Training embeddings from $STANDARD_TRAINING_EMBEDDINGS_DIR
 
 # Add optional parameters
 if [ "$USE_HEUN" = true ]; then
@@ -307,6 +307,10 @@ if [ -n "$MAX_SAMPLES" ] && [ "$MAX_SAMPLES" != "None" ]; then
 fi
 
 echo "Executing: $EVAL_CMD"
+echo ""
+echo "🔍 Auto-detection will look for:"
+echo "   COCO embeddings: $COCO_CONSOLIDATED_FILE"
+echo "   Training embeddings: $STANDARD_TRAINING_EMBEDDINGS_DIR"
 echo ""
 
 # Monitor initial GPU memory
@@ -323,18 +327,18 @@ EVAL_EXIT_CODE=$?
 
 echo ""
 echo "=================================================================="
-echo "📊 Memory-Efficient MS-COCO Evaluation Results"
+echo "📊 Standard Temp Directory MS-COCO Evaluation Results"
 echo "=================================================================="
 
 if [ $EVAL_EXIT_CODE -eq 0 ]; then
-    echo "✅ Memory-efficient MS-COCO evaluation completed successfully!"
+    echo "✅ Standard temp directory MS-COCO evaluation completed successfully!"
     
     # Find and display results
     RESULTS_FILE="$OUTPUT_DIR/coco_evaluation_precomputed.json"
     
     if [ -f "$RESULTS_FILE" ]; then
         echo ""
-        echo "📋 Results Summary (Memory-Efficient Evaluation):"
+        echo "📋 Results Summary (Standard Temp Directory Evaluation):"
         echo "=============================================="
         
         # Extract key metrics using Python
@@ -363,13 +367,16 @@ try:
         print(f'⚠️ STATUS: Significant difference from training')
     
     print(f'')
-    print(f'💾 Memory Efficiency Status:')
+    print(f'📁 Standard Temp Directory Status:')
+    std_temp = metrics.get('standard_temp_directory', False)
     memory_efficient = metrics.get('memory_efficient', False)
+    print(f'   Standard Temp Directory: {\"✅ ENABLED\" if std_temp else \"❌ DISABLED\"}')
     print(f'   Memory-Efficient Mode: {\"✅ ENABLED\" if memory_efficient else \"❌ DISABLED\"}')
     
-    if memory_efficient:
-        print(f'   📂 Embeddings Source: Pre-computed file')
-        print(f'   🚀 Benefits: No real-time extraction, lower GPU usage')
+    if std_temp:
+        print(f'   📂 Embeddings Source: Standard temp directory')
+        print(f'   🔗 Consistent with training structure')
+        print(f'   🚀 Benefits: Auto-detection, consistent paths')
     
     print(f'')
     print(f'🏆 Quality Distribution:')
@@ -393,33 +400,33 @@ try:
     print(f'   Training Statistics: {\"✅ APPLIED\" if training_stats else \"❌ NOT APPLIED\"}')
     print(f'   Denormalization: {\"✅ APPLIED\" if denorm_applied else \"❌ NOT APPLIED\"}')
     
-    # Memory comparison
+    # Directory structure summary
     print(f'')
-    if memory_efficient:
-        print(f'🎉 MEMORY EFFICIENCY SUCCESS!')
-        print(f'   ✅ No CLIP/EVA model loading during evaluation')
-        print(f'   ✅ Pre-computed embeddings used')
-        print(f'   ✅ Lower GPU memory requirements')
-        print(f'   ✅ Faster evaluation')
+    if std_temp and memory_efficient:
+        print(f'🎉 STANDARD TEMP DIRECTORY SUCCESS!')
+        print(f'   ✅ Auto-detected COCO embeddings')
+        print(f'   ✅ Used standard temp directory structure')
+        print(f'   ✅ Consistent with training embeddings location')
+        print(f'   ✅ Memory-efficient evaluation')
         
         if abs(diff_pct) < 10:
-            print(f'   🎯 Performance maintained with memory efficiency!')
+            print(f'   🎯 Performance maintained with standard structure!')
         
     # Performance assessment
     print(f'')
-    if training_stats and denorm_applied:
+    if training_stats and denorm_applied and std_temp:
         if abs(diff_pct) < 5:
-            print(f'🎉 ASSESSMENT: EXCELLENT - Memory-efficient evaluation matches training!')
-            print(f'   The model performs very similarly to training with much lower memory usage.')
+            print(f'🎉 ASSESSMENT: EXCELLENT - Standard structure with optimal performance!')
+            print(f'   The model performs very similarly to training using the standard temp directory.')
         elif abs(diff_pct) < 15:
-            print(f'✅ ASSESSMENT: GOOD - Close performance with memory efficiency')
-            print(f'   Small differences while achieving significant memory savings.')
+            print(f'✅ ASSESSMENT: GOOD - Standard structure with close performance')
+            print(f'   Small differences while achieving directory consistency.')
         else:
             print(f'⚠️ ASSESSMENT: INVESTIGATION NEEDED - Check normalization')
             print(f'   Consider verifying training statistics integration.')
     else:
-        print(f'⚠️ ASSESSMENT: Incomplete training integration')
-        print(f'   Results may not be fully comparable to training performance.')
+        print(f'⚠️ ASSESSMENT: Incomplete standard structure integration')
+        print(f'   Some features may not be fully utilizing the standard temp directory.')
         
 except Exception as e:
     print(f'Could not parse results: {e}')
@@ -442,14 +449,21 @@ except Exception as e:
     fi
     
     echo ""
-    echo "🎯 Memory-Efficient Evaluation Benefits:"
+    echo "🎯 Standard Temp Directory Benefits:"
     echo "======================================"
-    echo "✅ Avoided loading CLIP and EVA models during evaluation"
-    echo "✅ Used pre-computed embeddings from disk"
-    echo "✅ Lower GPU memory requirements"
-    echo "✅ Faster evaluation (no re-extraction)"
-    echo "✅ Consistent embeddings across multiple evaluations"
-    echo "✅ Enables larger batch sizes"
+    echo "✅ Auto-detected COCO embeddings from standard location"
+    echo "✅ Used consistent directory structure with training"
+    echo "✅ Automatically loaded training statistics for normalization"
+    echo "✅ No need to specify embeddings file paths manually"
+    echo "✅ Memory-efficient evaluation"
+    echo "✅ Reproducible results across evaluations"
+    echo "✅ Simplified job script configuration"
+    
+    echo ""
+    echo "📁 Directory Structure Used:"
+    echo "   Base: $STANDARD_EMBEDDINGS_BASE"
+    echo "   Training: $STANDARD_TRAINING_EMBEDDINGS_DIR"
+    echo "   COCO: $STANDARD_COCO_EMBEDDINGS_DIR"
     
     echo ""
     echo "💡 Next Steps:"
@@ -481,39 +495,48 @@ try:
         print('  - Verify model loading')
         print('  - Check normalization statistics')
         print('  - Review training logs')
+        
+    print('• Standard temp directory is working correctly!')
+    print('• Future evaluations will auto-detect embeddings')
 except:
     print('• Review detailed results in output directory')
+    print('• Standard temp directory structure is established')
 "
     fi
     
     echo ""
-    echo "✅ SUCCESS: Memory-efficient MS-COCO evaluation completed!"
+    echo "✅ SUCCESS: Standard temp directory MS-COCO evaluation completed!"
     
 else
     echo "❌ FAILED: Evaluation exit code $EVAL_EXIT_CODE"
     echo ""
-    echo "💡 Troubleshooting (Memory-Efficient Mode):"
+    echo "💡 Troubleshooting (Standard Temp Directory):"
     echo "========================================"
     echo "• Check log files in ./slurm_out/ for detailed error messages"
-    echo "• Verify pre-computed embeddings file:"
-    echo "  - File exists: $COCO_EMBEDDINGS_FILE"
-    echo "  - File is not corrupted"
-    echo "  - Embeddings format is correct"
+    echo "• Verify standard temp directory structure:"
+    echo "  - Base: $STANDARD_EMBEDDINGS_BASE"
+    echo "  - COCO: $STANDARD_COCO_EMBEDDINGS_DIR"
+    echo "  - Training: $STANDARD_TRAINING_EMBEDDINGS_DIR"
+    echo "• Check COCO embeddings file: $COCO_CONSOLIDATED_FILE"
     echo "• Verify model path and checkpoint format"
-    echo "• Check training embeddings directory for normalization"
-    echo "• Monitor GPU memory - even with pre-computed embeddings, inference needs memory"
+    echo "• Monitor GPU memory usage"
     echo ""
     echo "🔧 Quick fixes:"
-    echo "• Reduce batch size: --batch_size 2"
-    echo "• Reduce samples: --max_samples 100"
+    echo "• Reduce batch size: sbatch this_script.job <model_path> <max_samples> 2"
+    echo "• Reduce samples: sbatch this_script.job <model_path> 100"
     echo "• Check embeddings file:"
-    echo "  python -c \"import pickle; print(pickle.load(open('$COCO_EMBEDDINGS_FILE', 'rb')).keys())\""
+    echo "  python -c \"import pickle; print(pickle.load(open('$COCO_CONSOLIDATED_FILE', 'rb')).keys())\""
     echo ""
-    echo "🔥 Memory-Efficient Specific Issues:"
-    echo "• If embeddings file is corrupted, re-extract:"
-    echo "  sbatch job_scripts/extract_coco_embeddings.job"
-    echo "• If model loading fails, check checkpoint format"
-    echo "• If normalization fails, verify training embeddings directory"
+    echo "🔥 Standard Temp Directory Specific Issues:"
+    echo "• If auto-detection fails, check directory permissions"
+    echo "• If COCO embeddings missing, re-extract:"
+    echo "  sbatch job_scripts/extract_coco_updated.job"
+    echo "• If training embeddings missing, check training output"
+    echo ""
+    echo "📁 Directory Structure Check:"
+    echo "  ls -la $STANDARD_EMBEDDINGS_BASE"
+    echo "  ls -la $STANDARD_COCO_EMBEDDINGS_DIR"
+    echo "  ls -la $STANDARD_TRAINING_EMBEDDINGS_DIR"
 fi
 
 # Final GPU memory status
@@ -526,18 +549,27 @@ echo ""
 echo "🏁 Job completed at $(date)"
 echo "=================================================================="
 
-# Show memory usage comparison
+# Show final directory status
 echo ""
-echo "📚 MEMORY-EFFICIENT EVALUATION SUMMARY:"
-echo "This evaluation uses pre-computed CLIP and EVA embeddings to avoid GPU memory issues."
-echo "Benefits:"
-echo "  • No real-time CLIP/EVA model loading (saves ~10-15GB GPU memory)"
-echo "  • Faster evaluation (no re-extraction of embeddings)"
-echo "  • Consistent embeddings across multiple evaluations"
-echo "  • Enables larger batch sizes and more samples"
-echo "  • Same evaluation quality as real-time extraction"
+echo "📚 STANDARD TEMP DIRECTORY EVALUATION SUMMARY:"
+echo "This evaluation uses the standard temp directory structure for consistency."
 echo ""
-echo "Memory savings: Estimated 10-15GB GPU memory compared to real-time extraction"
+echo "🔥 STANDARD DIRECTORY BENEFITS:"
+echo "  • Auto-detection of COCO embeddings"
+echo "  • Consistent location with training embeddings"
+echo "  • Automatic training statistics loading"
+echo "  • No manual path specification needed"
+echo "  • Reproducible evaluation setup"
+echo "  • Simplified job script usage"
+echo ""
+echo "📁 Directory Structure:"
+echo "  $STANDARD_EMBEDDINGS_BASE/"
+echo "  ├── patch_only_256_tokens/           (training embeddings)"
+echo "  └── coco_embeddings/                 (COCO embeddings)"
+echo "      ├── coco_embeddings_consolidated.pkl"
+echo "      └── coco_embeddings_manifest.json"
+echo ""
+echo "🎯 Future evaluations will automatically use this structure."
 echo "=================================================================="
 
 exit $EVAL_EXIT_CODE

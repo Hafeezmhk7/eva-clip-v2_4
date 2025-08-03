@@ -6,13 +6,19 @@ eval_blip3o_coco_updated.py
 🔥 NEW FEATURES:
 1. Support for pre-computed embeddings to avoid GPU memory issues
 2. Memory-efficient evaluation using saved CLIP/EVA embeddings
-3. Fallback to real-time extraction if needed
-4. Batch processing of pre-computed embeddings
-5. Comprehensive error handling and recovery
+3. Auto-detection of embeddings from standard temp directory
+4. Fallback to real-time extraction if needed
+5. Batch processing of pre-computed embeddings
+6. Comprehensive error handling and recovery
+
+UPDATED: Uses standard temp directory structure consistent with training
 
 Usage:
-    # With pre-computed embeddings (recommended for memory efficiency)
-    python eval_blip3o_coco_updated.py --model_path ./checkpoints/model --coco_embeddings_file ./coco_embeddings_consolidated.pkl
+    # With auto-detection (recommended - uses standard temp directory)
+    python eval_blip3o_coco_updated.py --model_path ./checkpoints/model
+    
+    # With specific embeddings file
+    python eval_blip3o_coco_updated.py --model_path ./checkpoints/model --coco_embeddings_file ./path/to/embeddings.pkl
     
     # Traditional real-time extraction (if embeddings not available)
     python eval_blip3o_coco_updated.py --model_path ./checkpoints/model --coco_root ./data/coco
@@ -44,6 +50,11 @@ logger = logging.getLogger(__name__)
 # Setup paths
 sys.path.insert(0, str(Path(__file__).parent))
 
+# STANDARD TEMP DIRECTORY STRUCTURE
+STANDARD_EMBEDDINGS_BASE = "/scratch-shared/azadaianchuk1/blip3o_workspace/embeddings"
+STANDARD_COCO_EMBEDDINGS_DIR = f"{STANDARD_EMBEDDINGS_BASE}/coco_embeddings"
+STANDARD_TRAINING_EMBEDDINGS_DIR = f"{STANDARD_EMBEDDINGS_BASE}/patch_only_256_tokens"
+
 # Import with fallbacks
 try:
     from transformers import CLIPProcessor, CLIPModel, AutoModel, CLIPImageProcessor
@@ -69,6 +80,53 @@ except ImportError as e:
     logger.error(f"❌ Failed to import CLIP normalizer: {e}")
     NORMALIZER_AVAILABLE = False
 
+def find_coco_embeddings_file():
+    """Auto-detect COCO embeddings file from standard locations"""
+    
+    search_paths = [
+        # Standard temp directory (priority)
+        Path(STANDARD_COCO_EMBEDDINGS_DIR) / "coco_embeddings_consolidated.pkl",
+        
+        # Alternative standard locations
+        Path(STANDARD_EMBEDDINGS_BASE) / "coco_embeddings_consolidated.pkl",
+        
+        # Local fallback paths
+        Path("./coco_embeddings/coco_embeddings_consolidated.pkl"),
+        Path("./coco_embeddings_consolidated.pkl"),
+        
+        # Workspace search
+        Path("/scratch-shared/azadaianchuk1/blip3o_workspace") / "coco_embeddings_consolidated.pkl",
+    ]
+    
+    logger.info("🔍 Auto-detecting COCO embeddings file...")
+    logger.info(f"📁 Standard directory: {STANDARD_COCO_EMBEDDINGS_DIR}")
+    
+    for path in search_paths:
+        if path.exists():
+            logger.info(f"✅ Found COCO embeddings at: {path}")
+            return str(path)
+    
+    # Try to find any consolidated file
+    search_patterns = [
+        Path(STANDARD_EMBEDDINGS_BASE).glob("**/coco_embeddings_consolidated.pkl"),
+        Path("/scratch-shared/azadaianchuk1").glob("**/coco_embeddings_consolidated.pkl"),
+        Path(".").glob("**/coco_embeddings_consolidated.pkl"),
+    ]
+    
+    for pattern in search_patterns:
+        try:
+            for found_path in pattern:
+                if found_path.exists():
+                    logger.info(f"✅ Found COCO embeddings at: {found_path}")
+                    return str(found_path)
+        except Exception:
+            continue
+    
+    logger.warning("⚠️ No COCO embeddings file found in standard locations")
+    logger.info("💡 To extract COCO embeddings:")
+    logger.info(f"   python extract_coco_embeddings_updated.py --coco_root /path/to/coco")
+    
+    return None
 
 class PrecomputedCOCODataset(Dataset):
     """Dataset for pre-computed COCO embeddings"""
@@ -92,6 +150,15 @@ class PrecomputedCOCODataset(Dataset):
         self.eva_embeddings = self.data['eva_embeddings']
         self.metadata = self.data['metadata']
         self.config = self.data.get('config', {})
+        
+        # Log storage information
+        storage_location = self.config.get('storage_location', 'unknown')
+        base_dir = self.config.get('base_embeddings_dir', 'unknown')
+        
+        if storage_location == 'standard_temp_dir':
+            logger.info(f"✅ Using embeddings from standard temp directory")
+            logger.info(f"📁 Base embeddings directory: {base_dir}")
+            logger.info(f"🔗 Consistent with training embeddings location")
         
         # Validate data consistency
         assert len(self.metadata) == self.clip_embeddings.shape[0] == self.eva_embeddings.shape[0], \
@@ -271,12 +338,13 @@ class MemoryEfficientCOCOEvaluator:
         self.use_heun = use_heun
         self.use_half_precision = use_half_precision
         
-        # Default training embeddings directory from training logs
+        # Use standard training embeddings directory
         if training_embeddings_dir is None:
-            training_embeddings_dir = "/scratch-shared/azadaianchuk1/blip3o_workspace/embeddings/patch_only_256_tokens"
+            training_embeddings_dir = STANDARD_TRAINING_EMBEDDINGS_DIR
         self.training_embeddings_dir = training_embeddings_dir
         
         logger.info(f"🔬 Memory-Efficient COCO Evaluator")
+        logger.info(f"📁 Standard temp directory structure")
         logger.info(f"Training embeddings source: {self.training_embeddings_dir}")
         logger.info(f"Inference steps: {num_inference_steps}")
         logger.info(f"Using Heun solver: {use_heun}")
@@ -294,7 +362,17 @@ class MemoryEfficientCOCOEvaluator:
             self.blip3o_model = self.blip3o_model.float()
             self.model_dtype = torch.float32
         
-        logger.info(f"🔧 Model dtype set to: {self.model_dtype}")
+        # Verify model dtype by checking actual parameters
+        actual_dtype = next(self.blip3o_model.parameters()).dtype
+        if actual_dtype != self.model_dtype:
+            logger.warning(f"⚠️ Model dtype mismatch detected!")
+            logger.warning(f"   Expected: {self.model_dtype}, Actual: {actual_dtype}")
+            logger.warning(f"   Using actual model dtype: {actual_dtype}")
+            self.model_dtype = actual_dtype
+        
+        logger.info(f"🔧 Model dtype verified: {self.model_dtype}")
+        logger.info(f"   Use half precision setting: {use_half_precision}")
+        logger.info(f"   Actual model parameter dtype: {actual_dtype}")
         
         # Load CLIP normalizer using training statistics
         self.clip_normalizer = self._load_clip_normalizer_with_training_stats()
@@ -466,7 +544,19 @@ class MemoryEfficientCOCOEvaluator:
         ).to(self.device)
         self.eva_model.eval()
         
+        # Verify dtypes match
+        clip_dtype = next(self.clip_model.parameters()).dtype
+        eva_dtype = next(self.eva_model.parameters()).dtype
+        
         logger.info("✅ Feature extraction models loaded")
+        logger.info(f"   CLIP model dtype: {clip_dtype}")
+        logger.info(f"   EVA model dtype: {eva_dtype}")
+        logger.info(f"   Main model dtype: {self.model_dtype}")
+        
+        if clip_dtype != self.model_dtype:
+            logger.warning(f"⚠️ CLIP model dtype mismatch: {clip_dtype} vs {self.model_dtype}")
+        if eva_dtype != self.model_dtype:
+            logger.warning(f"⚠️ EVA model dtype mismatch: {eva_dtype} vs {self.model_dtype}")
 
     def _check_tensor_health(self, tensor: torch.Tensor, name: str) -> bool:
         """Check tensor for NaN/Inf values and dtype"""
@@ -488,12 +578,17 @@ class MemoryEfficientCOCOEvaluator:
         clip_features = []
         eva_features = []
         
+        # Get actual model dtypes for consistency
+        clip_model_dtype = next(self.clip_model.parameters()).dtype
+        eva_model_dtype = next(self.eva_model.parameters()).dtype
+        
         for img in images:
             # CLIP features (remove CLS token for patch_only mode)
             clip_inputs = self.clip_processor(images=img, return_tensors="pt")
             
+            # Ensure inputs match CLIP model dtype
             clip_inputs = {
-                k: v.to(self.device, dtype=self.model_dtype) if v.dtype.is_floating_point 
+                k: v.to(self.device, dtype=clip_model_dtype) if v.dtype.is_floating_point 
                 else v.to(self.device) 
                 for k, v in clip_inputs.items()
             }
@@ -502,19 +597,22 @@ class MemoryEfficientCOCOEvaluator:
                 clip_outputs = self.clip_model.vision_model(**clip_inputs, output_hidden_states=True)
                 clip_emb = clip_outputs.last_hidden_state[:, 1:, :]  # Remove CLS, get patches [1, 256, 1024]
                 
-                clip_emb = clip_emb.to(self.model_dtype)
+                # Ensure output dtype consistency
+                clip_emb = clip_emb.to(clip_model_dtype)
                 
                 if not self._check_tensor_health(clip_emb, "clip_embeddings"):
                     logger.warning("⚠️ Unhealthy CLIP embeddings detected")
                     continue
                     
+                # Convert to float32 for storage and move to CPU
                 clip_features.append(clip_emb.squeeze().cpu().float())
             
             # EVA features (remove CLS token for patch_only mode)
             eva_inputs = self.eva_processor(images=img, return_tensors="pt")
             
+            # Ensure inputs match EVA model dtype
             eva_inputs = {
-                k: v.to(self.device, dtype=self.model_dtype) if v.dtype.is_floating_point 
+                k: v.to(self.device, dtype=eva_model_dtype) if v.dtype.is_floating_point 
                 else v.to(self.device) 
                 for k, v in eva_inputs.items()
             }
@@ -523,12 +621,14 @@ class MemoryEfficientCOCOEvaluator:
                 eva_outputs = self.eva_model.vision_model(**eva_inputs, output_hidden_states=True)
                 eva_emb = eva_outputs.last_hidden_state[:, 1:, :]  # Remove CLS, get patches
                 
-                eva_emb = eva_emb.to(self.model_dtype)
+                # Ensure output dtype consistency
+                eva_emb = eva_emb.to(eva_model_dtype)
                 
                 if not self._check_tensor_health(eva_emb, "eva_embeddings"):
                     logger.warning("⚠️ Unhealthy EVA embeddings detected")
                     continue
                     
+                # Convert to float32 for storage and move to CPU
                 eva_features.append(eva_emb.squeeze().cpu().float())
         
         if not clip_features or not eva_features:
@@ -537,19 +637,20 @@ class MemoryEfficientCOCOEvaluator:
         return torch.stack(clip_features), torch.stack(eva_features)
 
     def _safe_generate_with_heun(self, eva_features: torch.Tensor, num_steps: int = 50) -> torch.Tensor:
-        """Generate using Heun's method with comprehensive error handling"""
+        """Generate using Heun's method with comprehensive error handling and dtype consistency"""
         try:
             batch_size, seq_len, _ = eva_features.shape
             
+            # CRITICAL: Ensure all tensors match model dtype
             eva_features = eva_features.to(self.device, dtype=self.model_dtype)
             
-            # Start from standard Gaussian noise
+            # Start from standard Gaussian noise with correct dtype
             x = torch.randn(
                 batch_size, seq_len, 1024,
                 device=self.device, dtype=self.model_dtype
             )
             
-            # Linear timestep schedule
+            # Linear timestep schedule with correct dtype
             timesteps = torch.linspace(1.0, 0.0, num_steps + 1, device=self.device, dtype=self.model_dtype)[:-1]
             
             for i, t in enumerate(timesteps):
@@ -562,89 +663,128 @@ class MemoryEfficientCOCOEvaluator:
                     dt = timesteps[i]
                 dt = dt.item()
                 
+                # Convert dt to tensor with correct dtype for operations
+                dt_tensor = torch.tensor(dt, device=self.device, dtype=self.model_dtype)
+                
                 if self.use_heun:
-                    # Heun's method with error checking
+                    # Heun's method with error checking and dtype consistency
                     try:
-                        # First velocity prediction
-                        v1 = self.blip3o_model(
-                            hidden_states=x,
-                            timestep=t_batch,
-                            encoder_hidden_states=eva_features,
-                            return_dict=False
-                        )
+                        # First velocity prediction - ensure input dtype consistency
+                        with torch.amp.autocast('cuda', enabled=self.use_half_precision):
+                            v1 = self.blip3o_model(
+                                hidden_states=x.to(self.model_dtype),
+                                timestep=t_batch.to(self.model_dtype),
+                                encoder_hidden_states=eva_features.to(self.model_dtype),
+                                return_dict=False
+                            )
+                        
                         if isinstance(v1, dict):
                             v1 = v1.get('velocity_prediction', v1.get('prediction', list(v1.values())[0]))
                         
+                        # Ensure output dtype consistency
                         v1 = v1.to(self.model_dtype)
                         
                         if not self._check_tensor_health(v1, f"v1_step_{i}"):
                             logger.warning(f"⚠️ Unhealthy v1 at step {i}, falling back to Euler")
-                            x = x + dt * v1
+                            x = x.to(self.model_dtype) + dt_tensor * v1.to(self.model_dtype)
                             continue
                         
-                        # Predict intermediate point
-                        x_mid = x + dt * v1
+                        # Predict intermediate point with dtype consistency
+                        x_mid = x.to(self.model_dtype) + dt_tensor * v1.to(self.model_dtype)
                         t_mid = torch.full((batch_size,), max(0.0, t.item() - dt), device=self.device, dtype=self.model_dtype)
                         
-                        # Second velocity prediction
-                        v2 = self.blip3o_model(
-                            hidden_states=x_mid,
-                            timestep=t_mid,
-                            encoder_hidden_states=eva_features,
-                            return_dict=False
-                        )
+                        # Second velocity prediction with dtype consistency
+                        with torch.amp.autocast('cuda', enabled=self.use_half_precision):
+                            v2 = self.blip3o_model(
+                                hidden_states=x_mid.to(self.model_dtype),
+                                timestep=t_mid.to(self.model_dtype),
+                                encoder_hidden_states=eva_features.to(self.model_dtype),
+                                return_dict=False
+                            )
+                        
                         if isinstance(v2, dict):
                             v2 = v2.get('velocity_prediction', v2.get('prediction', list(v2.values())[0]))
                         
+                        # Ensure output dtype consistency
                         v2 = v2.to(self.model_dtype)
                         
                         if not self._check_tensor_health(v2, f"v2_step_{i}"):
                             logger.warning(f"⚠️ Unhealthy v2 at step {i}, using v1 only")
-                            x = x + dt * v1
+                            x = x.to(self.model_dtype) + dt_tensor * v1.to(self.model_dtype)
                             continue
                         
-                        # Heun's corrector
-                        v_avg = (v1 + v2) / 2.0
-                        x = x + dt * v_avg
+                        # Heun's corrector with dtype consistency
+                        v_avg = (v1.to(self.model_dtype) + v2.to(self.model_dtype)) / 2.0
+                        x = x.to(self.model_dtype) + dt_tensor * v_avg.to(self.model_dtype)
                         
                     except RuntimeError as e:
                         if "CUDA out of memory" in str(e):
                             logger.error(f"❌ CUDA OOM at step {i}: {e}")
                             logger.error("Try reducing batch size or using --max_samples for smaller evaluation")
                             return None
+                        elif "dtype" in str(e).lower():
+                            logger.warning(f"⚠️ Dtype mismatch at step {i}: {e}, attempting dtype fix")
+                            try:
+                                # Force dtype consistency and retry with Euler
+                                with torch.amp.autocast('cuda', enabled=self.use_half_precision):
+                                    velocity = self.blip3o_model(
+                                        hidden_states=x.to(self.model_dtype),
+                                        timestep=t_batch.to(self.model_dtype),
+                                        encoder_hidden_states=eva_features.to(self.model_dtype),
+                                        return_dict=False
+                                    )
+                                if isinstance(velocity, dict):
+                                    velocity = velocity.get('velocity_prediction', velocity.get('prediction', list(velocity.values())[0]))
+                                x = x.to(self.model_dtype) + dt_tensor * velocity.to(self.model_dtype)
+                            except Exception as e2:
+                                logger.error(f"❌ Dtype fix failed at step {i}: {e2}")
+                                return None
                         else:
                             logger.warning(f"⚠️ Heun step failed at {i}: {e}, using Euler fallback")
-                            # Fallback to Euler
+                            # Fallback to Euler with dtype consistency
+                            try:
+                                with torch.amp.autocast('cuda', enabled=self.use_half_precision):
+                                    velocity = self.blip3o_model(
+                                        hidden_states=x.to(self.model_dtype),
+                                        timestep=t_batch.to(self.model_dtype),
+                                        encoder_hidden_states=eva_features.to(self.model_dtype),
+                                        return_dict=False
+                                    )
+                                if isinstance(velocity, dict):
+                                    velocity = velocity.get('velocity_prediction', velocity.get('prediction', list(velocity.values())[0]))
+                                x = x.to(self.model_dtype) + dt_tensor * velocity.to(self.model_dtype)
+                            except Exception as e2:
+                                logger.error(f"❌ Euler fallback failed at step {i}: {e2}")
+                                return None
+                else:
+                    # Euler method with dtype consistency
+                    try:
+                        with torch.amp.autocast('cuda', enabled=self.use_half_precision):
                             velocity = self.blip3o_model(
-                                hidden_states=x,
-                                timestep=t_batch,
-                                encoder_hidden_states=eva_features,
+                                hidden_states=x.to(self.model_dtype),
+                                timestep=t_batch.to(self.model_dtype),
+                                encoder_hidden_states=eva_features.to(self.model_dtype),
                                 return_dict=False
                             )
-                            if isinstance(velocity, dict):
-                                velocity = velocity.get('velocity_prediction', velocity.get('prediction', list(velocity.values())[0]))
-                            x = x + dt * velocity
-                else:
-                    # Euler method
-                    velocity = self.blip3o_model(
-                        hidden_states=x,
-                        timestep=t_batch,
-                        encoder_hidden_states=eva_features,
-                        return_dict=False
-                    )
-                    if isinstance(velocity, dict):
-                        velocity = velocity.get('velocity_prediction', velocity.get('prediction', list(velocity.values())[0]))
-                    x = x + dt * velocity
+                        
+                        if isinstance(velocity, dict):
+                            velocity = velocity.get('velocity_prediction', velocity.get('prediction', list(velocity.values())[0]))
+                        
+                        x = x.to(self.model_dtype) + dt_tensor * velocity.to(self.model_dtype)
+                    except Exception as e:
+                        logger.error(f"❌ Euler method failed at step {i}: {e}")
+                        return None
                 
-                # Conservative clamping
-                x = torch.clamp(x, min=-10.0, max=10.0)
+                # Conservative clamping with dtype consistency
+                x = torch.clamp(x.to(self.model_dtype), min=-10.0, max=10.0)
                 
                 # Check for unhealthy outputs
                 if not self._check_tensor_health(x, f"x_step_{i}"):
                     logger.error(f"❌ Unhealthy generation at step {i}")
                     return None
             
-            return x
+            # Ensure final output has correct dtype
+            return x.to(self.model_dtype)
             
         except Exception as e:
             logger.error(f"❌ Generation failed: {e}")
@@ -722,16 +862,28 @@ class MemoryEfficientCOCOEvaluator:
         
         for batch_idx, batch in enumerate(tqdm(dataloader, desc="Evaluating", unit="batch")):
             try:
-                # Get data from batch
-                eva_features = batch['eva_embeddings'].to(self.device, dtype=self.model_dtype)
-                clip_features_original = batch['clip_embeddings'].float()  # Keep original for comparison
+                # Get data from batch with strict dtype handling
+                eva_features = batch['eva_embeddings']
+                clip_features_original = batch['clip_embeddings']
+                
+                # CRITICAL: Ensure all tensors have correct dtypes before GPU transfer
+                eva_features = eva_features.to(self.device, dtype=self.model_dtype)
+                clip_features_original = clip_features_original.float()  # Keep original for comparison
                 
                 # Show memory usage periodically
                 if batch_idx % 10 == 0:
                     allocated, reserved = get_memory_usage()
                     logger.info(f"💾 Batch {batch_idx}: GPU {allocated:.1f}GB/{get_total_memory():.1f}GB ({allocated/get_total_memory()*100:.1f}%)")
                 
-                # Generate CLIP embeddings
+                # Log dtype information for debugging
+                if batch_idx == 0:
+                    logger.info(f"🔧 Dtype Debug Info:")
+                    logger.info(f"   Model dtype: {self.model_dtype}")
+                    logger.info(f"   EVA features dtype: {eva_features.dtype}")
+                    logger.info(f"   CLIP original dtype: {clip_features_original.dtype}")
+                    logger.info(f"   Use half precision: {self.use_half_precision}")
+                
+                # Generate CLIP embeddings with dtype consistency
                 generated_clip_normalized = self._safe_generate_with_heun(
                     eva_features=eva_features,
                     num_steps=self.num_inference_steps,
@@ -742,19 +894,24 @@ class MemoryEfficientCOCOEvaluator:
                     logger.warning(f"⚠️ Generation failed for batch {batch_idx}")
                     continue
                 
+                # Ensure consistent dtypes for storage
+                generated_clip_normalized = generated_clip_normalized.cpu().float()
+                clip_features_original = clip_features_original.cpu().float()
+                
                 # Store results
-                all_generated_normalized.append(generated_clip_normalized.cpu().float())
-                all_targets_original.append(clip_features_original.cpu().float())
+                all_generated_normalized.append(generated_clip_normalized)
+                all_targets_original.append(clip_features_original)
                 
                 samples_processed += len(eva_features)
                 
-                # Clear memory
+                # Clear GPU memory with proper cleanup
                 del eva_features, generated_clip_normalized
                 torch.cuda.empty_cache()
                 
             except Exception as e:
                 evaluation_errors += 1
                 logger.warning(f"⚠️ Error processing batch {batch_idx}: {e}")
+                logger.warning(f"   Error details: {type(e).__name__}: {str(e)}")
                 continue
         
         if not all_generated_normalized:
@@ -841,6 +998,7 @@ class MemoryEfficientCOCOEvaluator:
                 'primary_metrics_source': primary_prefix[:-1],
                 'embeddings_source': embeddings_file,
                 'memory_efficient': True,
+                'standard_temp_directory': True,
             })
             
         except Exception as e:
@@ -972,6 +1130,7 @@ class MemoryEfficientCOCOEvaluator:
         logger.info(f"   Samples: {metrics['eval_samples']:,}")
         logger.info(f"   Success Rate: {metrics['eval_success_rate']*100:.1f}%")
         logger.info(f"   Memory Efficient: {'✅' if metrics.get('memory_efficient', False) else '❌'}")
+        logger.info(f"   Standard Temp Dir: {'✅' if metrics.get('standard_temp_directory', False) else '❌'}")
         logger.info(f"   Time: {metrics['evaluation_time_seconds']:.1f}s")
         
         logger.info("="*80)
@@ -980,8 +1139,8 @@ class MemoryEfficientCOCOEvaluator:
 def get_memory_usage():
     """Get current GPU memory usage in GB"""
     if torch.cuda.is_available():
-        return torch.cuda.memory_allocated() / 1024**3
-    return 0.0
+        return torch.cuda.memory_allocated() / 1024**3, torch.cuda.memory_reserved() / 1024**3
+    return 0.0, 0.0
 
 def get_total_memory():
     """Get total GPU memory in GB"""
@@ -995,15 +1154,15 @@ def main():
                        help="Path to the trained model directory")
     
     # Input source (either precomputed embeddings or real-time COCO)
-    input_group = parser.add_mutually_exclusive_group(required=True)
+    input_group = parser.add_mutually_exclusive_group()
     input_group.add_argument("--coco_embeddings_file", type=str,
-                           help="Path to pre-computed COCO embeddings file (recommended)")
+                           help="Path to pre-computed COCO embeddings file (auto-detected if not provided)")
     input_group.add_argument("--coco_root", type=str,
                            help="Path to COCO dataset root directory (fallback)")
     
     parser.add_argument("--training_embeddings_dir", type=str, 
-                       default="/scratch-shared/azadaianchuk1/blip3o_workspace/embeddings/patch_only_256_tokens",
-                       help="Path to training embeddings directory")
+                       default=None,
+                       help=f"Path to training embeddings directory (default: {STANDARD_TRAINING_EMBEDDINGS_DIR})")
     parser.add_argument("--output_dir", type=str, default=None,
                        help="Output directory for results")
     parser.add_argument("--max_samples", type=int, default=None,
@@ -1023,8 +1182,10 @@ def main():
     
     logger.info("🔬 Memory-Efficient BLIP3-o COCO Evaluation")
     logger.info("="*70)
-    logger.info("🔥 NEW: Support for pre-computed embeddings")
-    logger.info("💾 Memory-efficient evaluation strategy")
+    logger.info("🔥 UPDATED: Standard temp directory integration")
+    logger.info(f"📁 Standard COCO embeddings: {STANDARD_COCO_EMBEDDINGS_DIR}")
+    logger.info(f"📂 Standard training embeddings: {STANDARD_TRAINING_EMBEDDINGS_DIR}")
+    logger.info("💾 Auto-detection of embeddings files")
     logger.info("="*70)
     
     # Check paths
@@ -1032,18 +1193,34 @@ def main():
         logger.error(f"❌ Model path not found: {args.model_path}")
         return 1
     
+    # Determine evaluation mode
     if args.coco_embeddings_file:
         if not Path(args.coco_embeddings_file).exists():
             logger.error(f"❌ COCO embeddings file not found: {args.coco_embeddings_file}")
             return 1
-        logger.info(f"📂 Using pre-computed embeddings: {args.coco_embeddings_file}")
+        logger.info(f"📂 Using specified embeddings: {args.coco_embeddings_file}")
         evaluation_mode = "precomputed"
-    else:
+        embeddings_file = args.coco_embeddings_file
+    elif args.coco_root:
         if not Path(args.coco_root).exists():
             logger.error(f"❌ COCO root not found: {args.coco_root}")
             return 1
         logger.info(f"📂 Using real-time extraction: {args.coco_root}")
         evaluation_mode = "realtime"
+        embeddings_file = None
+    else:
+        # Auto-detect embeddings file
+        embeddings_file = find_coco_embeddings_file()
+        if embeddings_file:
+            logger.info(f"📂 Auto-detected embeddings: {embeddings_file}")
+            evaluation_mode = "precomputed"
+        else:
+            logger.error(f"❌ No COCO embeddings found and no COCO root provided")
+            logger.info(f"💡 Options:")
+            logger.info(f"   1. Extract embeddings: python extract_coco_embeddings_updated.py --coco_root /path/to/coco")
+            logger.info(f"   2. Provide embeddings file: --coco_embeddings_file /path/to/embeddings.pkl")
+            logger.info(f"   3. Provide COCO root: --coco_root /path/to/coco")
+            return 1
     
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     logger.info(f"Using device: {device}")
@@ -1065,7 +1242,7 @@ def main():
         
         if evaluation_mode == "precomputed":
             results = evaluator.evaluate_with_precomputed_embeddings(
-                embeddings_file=args.coco_embeddings_file,
+                embeddings_file=embeddings_file,
                 max_samples=args.max_samples,
                 batch_size=args.batch_size,
                 output_dir=args.output_dir,
@@ -1084,6 +1261,9 @@ def main():
             logger.info("🎉 Evaluation completed successfully!")
             similarity = results['eval_clip_similarity']
             logger.info(f"📊 Final CLIP similarity: {similarity:.4f}")
+            
+            if results.get('standard_temp_directory', False):
+                logger.info("✅ Used standard temp directory structure!")
             
             if similarity > 0.8:
                 logger.info("🎉 EXCELLENT performance!")

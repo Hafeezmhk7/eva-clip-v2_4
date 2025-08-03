@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 """
 MS-COCO Embedding Extraction for BLIP3-o Evaluation
-extract_coco_embeddings.py
+extract_coco_embeddings_updated.py
 
 Extracts CLIP and EVA-CLIP embeddings from MS-COCO validation dataset
 and saves them for memory-efficient evaluation.
 
+UPDATED: Uses standard temp directory structure for consistency with training
+
 Usage:
-    python extract_coco_embeddings.py --coco_root ./data/coco --output_dir /path/to/output
+    python extract_coco_embeddings_updated.py --coco_root ./data/coco
 """
 
 import os
@@ -35,6 +37,10 @@ logger = logging.getLogger(__name__)
 # Setup paths
 sys.path.insert(0, str(Path(__file__).parent))
 
+# STANDARD TEMP DIRECTORY STRUCTURE
+STANDARD_EMBEDDINGS_BASE = "/scratch-shared/azadaianchuk1/blip3o_workspace/embeddings"
+STANDARD_COCO_EMBEDDINGS_DIR = f"{STANDARD_EMBEDDINGS_BASE}/coco_embeddings"
+
 def setup_temp_manager():
     """Setup temp manager for structured directory management."""
     try:
@@ -42,8 +48,20 @@ def setup_temp_manager():
         manager = setup_snellius_environment("blip3o_workspace")
         return manager
     except ImportError:
-        logger.warning("⚠️  Temp manager not available, using fallback directories")
+        logger.warning("⚠️  Temp manager not available, using standard directories")
         return None
+
+def get_standard_coco_output_dir():
+    """Get the standard COCO embeddings output directory"""
+    standard_dir = Path(STANDARD_COCO_EMBEDDINGS_DIR)
+    
+    # Create the directory structure if it doesn't exist
+    standard_dir.mkdir(parents=True, exist_ok=True)
+    
+    logger.info(f"📁 Using standard COCO embeddings directory: {standard_dir}")
+    logger.info(f"📂 Consistent with training embeddings structure at: {STANDARD_EMBEDDINGS_BASE}")
+    
+    return standard_dir
 
 def get_memory_usage():
     """Get current GPU memory usage in GB"""
@@ -282,6 +300,7 @@ def process_coco_embeddings(
     logger.info(f"🔄 Processing MS-COCO validation set...")
     logger.info(f"   COCO root: {coco_root}")
     logger.info(f"   Output directory: {output_dir}")
+    logger.info(f"   📁 Directory matches training embeddings structure")
     logger.info(f"   Batch size: {batch_size}")
     logger.info(f"   Max samples: {max_samples if max_samples else 'All'}")
     logger.info(f"   Include CLS: {include_cls}")
@@ -361,7 +380,9 @@ def process_coco_embeddings(
                     'sample_idx': i
                 }
                 batch_metadata.append(metadata)
-                all_metadata.extend(batch_metadata)
+            
+            # Extend metadata with the batch metadata (outside the loop!)
+            all_metadata.extend(batch_metadata)
             
             # Save intermediate results every N batches to avoid memory issues
             if (batch_idx + 1) % save_every_n_batches == 0:
@@ -371,6 +392,14 @@ def process_coco_embeddings(
                 if all_clip_embeddings:
                     clip_embeddings_tensor = torch.cat(all_clip_embeddings, dim=0)
                     eva_embeddings_tensor = torch.cat(all_eva_embeddings, dim=0)
+                    
+                    # Ensure metadata count matches embeddings count
+                    expected_samples = clip_embeddings_tensor.shape[0]
+                    if len(all_metadata) != expected_samples:
+                        logger.warning(f"⚠️ Metadata count mismatch: {len(all_metadata)} metadata vs {expected_samples} embeddings")
+                        # Truncate metadata to match embeddings if needed
+                        all_metadata = all_metadata[:expected_samples]
+                        logger.info(f"   Adjusted metadata count to {len(all_metadata)}")
                     
                     # Save intermediate file
                     intermediate_file = output_dir / f"coco_embeddings_batch_{batch_idx + 1}.pkl"
@@ -385,7 +414,9 @@ def process_coco_embeddings(
                             'eva_dim': eva_embeddings_tensor.shape[-1],
                             'batch_size': batch_size,
                             'end_batch': batch_idx + 1,
-                            'samples_count': len(all_metadata)
+                            'samples_count': len(all_metadata),
+                            'storage_location': 'standard_temp_dir',
+                            'base_embeddings_dir': STANDARD_EMBEDDINGS_BASE
                         }
                     }
                     
@@ -393,6 +424,7 @@ def process_coco_embeddings(
                         pickle.dump(intermediate_data, f, protocol=pickle.HIGHEST_PROTOCOL)
                     
                     logger.info(f"   Saved {len(all_metadata)} samples to {intermediate_file}")
+                    logger.info(f"   Verified: {clip_embeddings_tensor.shape[0]} CLIP, {eva_embeddings_tensor.shape[0]} EVA, {len(all_metadata)} metadata")
                     
                     # Clear memory
                     all_clip_embeddings.clear()
@@ -419,6 +451,14 @@ def process_coco_embeddings(
         clip_embeddings_tensor = torch.cat(all_clip_embeddings, dim=0)
         eva_embeddings_tensor = torch.cat(all_eva_embeddings, dim=0)
         
+        # Ensure metadata count matches embeddings count
+        expected_samples = clip_embeddings_tensor.shape[0]
+        if len(all_metadata) != expected_samples:
+            logger.warning(f"⚠️ Final metadata count mismatch: {len(all_metadata)} metadata vs {expected_samples} embeddings")
+            # Truncate metadata to match embeddings if needed
+            all_metadata = all_metadata[:expected_samples]
+            logger.info(f"   Adjusted final metadata count to {len(all_metadata)}")
+        
         final_file = output_dir / f"coco_embeddings_final.pkl"
         final_data = {
             'clip_embeddings': clip_embeddings_tensor,
@@ -431,7 +471,9 @@ def process_coco_embeddings(
                 'eva_dim': eva_embeddings_tensor.shape[-1],
                 'batch_size': batch_size,
                 'is_final': True,
-                'samples_count': len(all_metadata)
+                'samples_count': len(all_metadata),
+                'storage_location': 'standard_temp_dir',
+                'base_embeddings_dir': STANDARD_EMBEDDINGS_BASE
             }
         }
         
@@ -439,6 +481,7 @@ def process_coco_embeddings(
             pickle.dump(final_data, f, protocol=pickle.HIGHEST_PROTOCOL)
         
         logger.info(f"   Saved final {len(all_metadata)} samples to {final_file}")
+        logger.info(f"   Verified: {clip_embeddings_tensor.shape[0]} CLIP, {eva_embeddings_tensor.shape[0]} EVA, {len(all_metadata)} metadata")
     
     logger.info("✅ MS-COCO embedding extraction completed!")
 
@@ -468,12 +511,29 @@ def consolidate_embeddings(output_dir: Path, include_cls: bool = True):
             with open(file_path, 'rb') as f:
                 data = pickle.load(f)
             
-            all_clip_embeddings.append(data['clip_embeddings'])
-            all_eva_embeddings.append(data['eva_embeddings'])
-            all_metadata.extend(data['metadata'])
-            total_samples += data['config']['samples_count']
+            # Validate data consistency before adding
+            clip_emb = data['clip_embeddings']
+            eva_emb = data['eva_embeddings']
+            metadata = data['metadata']
             
-            logger.info(f"     Added {data['config']['samples_count']} samples")
+            if len(metadata) != clip_emb.shape[0] or len(metadata) != eva_emb.shape[0]:
+                logger.warning(f"⚠️ Data inconsistency in {file_path.name}:")
+                logger.warning(f"   Metadata: {len(metadata)}, CLIP: {clip_emb.shape[0]}, EVA: {eva_emb.shape[0]}")
+                
+                # Fix by truncating to the minimum size
+                min_size = min(len(metadata), clip_emb.shape[0], eva_emb.shape[0])
+                logger.info(f"   Fixing by truncating to {min_size} samples")
+                
+                clip_emb = clip_emb[:min_size]
+                eva_emb = eva_emb[:min_size]
+                metadata = metadata[:min_size]
+            
+            all_clip_embeddings.append(clip_emb)
+            all_eva_embeddings.append(eva_emb)
+            all_metadata.extend(metadata)
+            total_samples += len(metadata)
+            
+            logger.info(f"     Added {len(metadata)} samples (verified consistent)")
             
         except Exception as e:
             logger.error(f"   ❌ Error loading {file_path}: {e}")
@@ -489,9 +549,24 @@ def consolidate_embeddings(output_dir: Path, include_cls: bool = True):
     final_clip_embeddings = torch.cat(all_clip_embeddings, dim=0)
     final_eva_embeddings = torch.cat(all_eva_embeddings, dim=0)
     
-    logger.info(f"✅ Consolidated embeddings:")
+    # Final validation of data consistency
+    if len(all_metadata) != final_clip_embeddings.shape[0] or len(all_metadata) != final_eva_embeddings.shape[0]:
+        logger.warning(f"⚠️ Final data inconsistency detected:")
+        logger.warning(f"   Metadata: {len(all_metadata)}, CLIP: {final_clip_embeddings.shape[0]}, EVA: {final_eva_embeddings.shape[0]}")
+        
+        # Fix by truncating to the minimum size
+        min_size = min(len(all_metadata), final_clip_embeddings.shape[0], final_eva_embeddings.shape[0])
+        logger.info(f"   Fixing by truncating all to {min_size} samples")
+        
+        final_clip_embeddings = final_clip_embeddings[:min_size]
+        final_eva_embeddings = final_eva_embeddings[:min_size]
+        all_metadata = all_metadata[:min_size]
+        total_samples = min_size
+    
+    logger.info(f"✅ Consolidated embeddings (verified consistent):")
     logger.info(f"   CLIP embeddings: {final_clip_embeddings.shape}")
     logger.info(f"   EVA embeddings: {final_eva_embeddings.shape}")
+    logger.info(f"   Metadata entries: {len(all_metadata)}")
     logger.info(f"   Total samples: {total_samples}")
     
     # Create final consolidated file
@@ -508,7 +583,10 @@ def consolidate_embeddings(output_dir: Path, include_cls: bool = True):
             'consolidated': True,
             'source_files': [f.name for f in embedding_files],
             'extraction_timestamp': time.time(),
-            'format_version': 'coco_embeddings_v1'
+            'format_version': 'coco_embeddings_v1',
+            'storage_location': 'standard_temp_dir',
+            'base_embeddings_dir': STANDARD_EMBEDDINGS_BASE,
+            'coco_embeddings_dir': str(output_dir)
         }
     }
     
@@ -532,9 +610,14 @@ def consolidate_embeddings(output_dir: Path, include_cls: bool = True):
         'include_cls': include_cls,
         'tokens': 257 if include_cls else 256,
         'created': time.strftime('%Y-%m-%d %H:%M:%S'),
+        'storage_location': 'standard_temp_dir',
+        'base_embeddings_dir': STANDARD_EMBEDDINGS_BASE,
+        'coco_embeddings_dir': str(output_dir),
+        'training_embeddings_compatible': True,
         'usage': {
-            'evaluation_script': 'eval_blip3o_coco.py --use_precomputed_embeddings',
-            'embeddings_file': str(consolidated_file)
+            'evaluation_script': 'eval_blip3o_coco_updated.py --coco_embeddings_file',
+            'embeddings_file': str(consolidated_file),
+            'note': 'Stored in same temp directory structure as training embeddings'
         }
     }
     
@@ -553,7 +636,7 @@ def main():
     parser.add_argument("--coco_root", type=str, required=True,
                        help="Path to MS-COCO dataset root directory")
     parser.add_argument("--output_dir", type=str, default=None,
-                       help="Output directory for embeddings (default: auto-detect from temp manager)")
+                       help="Output directory for embeddings (default: standard temp directory)")
     parser.add_argument("--batch_size", type=int, default=8,
                        help="Batch size for processing")
     parser.add_argument("--max_samples", type=int, default=None,
@@ -571,6 +654,10 @@ def main():
     
     logger.info("🚀 MS-COCO Embedding Extraction for BLIP3-o Evaluation")
     logger.info("=" * 70)
+    logger.info("🔥 UPDATED: Uses standard temp directory structure")
+    logger.info(f"📁 Standard directory: {STANDARD_COCO_EMBEDDINGS_DIR}")
+    logger.info(f"📂 Consistent with training at: {STANDARD_EMBEDDINGS_BASE}")
+    logger.info("=" * 70)
     logger.info(f"COCO root: {args.coco_root}")
     logger.info(f"Include CLS: {args.include_cls} ({'257' if args.include_cls else '256'} tokens)")
     logger.info(f"Batch size: {args.batch_size}")
@@ -580,18 +667,15 @@ def main():
     # Setup output directory
     if args.output_dir:
         output_dir = Path(args.output_dir)
+        logger.info(f"📁 Using custom output directory: {output_dir}")
     else:
-        # Try to use temp manager
-        temp_manager = setup_temp_manager()
-        if temp_manager:
-            output_dir = temp_manager.get_working_dir() / "coco_embeddings"
-            logger.info(f"✅ Using temp manager working directory: {output_dir}")
-        else:
-            output_dir = Path("./coco_embeddings")
-            logger.warning(f"⚠️ Using fallback directory: {output_dir}")
+        # Use standard temp directory structure
+        output_dir = get_standard_coco_output_dir()
+        logger.info(f"📁 Using standard temp directory: {output_dir}")
+        logger.info(f"✅ Consistent with training embeddings structure")
     
     output_dir.mkdir(parents=True, exist_ok=True)
-    logger.info(f"📁 Output directory: {output_dir}")
+    logger.info(f"📂 Output directory confirmed: {output_dir}")
     
     # Check CUDA
     if not torch.cuda.is_available():
@@ -608,6 +692,7 @@ def main():
             consolidated_file = consolidate_embeddings(output_dir, args.include_cls)
             if consolidated_file:
                 logger.info(f"✅ Consolidation completed: {consolidated_file}")
+                logger.info(f"📁 Stored in standard temp directory structure")
                 return 0
             else:
                 logger.error("❌ Consolidation failed")
@@ -632,11 +717,16 @@ def main():
             if consolidated_file:
                 logger.info(f"🎉 MS-COCO embedding extraction completed successfully!")
                 logger.info(f"📁 Consolidated embeddings: {consolidated_file}")
+                logger.info(f"📂 Location: Standard temp directory structure")
+                logger.info(f"✅ Consistent with training embeddings at: {STANDARD_EMBEDDINGS_BASE}")
                 logger.info(f"")
                 logger.info(f"💡 Usage in evaluation:")
-                logger.info(f"   python eval_blip3o_coco.py \\")
+                logger.info(f"   python eval_blip3o_coco_updated.py \\")
                 logger.info(f"     --model_path /path/to/model \\")
                 logger.info(f"     --coco_embeddings_file {consolidated_file}")
+                logger.info(f"")
+                logger.info(f"🎯 Or use auto-detection with standard location:")
+                logger.info(f"   python eval_blip3o_coco_updated.py --model_path /path/to/model")
                 return 0
             else:
                 logger.error("❌ Consolidation failed")
