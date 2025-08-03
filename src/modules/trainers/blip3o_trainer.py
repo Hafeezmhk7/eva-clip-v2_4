@@ -93,7 +93,7 @@ class BLIP3oCLIPTrainer:
         device: Optional[torch.device] = None,
         
         # WandB configuration
-        use_wandb: bool = False,
+        use_wandb: bool = True,
         wandb_project: str = "blip3o-clip-no-norm",
         wandb_run_name: Optional[str] = None,
         wandb_config: Optional[Dict] = None,
@@ -1043,9 +1043,4 @@ def create_clip_trainer(
         use_wandb=use_wandb,
         wandb_project=wandb_project,
         **kwargs
-    )
-
-
-# Backward compatibility aliases
-create_ultra_conservative_clip_trainer = create_clip_trainer
-create_fixed_clip_trainer = create_clip_trainer
+    )r

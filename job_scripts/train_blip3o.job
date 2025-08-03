@@ -33,15 +33,15 @@ module load Miniconda3/24.7.1-0
 module load CUDA/12.6.0
 source activate eva_clip_env
 
-# ✅ Set WandB API key
-export WANDB_API_KEY="0d9895af249ee18e4fa141e8a2350e0f4adb920f"
-export WANDB_MODE="online"
-export WANDB_CACHE_DIR="${TMPDIR}/wandb_cache"
-mkdir -p "${WANDB_CACHE_DIR}"
+# # ✅ Set WandB API key
+# export WANDB_API_KEY="0d9895af249ee18e4fa141e8a2350e0f4adb920f"
+# export WANDB_MODE="online"
+# export WANDB_CACHE_DIR="${TMPDIR}/wandb_cache"
+# mkdir -p "${WANDB_CACHE_DIR}"
 
-# Verify WandB login
-echo "🔐 Verifying WandB authentication..."
-python -c "import wandb; wandb.login(key='$WANDB_API_KEY'); print('✅ WandB login successful')"
+# # Verify WandB login
+# echo "🔐 Verifying WandB authentication..."
+# python -c "import wandb; wandb.login(key='$WANDB_API_KEY'); print('✅ WandB login successful')"
 
 # Configuration
 EMBEDDINGS_DIR="/scratch-shared/azadaianchuk1/blip3o_workspace/embeddings/patch_only_256_tokens"
@@ -200,8 +200,9 @@ python train_dit.py \
     --use_heun_inference \
     --use_timestep_weighting \
     --fp16 \
-    --use_wandb \
     --wandb_project "blip3o-clip-no-norm"
+
+# --use_wandb  \
 
 TRAINING_EXIT_CODE=$?
 

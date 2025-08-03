@@ -1042,8 +1042,3 @@ def create_improved_clip_reproduction_model(
     logger.info(f"   Sandwich norm: {'✅' if use_sandwich_norm else '❌'}")
     
     return model
-
-
-# Aliases for backward compatibility
-BLIP3oCLIPDiTModel = ImprovedBLIP3oCLIPDiTModel
-create_clip_reproduction_model = create_improved_clip_reproduction_model

@@ -345,10 +345,10 @@ class SemanticPreservingFlowMatchingLoss(nn.Module):
         
         # TOTAL LOSS COMBINATION
         total_loss = scale_factor * (
-            self.velocity_weight * velocity_loss +
-            self.semantic_weight * semantic_loss +
-            self.cosine_weight * cosine_loss +
-            self.consistency_weight * consistency_loss
+            self.velocity_weight * velocity_loss 
+            # self.semantic_weight * semantic_loss +
+            # self.cosine_weight * cosine_loss +
+            # self.consistency_weight * consistency_loss
         )
         
         # Final safety checks
@@ -570,10 +570,3 @@ def create_clip_reproduction_loss(
         robust_similarity=robust_similarity,
         **kwargs
     )
-
-
-# Backward compatibility aliases
-BLIP3oCLIPFlowMatchingLoss = SemanticPreservingFlowMatchingLoss
-RobustSemanticPreservingFlowMatchingLoss = SemanticPreservingFlowMatchingLoss
-create_robust_clip_reproduction_loss = create_clip_reproduction_loss
-create_fixed_clip_reproduction_loss = create_clip_reproduction_loss

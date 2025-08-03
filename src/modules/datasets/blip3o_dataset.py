@@ -502,8 +502,3 @@ def create_clip_reproduction_dataloaders(
     logger.info(f"  🔥 CLIP normalization: DISABLED")
     
     return train_dataloader, eval_dataloader
-
-
-# Backward compatibility aliases
-create_ultra_conservative_clip_reproduction_dataloaders = create_clip_reproduction_dataloaders
-ultra_conservative_clip_reproduction_collate_fn = clip_reproduction_collate_fn
