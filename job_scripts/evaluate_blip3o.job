@@ -160,7 +160,7 @@ if [ ! -d "$STANDARD_COCO_EMBEDDINGS_DIR" ]; then
     echo "❌ COCO embeddings directory not found: $STANDARD_COCO_EMBEDDINGS_DIR"
     echo ""
     echo "💡 To extract COCO embeddings to standard location:"
-    echo "   sbatch job_scripts/extract_coco_updated.job"
+    echo "   sbatch job_scripts/extract_coco.job"
     exit 1
 fi
 
@@ -175,7 +175,7 @@ if [ ! -f "$COCO_CONSOLIDATED_FILE" ]; then
     ls -la "$STANDARD_COCO_EMBEDDINGS_DIR"
     echo ""
     echo "💡 If you see batch files, try consolidating them:"
-    echo "   python extract_coco_embeddings_updated.py --consolidate_only"
+    echo "   python extract_coco_embeddings.py --consolidate_only"
     exit 1
 fi
 
@@ -256,7 +256,7 @@ fi
 
 # Verify evaluation script
 if [ ! -f "eval_blip3o_coco.py" ]; then
-    echo "❌ Updated evaluation script not found: eval_blip3o_coco_updated.py"
+    echo "❌ Updated evaluation script not found: eval_coco_same_pipeline.py"
     echo "Please ensure the updated evaluation script is in the current directory"
     echo ""
     echo "Expected script features:"
@@ -288,18 +288,17 @@ echo ""
 # Build evaluation command - using auto-detection
 EVAL_CMD="python eval_blip3o_coco.py \
     --model_path \"$MODEL_PATH\" \
+    --coco_embeddings_file \"$COCO_CONSOLIDATED_FILE\" \
     --output_dir \"$OUTPUT_DIR\" \
     --batch_size $BATCH_SIZE \
     --num_inference_steps $NUM_INFERENCE_STEPS \
     --save_results"
 
-# The script will auto-detect:
-# - COCO embeddings from $STANDARD_COCO_EMBEDDINGS_DIR/coco_embeddings_consolidated.pkl
-# - Training embeddings from $STANDARD_TRAINING_EMBEDDINGS_DIR
-
 # Add optional parameters
 if [ "$USE_HEUN" = true ]; then
     EVAL_CMD="$EVAL_CMD --use_heun"
+else
+    EVAL_CMD="$EVAL_CMD --no_use_heun"
 fi
 
 if [ -n "$MAX_SAMPLES" ] && [ "$MAX_SAMPLES" != "None" ]; then
@@ -308,7 +307,7 @@ fi
 
 echo "Executing: $EVAL_CMD"
 echo ""
-echo "🔍 Auto-detection will look for:"
+echo "🔍 Using embeddings:"
 echo "   COCO embeddings: $COCO_CONSOLIDATED_FILE"
 echo "   Training embeddings: $STANDARD_TRAINING_EMBEDDINGS_DIR"
 echo ""
@@ -334,7 +333,7 @@ if [ $EVAL_EXIT_CODE -eq 0 ]; then
     echo "✅ Standard temp directory MS-COCO evaluation completed successfully!"
     
     # Find and display results
-    RESULTS_FILE="$OUTPUT_DIR/coco_evaluation_precomputed.json"
+    RESULTS_FILE="$OUTPUT_DIR/coco_evaluation_same_pipeline.json"
     
     if [ -f "$RESULTS_FILE" ]; then
         echo ""
