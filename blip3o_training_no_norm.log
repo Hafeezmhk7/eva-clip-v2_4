@@ -1370,3 +1370,74 @@
 2025-08-03 15:43:48,616 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
 2025-08-03 15:43:49,601 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
 2025-08-03 15:43:50,585 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 15:43:51,571 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 15:43:51,591 - INFO - Step 900: Loss=1.765087, GradNorm=54552.879, Failures=0
+2025-08-03 15:43:51,591 - INFO - Running evaluation at step 900...
+2025-08-03 15:43:51,591 - INFO - Starting evaluation with 100 samples (NO NORMALIZATION)
+2025-08-03 15:44:33,889 - INFO - ✅ Evaluation completed: 128 samples
+2025-08-03 15:44:33,891 - INFO -    CLIP similarity: 0.8972
+2025-08-03 15:44:33,891 - INFO -    Success rate: 100.0%
+2025-08-03 15:44:33,894 - INFO - ✅ Evaluation: CLIP similarity = 0.8972
+2025-08-03 15:44:34,862 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 15:44:35,847 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 15:44:36,832 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 15:44:37,816 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 15:44:38,801 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 15:44:39,787 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 15:44:40,772 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 15:44:41,757 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 15:44:42,742 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 15:44:43,726 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 15:44:43,743 - INFO - Step 910: Loss=1.765652, GradNorm=50226.148, Failures=0
+2025-08-03 15:44:44,712 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 15:44:45,698 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 15:44:46,684 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 15:44:47,670 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 15:44:48,653 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 15:44:48,823 - INFO - Iteration completed: 7832 samples processed
+2025-08-03 15:44:48,824 - INFO - Epoch 15 completed: 61 batches, 0 failures
+2025-08-03 15:44:48,839 - INFO - Epoch 15 summary:
+2025-08-03 15:44:48,839 - INFO -   Average loss: 1.797986
+2025-08-03 15:44:48,839 - INFO -   Failure rate: 0.0%
+2025-08-03 15:44:48,839 - INFO -   Best similarity: 0.8989
+2025-08-03 15:44:48,839 - INFO -   Epoch time: 117.2s
+2025-08-03 15:44:48,839 - INFO - Running final evaluation...
+2025-08-03 15:44:48,839 - INFO - Starting evaluation with 200 samples (NO NORMALIZATION)
+2025-08-03 15:46:08,713 - INFO - ✅ Evaluation completed: 256 samples
+2025-08-03 15:46:08,714 - INFO -    CLIP similarity: 0.8988
+2025-08-03 15:46:08,715 - INFO -    Success rate: 100.0%
+2025-08-03 15:46:09,651 - INFO - 🎉 Training completed (NO NORMALIZATION)!
+2025-08-03 15:46:09,651 - INFO -   Total time: 1949.2 seconds
+2025-08-03 15:46:09,651 - INFO -   Best similarity: 0.8989
+2025-08-03 15:46:09,651 - INFO -   Training stability maintained
+2025-08-03 15:46:09,654 - INFO - 
+================================================================================
+2025-08-03 15:46:09,654 - INFO - 🎉 TRAINING COMPLETED (NO NORMALIZATION)!
+2025-08-03 15:46:09,654 - INFO - ================================================================================
+2025-08-03 15:46:09,654 - INFO - 📊 RESULTS:
+2025-08-03 15:46:09,654 - INFO -   Duration: 1950.2 seconds (32.5 minutes)
+2025-08-03 15:46:09,654 - INFO -   Total steps: 915
+2025-08-03 15:46:09,654 - INFO -   Best loss: inf
+2025-08-03 15:46:09,654 - INFO -   Best CLIP similarity: 0.8989
+2025-08-03 15:46:09,654 - INFO -   🎉 EXCELLENT: Similarity >0.6 without normalization!
+2025-08-03 15:46:09,654 - INFO - 📊 Final Evaluation (RAW CLIP space):
+2025-08-03 15:46:09,654 - INFO -   CLIP similarity: 0.8988
+2025-08-03 15:46:09,654 - INFO -   High quality (>0.7): 100.0%
+2025-08-03 15:46:09,654 - INFO -   Very high quality (>0.8): 100.0%
+2025-08-03 15:46:09,655 - INFO - 📁 Outputs:
+2025-08-03 15:46:09,655 - INFO -   Model checkpoints: checkpoints/blip3o_no_norm_20250803_151326
+2025-08-03 15:46:09,655 - INFO -   Training logs: blip3o_training_no_norm.log
+2025-08-03 15:46:09,655 - INFO - ================================================================================
+2025-08-03 15:46:09,655 - INFO - ✅ TRAINING COMPLETED SUCCESSFULLY (NO NORMALIZATION)!
+2025-08-03 15:46:09,655 - INFO - 🔑 Working directly with raw CLIP embeddings!
+2025-08-03 15:46:09,655 - INFO - 💡 Next Steps:
+2025-08-03 15:46:09,655 - INFO -   • Outstanding! Try scaling up:
+2025-08-03 15:46:09,655 - INFO -     - Use more shards (--max_shards 10)
+2025-08-03 15:46:09,655 - INFO -     - Larger model (--model_size large)
+2025-08-03 15:46:09,655 - INFO - ================================================================================
+2025-08-03 15:46:09,655 - INFO - 🔧 Advantages of No Normalization:
+2025-08-03 15:46:09,655 - INFO -   • No dependency on training data statistics
+2025-08-03 15:46:09,655 - INFO -   • Simpler training and evaluation pipeline
+2025-08-03 15:46:09,655 - INFO -   • Direct work with original CLIP space
+2025-08-03 15:46:09,655 - INFO -   • Easier to debug and understand
+2025-08-03 15:46:09,655 - INFO -   • No risk of normalization-related crashes
