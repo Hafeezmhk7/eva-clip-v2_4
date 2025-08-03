@@ -164,7 +164,7 @@ Where `c` is the EVA conditioning.
 ### Inference Process
 
 ```mermaid
-graph LR
+graph TB
     A[Random Noise<br/>ε ~ N(0,I)] --> B[t=1.0]
     B --> C[Velocity<br/>Prediction]
     C --> D[Heun Step<br/>O(h²) accuracy]
