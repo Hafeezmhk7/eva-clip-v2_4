@@ -1,0 +1,285 @@
+2025-08-03 14:57:11,254 - INFO - 🚀 BLIP3-o CLIP Reproduction Training (NO NORMALIZATION)
+2025-08-03 14:57:11,255 - INFO - ================================================================================
+2025-08-03 14:57:11,255 - INFO - 📋 Task: Reproduce CLIP embeddings from EVA embeddings
+2025-08-03 14:57:11,255 - INFO - 🧠 Model: BLIP3-o DiT WITHOUT CLIP normalization
+2025-08-03 14:57:11,255 - INFO - 🌊 Method: Rectified Flow Matching with raw embeddings
+2025-08-03 14:57:11,255 - INFO - 🎯 Target: CLIP embeddings [B, N, 1024] (RAW)
+2025-08-03 14:57:11,255 - INFO - 🎮 Conditioning: EVA embeddings [B, N, 4096]
+2025-08-03 14:57:11,255 - INFO - 🔑 Focus: Training without data-dependent normalization
+2025-08-03 14:57:11,255 - INFO - ================================================================================
+2025-08-03 14:57:11,255 - INFO - 🛠️ KEY CHANGES:
+2025-08-03 14:57:11,255 - INFO -    ✅ 1. No CLIP normalization/denormalization
+2025-08-03 14:57:11,255 - INFO -    ✅ 2. Work directly with raw CLIP embeddings
+2025-08-03 14:57:11,255 - INFO -    ✅ 3. No dependency on training data statistics
+2025-08-03 14:57:11,255 - INFO -    ✅ 4. Simplified training and evaluation pipeline
+2025-08-03 14:57:11,255 - INFO -    ✅ 5. Optional simple data-independent scaling
+2025-08-03 14:57:11,255 - INFO - ================================================================================
+2025-08-03 14:57:11,257 - INFO - Found 35 embedding files
+2025-08-03 14:57:11,258 - WARNING - ⚠️ Large batch size (128) may cause memory issues
+2025-08-03 14:57:11,258 - INFO - Configuration (NO NORMALIZATION):
+2025-08-03 14:57:11,258 - INFO -   Model size: base
+2025-08-03 14:57:11,258 - INFO -   Training mode: patch_only
+2025-08-03 14:57:11,258 - INFO -   Embeddings dir: /scratch-shared/azadaianchuk1/blip3o_workspace/embeddings/patch_only_256_tokens
+2025-08-03 14:57:11,258 - INFO -   Output dir: ./checkpoints/blip3o_no_norm_20250803_145708
+2025-08-03 14:57:11,258 - INFO -   Learning rate: 0.0001
+2025-08-03 14:57:11,258 - INFO -   Batch size: 128
+2025-08-03 14:57:11,258 - INFO -   Epochs: 15
+2025-08-03 14:57:11,258 - INFO -   Max shards: 3
+2025-08-03 14:57:11,258 - INFO -   Simple scale factor: 1.0
+2025-08-03 14:57:11,258 - INFO -   Loss weights:
+2025-08-03 14:57:11,258 - INFO -     Velocity: 1.0
+2025-08-03 14:57:11,258 - INFO -     Semantic: 0.5
+2025-08-03 14:57:11,258 - INFO -     Cosine: 0.2
+2025-08-03 14:57:11,258 - INFO -     Consistency: 0.3
+2025-08-03 14:57:11,258 - INFO -   EVA adapter: ✅ ENABLED
+2025-08-03 14:57:11,258 - INFO -   Heun inference: ✅ ENABLED
+2025-08-03 14:57:11,258 - INFO -   Normalization: DISABLED
+2025-08-03 14:57:11,532 - INFO - Using GPU: NVIDIA H100
+2025-08-03 14:57:11,532 - INFO - GPU Memory: 100.0 GB
+2025-08-03 14:57:11,532 - INFO - PyTorch version: 2.7.1+cu126
+2025-08-03 14:57:17,585 - INFO - ✅ CLIP DiT model loaded successfully
+2025-08-03 14:57:17,588 - INFO - ✅ Flow matching loss loaded successfully
+2025-08-03 14:57:18,306 - INFO - ✅ CLIP trainer loaded successfully
+2025-08-03 14:57:18,312 - INFO - ✅ CLIP datasets loaded successfully
+2025-08-03 14:57:18,316 - INFO - ✅ Configuration loaded successfully
+2025-08-03 14:57:18,316 - INFO - 🎉 All CLIP reproduction components loaded successfully!
+2025-08-03 14:57:18,316 - INFO - 🎉 Clean BLIP3-o CLIP reproduction modules fully initialized!
+2025-08-03 14:57:18,316 - INFO - 🎯 Ready for EVA → CLIP reproduction training
+2025-08-03 14:57:18,316 - INFO - ✅ Dataset module loaded (NO NORMALIZATION)
+2025-08-03 14:57:18,316 - INFO - ✅ Model module loaded
+2025-08-03 14:57:18,316 - INFO - ✅ Loss module loaded (NO NORMALIZATION)
+2025-08-03 14:57:18,316 - INFO - ✅ Trainer module loaded (NO NORMALIZATION)
+2025-08-03 14:57:18,316 - INFO - ✅ All required modules loaded successfully
+2025-08-03 14:57:18,316 - INFO - ✅ Environment check passed
+2025-08-03 14:57:18,317 - INFO - ✅ Output directory ready: checkpoints/blip3o_no_norm_20250803_145708
+2025-08-03 14:57:18,317 - INFO - 🏗️ Creating model...
+2025-08-03 14:57:18,318 - INFO - ✅ Configuration validation passed
+2025-08-03 14:57:18,747 - INFO - ✅ EVA-CLIP Adapter initialized: 4096 → 768
+2025-08-03 14:57:18,747 - INFO -    Layers: 6, Dropout: 0.1, Residual: True
+2025-08-03 14:57:20,192 - INFO - ✅ Stable initialization applied with depth scale: 0.2887
+2025-08-03 14:57:20,193 - INFO - ✅ IMPROVED BLIP3-o CLIP DiT model initialized: 227,474,014 parameters
+2025-08-03 14:57:20,193 - INFO -   🔥 EVA adapter: ENABLED
+2025-08-03 14:57:20,194 - INFO -   🚀 Heun solver: ENABLED
+2025-08-03 14:57:20,194 - INFO -   ⚡ Attention caching: Available
+2025-08-03 14:57:20,194 - INFO - ✅ IMPROVED BLIP3-o model created:
+2025-08-03 14:57:20,194 - INFO -    Size: base
+2025-08-03 14:57:20,195 - INFO -    Parameters: 227,474,014
+2025-08-03 14:57:20,195 - INFO -    EVA adapter: ✅
+2025-08-03 14:57:20,195 - INFO -    Heun solver: ✅
+2025-08-03 14:57:20,195 - INFO -    3D RoPE: ✅
+2025-08-03 14:57:20,195 - INFO -    Sandwich norm: ✅
+2025-08-03 14:57:20,426 - INFO - ✅ Model created with 227,474,014 parameters
+2025-08-03 14:57:20,426 - INFO -   Model size: base
+2025-08-03 14:57:20,426 - INFO -   Training mode: patch_only
+2025-08-03 14:57:20,427 - INFO -   3D RoPE: ✅ ENABLED
+2025-08-03 14:57:20,427 - INFO -   Sandwich Norm: ✅ ENABLED
+2025-08-03 14:57:20,427 - INFO -   EVA Adapter: ✅ ENABLED
+2025-08-03 14:57:20,427 - INFO -   Heun Solver: ✅ ENABLED
+2025-08-03 14:57:20,427 - INFO - 🌊 Creating loss function...
+2025-08-03 14:57:20,427 - INFO - ✅ Flow Matching Loss initialized (NO NORMALIZATION):
+2025-08-03 14:57:20,427 - INFO -   Prediction type: velocity
+2025-08-03 14:57:20,427 - INFO -   Flow type: rectified
+2025-08-03 14:57:20,427 - INFO -   Weights - Velocity: 1.0, Semantic: 0.5, Cosine: 0.2
+2025-08-03 14:57:20,427 - INFO -   Consistency weight: 0.3
+2025-08-03 14:57:20,427 - INFO -   Normalization: DISABLED
+2025-08-03 14:57:20,427 - INFO - ✅ Loss function created (NO NORMALIZATION):
+2025-08-03 14:57:20,427 - INFO -   Prediction type: velocity
+2025-08-03 14:57:20,427 - INFO -   Flow type: rectified
+2025-08-03 14:57:20,427 - INFO -   Weights - Velocity: 1.0, Semantic: 0.5, Cosine: 0.2
+2025-08-03 14:57:20,427 - INFO -   Consistency weight: 0.3
+2025-08-03 14:57:20,427 - INFO -   Timestep weighting: ✅ ENABLED
+2025-08-03 14:57:20,427 - INFO -   Normalization: DISABLED
+2025-08-03 14:57:20,427 - INFO - 📊 Creating dataloaders (NO NORMALIZATION)...
+2025-08-03 14:57:20,427 - INFO - Loading embeddings from: /scratch-shared/azadaianchuk1/blip3o_workspace/embeddings/patch_only_256_tokens
+2025-08-03 14:57:20,428 - INFO - Found 35 .pkl files in embeddings directory
+2025-08-03 14:57:20,428 - INFO - Creating CLIP reproduction dataloaders (NO NORMALIZATION):
+2025-08-03 14:57:20,428 - INFO -   Target: CLIP embeddings [B, N, 1024] (RAW)
+2025-08-03 14:57:20,428 - INFO -   Conditioning: EVA embeddings [B, N, 4096]
+2025-08-03 14:57:20,428 - INFO -   Simple scale factor: 1.0
+2025-08-03 14:57:20,428 - INFO -   Timestep sampling: U-shaped distribution
+2025-08-03 14:57:20,453 - INFO - Loaded manifest: 35 shards, 91,333 samples
+2025-08-03 14:57:20,454 - INFO - Found 35 files with pattern: embeddings_shard_*_patch_only.pkl
+2025-08-03 14:57:20,471 - INFO - Prepared 3 shard files
+2025-08-03 14:57:20,472 - INFO - Using manifest for length estimation: 7,828 samples
+2025-08-03 14:57:20,472 - INFO - BLIP3-o CLIP Reproduction Dataset initialized (NO NORMALIZATION):
+2025-08-03 14:57:20,472 - INFO -   Directory: /scratch-shared/azadaianchuk1/blip3o_workspace/embeddings/patch_only_256_tokens
+2025-08-03 14:57:20,472 - INFO -   Mode: patch_only (256 tokens)
+2025-08-03 14:57:20,472 - INFO -   TARGET: CLIP embeddings [B, N, 1024] (RAW - NO NORMALIZATION)
+2025-08-03 14:57:20,472 - INFO -   CONDITIONING: EVA embeddings [B, N, 4096]
+2025-08-03 14:57:20,472 - INFO -   Shards: 3
+2025-08-03 14:57:20,472 - INFO -   Simple scale factor: 1.0
+2025-08-03 14:57:20,472 - INFO -   ✅ CLIP normalization: DISABLED
+2025-08-03 14:57:20,472 - INFO - Loaded manifest: 35 shards, 91,333 samples
+2025-08-03 14:57:20,472 - INFO - Found 35 files with pattern: embeddings_shard_*_patch_only.pkl
+2025-08-03 14:57:20,472 - INFO - Prepared 3 shard files
+2025-08-03 14:57:20,472 - INFO - Using manifest for length estimation: 7,828 samples
+2025-08-03 14:57:20,472 - INFO - BLIP3-o CLIP Reproduction Dataset initialized (NO NORMALIZATION):
+2025-08-03 14:57:20,472 - INFO -   Directory: /scratch-shared/azadaianchuk1/blip3o_workspace/embeddings/patch_only_256_tokens
+2025-08-03 14:57:20,473 - INFO -   Mode: patch_only (256 tokens)
+2025-08-03 14:57:20,473 - INFO -   TARGET: CLIP embeddings [B, N, 1024] (RAW - NO NORMALIZATION)
+2025-08-03 14:57:20,473 - INFO -   CONDITIONING: EVA embeddings [B, N, 4096]
+2025-08-03 14:57:20,473 - INFO -   Shards: 3
+2025-08-03 14:57:20,473 - INFO -   Simple scale factor: 1.0
+2025-08-03 14:57:20,473 - INFO -   ✅ CLIP normalization: DISABLED
+2025-08-03 14:57:20,473 - INFO - ✅ CLIP reproduction dataloaders created (NO NORMALIZATION)
+2025-08-03 14:57:20,473 - INFO -   Training dataset length: 7,828
+2025-08-03 14:57:20,473 - INFO -   Evaluation dataset length: 7,828
+2025-08-03 14:57:20,473 - INFO -   🔥 CLIP normalization: DISABLED
+2025-08-03 14:57:20,473 - INFO - ✅ Dataloaders created successfully (NO NORMALIZATION):
+2025-08-03 14:57:20,473 - INFO -   Training mode: patch_only
+2025-08-03 14:57:20,473 - INFO -   Batch size: 128
+2025-08-03 14:57:20,473 - INFO -   Max shards: 3
+2025-08-03 14:57:20,473 - INFO -   Simple scale factor: 1.0
+2025-08-03 14:57:20,473 - INFO -   CLIP normalization: DISABLED
+2025-08-03 14:57:25,177 - INFO - ✅ Dataloader test successful:
+2025-08-03 14:57:25,177 - INFO -   Batch size: 128
+2025-08-03 14:57:25,177 - INFO -   CLIP embeddings shape: torch.Size([128, 256, 1024])
+2025-08-03 14:57:25,177 - INFO -   EVA embeddings shape: torch.Size([128, 256, 4096])
+2025-08-03 14:57:25,179 - INFO -   Raw CLIP range: [-37.781, 221.500]
+2025-08-03 14:57:25,179 - INFO - 🏃 Creating trainer...
+2025-08-03 14:57:25,183 - INFO - Got exact dataloader length: 61
+2025-08-03 14:57:25,184 - INFO - ✅ Conservative optimizer setup complete
+2025-08-03 14:57:25,184 - INFO - ✅ Mixed precision enabled
+2025-08-03 14:57:26,653 - INFO - ✅ WandB initialized: blip3o-clip-no-norm
+2025-08-03 14:57:26,653 - INFO - ✅ BLIP3-o Trainer initialized (NO NORMALIZATION)
+2025-08-03 14:57:26,654 - INFO -   Device: cuda
+2025-08-03 14:57:26,655 - INFO -   Parameters: 227,474,014
+2025-08-03 14:57:26,655 - INFO -   CLIP normalization: DISABLED
+2025-08-03 14:57:26,655 - INFO -   Enhanced stability features: enabled
+2025-08-03 14:57:26,655 - INFO - ✅ Trainer created successfully (NO NORMALIZATION):
+2025-08-03 14:57:26,655 - INFO -   Evaluation: Every 50 steps
+2025-08-03 14:57:26,655 - INFO -   WandB enabled: True
+2025-08-03 14:57:26,655 - INFO -   Heun inference: ✅ ENABLED
+2025-08-03 14:57:26,655 - INFO -   Normalization: DISABLED
+2025-08-03 14:57:26,655 - INFO - 💾 Saving experiment configuration...
+2025-08-03 14:57:26,658 - INFO - ✅ Configuration saved to checkpoints/blip3o_no_norm_20250803_145708/experiment_config.json
+2025-08-03 14:57:26,658 - INFO - 
+🚀 Starting BLIP3-o training (NO NORMALIZATION)...
+2025-08-03 14:57:26,658 - INFO - ================================================================================
+2025-08-03 14:57:26,658 - INFO - 🎯 Expected Results:
+2025-08-03 14:57:26,658 - INFO -    • Simplified training without normalization concerns
+2025-08-03 14:57:26,658 - INFO -    • Direct work with original CLIP embedding space
+2025-08-03 14:57:26,658 - INFO -    • No dependency on training data statistics
+2025-08-03 14:57:26,658 - INFO -    • Easier debugging and evaluation
+2025-08-03 14:57:26,658 - INFO - ================================================================================
+2025-08-03 14:57:26,658 - INFO - 🚀 Starting BLIP3-o training (NO NORMALIZATION)...
+2025-08-03 14:57:26,658 - INFO -   Enhanced stability monitoring active
+2025-08-03 14:57:26,658 - INFO -   WandB logging: ✅ ENABLED
+2025-08-03 14:57:26,661 - INFO - Starting epoch 1/15
+2025-08-03 14:57:41,236 - INFO - Step 10: Loss=2.067396, GradNorm=42059.525, Failures=0
+2025-08-03 14:57:42,208 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 14:57:43,200 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 14:57:44,189 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 14:57:45,177 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 14:57:46,167 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 14:57:47,156 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 14:57:48,144 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 14:57:49,132 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 14:57:50,121 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 14:57:51,109 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 14:57:51,126 - INFO - Step 20: Loss=2.030107, GradNorm=37935.697, Failures=0
+2025-08-03 14:57:57,005 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 14:57:57,997 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 14:57:58,986 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 14:57:59,974 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 14:58:00,962 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 14:58:01,950 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 14:58:02,940 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 14:58:03,930 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 14:58:04,918 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 14:58:05,916 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 14:58:05,933 - INFO - Step 30: Loss=2.029966, GradNorm=35583.308, Failures=0
+2025-08-03 14:58:06,904 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 14:58:07,893 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 14:58:08,881 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 14:58:09,869 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 14:58:10,856 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 14:58:11,844 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 14:58:12,832 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 14:58:13,820 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 14:58:14,807 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 14:58:15,796 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 14:58:15,813 - INFO - Step 40: Loss=2.020245, GradNorm=34505.857, Failures=0
+2025-08-03 14:58:21,619 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 14:58:22,607 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 14:58:23,595 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 14:58:24,583 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 14:58:25,570 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 14:58:26,559 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 14:58:27,547 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 14:58:28,535 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 14:58:29,522 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 14:58:30,509 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 14:58:30,526 - INFO - Step 50: Loss=1.998398, GradNorm=35196.042, Failures=0
+2025-08-03 14:58:30,526 - INFO - Running evaluation at step 50...
+2025-08-03 14:58:30,527 - INFO - Starting evaluation with 100 samples (NO NORMALIZATION)
+2025-08-03 14:59:13,335 - INFO - ✅ Evaluation completed: 128 samples
+2025-08-03 14:59:13,335 - INFO -    CLIP similarity: 0.7528
+2025-08-03 14:59:13,335 - INFO -    Success rate: 100.0%
+2025-08-03 14:59:13,338 - INFO - ✅ Evaluation: CLIP similarity = 0.7528
+2025-08-03 14:59:13,338 - INFO - 🎉 NEW BEST similarity: 0.7528
+2025-08-03 14:59:14,310 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 14:59:15,296 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 14:59:16,285 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 14:59:17,274 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 14:59:18,262 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 14:59:19,252 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 14:59:20,240 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 14:59:21,229 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 14:59:22,217 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 14:59:23,205 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 14:59:23,222 - INFO - Step 60: Loss=1.957668, GradNorm=31410.081, Failures=0
+2025-08-03 14:59:24,194 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 14:59:24,366 - INFO - Iteration completed: 7832 samples processed
+2025-08-03 14:59:24,366 - INFO - Epoch 1 completed: 61 batches, 0 failures
+2025-08-03 14:59:24,380 - INFO - Epoch 1 summary:
+2025-08-03 14:59:24,381 - INFO -   Average loss: 2.024804
+2025-08-03 14:59:24,381 - INFO -   Failure rate: 0.0%
+2025-08-03 14:59:24,381 - INFO -   Best similarity: 0.7528
+2025-08-03 14:59:24,381 - INFO -   Epoch time: 117.7s
+2025-08-03 14:59:24,381 - INFO - Starting epoch 2/15
+2025-08-03 14:59:29,480 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 14:59:30,473 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 14:59:31,465 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 14:59:32,457 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 14:59:33,450 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 14:59:34,442 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 14:59:35,435 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 14:59:36,428 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 14:59:37,418 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 14:59:37,436 - INFO - Step 70: Loss=1.963961, GradNorm=36323.600, Failures=0
+2025-08-03 14:59:38,408 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 14:59:39,398 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 14:59:40,386 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 14:59:41,375 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 14:59:42,365 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 14:59:43,353 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 14:59:44,342 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 14:59:45,331 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 14:59:46,322 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 14:59:47,311 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 14:59:47,328 - INFO - Step 80: Loss=1.928610, GradNorm=23314.576, Failures=0
+2025-08-03 14:59:48,302 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 14:59:53,756 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 14:59:54,745 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 14:59:55,733 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 14:59:56,722 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 14:59:57,711 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 14:59:58,699 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 14:59:59,688 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 15:00:00,676 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 15:00:01,665 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 15:00:01,681 - INFO - Step 90: Loss=1.916549, GradNorm=17978.420, Failures=0
+2025-08-03 15:00:02,654 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 15:00:03,643 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 15:00:04,632 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 15:00:05,621 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 15:00:06,610 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 15:00:07,602 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 15:00:08,592 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 15:00:09,581 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 15:00:10,571 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 15:00:11,559 - WARNING - ⚠️ High gradients detected, using stricter clipping: 0.500
+2025-08-03 15:00:11,576 - INFO - Step 100: Loss=1.860858, GradNorm=17302.813, Failures=0
+2025-08-03 15:00:11,576 - INFO - Running evaluation at step 100...
+2025-08-03 15:00:11,576 - INFO - Starting evaluation with 100 samples (NO NORMALIZATION)

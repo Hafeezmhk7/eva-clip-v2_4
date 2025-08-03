@@ -1,21 +1,16 @@
 #!/usr/bin/env python3
 """
-ULTRA-CONSERVATIVE BLIP3-o Training Script with Robust Normalization
+BLIP3-o Training Script WITHOUT CLIP Normalization
 train_dit.py
 
-🔥 ULTRA-CONSERVATIVE FIXES:
-1. ✅ Much more conservative CLIP normalization (scale 4.0→1.5)
-2. ✅ Robust outlier detection and percentile-based statistics
-3. ✅ Fallback to identity normalization if issues occur
-4. ✅ Increased semantic loss weights (0.1→0.5, 0.05→0.2) 
-5. ✅ New direct CLIP consistency loss (0.3 weight)
-6. ✅ Heun's solver for O(h²) integration accuracy
-7. ✅ Comprehensive error handling and validation
-
-Expected improvement: Training stability + CLIP similarity improvement
+CHANGES:
+1. Removed all references to CLIP normalization
+2. Works directly with raw CLIP embeddings
+3. Simplified training pipeline without normalization concerns
+4. Optional simple scaling factor (data-independent)
 
 Usage:
-    python train_dit.py --chunked_embeddings_dir /path/to/embeddings --output_dir ./checkpoints_ultra_conservative
+    python train_dit.py --chunked_embeddings_dir /path/to/embeddings --output_dir ./checkpoints_no_norm
 """
 
 import os
@@ -39,15 +34,15 @@ def setup_logging():
         format='%(asctime)s - %(levelname)s - %(message)s',
         handlers=[
             logging.StreamHandler(sys.stdout),
-            logging.FileHandler('ultra_conservative_clip_training.log', mode='w')
+            logging.FileHandler('blip3o_training_no_norm.log', mode='w')
         ]
     )
     return logging.getLogger(__name__)
 
 def parse_arguments():
-    """Parse command line arguments with ULTRA-CONSERVATIVE defaults"""
+    """Parse command line arguments"""
     parser = argparse.ArgumentParser(
-        description="ULTRA-CONSERVATIVE BLIP3-o CLIP Reproduction Training",
+        description="BLIP3-o CLIP Reproduction Training (NO NORMALIZATION)",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
     
@@ -67,7 +62,7 @@ def parse_arguments():
     
     # Training hyperparameters
     parser.add_argument("--learning_rate", type=float, default=1e-4,
-                       help="Learning rate (conservative for stability)")
+                       help="Learning rate")
     parser.add_argument("--batch_size", type=int, default=8,
                        help="Batch size")
     parser.add_argument("--num_epochs", type=int, default=10,
@@ -79,15 +74,19 @@ def parse_arguments():
     parser.add_argument("--max_grad_norm", type=float, default=1.0,
                        help="Max gradient norm")
     
-    # ULTRA-CONSERVATIVE: Even higher loss component weights
+    # Loss component weights
     parser.add_argument("--velocity_weight", type=float, default=1.0,
                        help="Weight for velocity prediction loss")
-    parser.add_argument("--semantic_weight", type=float, default=0.5,  # Kept high
+    parser.add_argument("--semantic_weight", type=float, default=0.5,
                        help="Weight for semantic consistency loss")
-    parser.add_argument("--cosine_weight", type=float, default=0.2,    # Kept high
+    parser.add_argument("--cosine_weight", type=float, default=0.2,
                        help="Weight for cosine similarity loss")
-    parser.add_argument("--consistency_weight", type=float, default=0.3,  # NEW
+    parser.add_argument("--consistency_weight", type=float, default=0.3,
                        help="Weight for direct CLIP consistency loss")
+    
+    # Data-independent scaling (optional)
+    parser.add_argument("--simple_scale_factor", type=float, default=1.0,
+                       help="Simple data-independent scaling factor for CLIP embeddings")
     
     # Evaluation
     parser.add_argument("--eval_every_n_steps", type=int, default=50,
@@ -120,15 +119,15 @@ def parse_arguments():
     # WandB configuration
     parser.add_argument("--use_wandb", action="store_true", default=True,
                        help="Enable WandB logging")
-    parser.add_argument("--wandb_project", type=str, default="blip3o-clip-ultra-conservative",
+    parser.add_argument("--wandb_project", type=str, default="blip3o-clip-no-norm",
                        help="WandB project name")
-    parser.add_argument("--wandb_run_name", type=str, default=None,
+    parser.add_argument("--wandb_run_name", type=str, default="3shard_sf1",
                        help="WandB run name")
     
     return parser.parse_args()
 
 def validate_arguments(args, logger):
-    """Validate command line arguments with robust error handling"""
+    """Validate command line arguments"""
     errors = []
     warnings = []
     
@@ -155,6 +154,10 @@ def validate_arguments(args, logger):
     if args.velocity_weight < 0 or args.semantic_weight < 0 or args.cosine_weight < 0:
         errors.append("All loss weights must be non-negative")
     
+    # Validate scaling factor
+    if args.simple_scale_factor <= 0:
+        errors.append(f"Scale factor must be positive: {args.simple_scale_factor}")
+    
     # Warnings for potentially suboptimal settings
     if args.semantic_weight < 0.3:
         warnings.append(f"Semantic weight ({args.semantic_weight}) seems low - recommend 0.5+")
@@ -164,6 +167,9 @@ def validate_arguments(args, logger):
     
     if args.batch_size > 16:
         warnings.append(f"Large batch size ({args.batch_size}) may cause memory issues")
+    
+    if args.simple_scale_factor != 1.0:
+        warnings.append(f"Using simple scaling factor: {args.simple_scale_factor}")
     
     # Log warnings
     for warning in warnings:
@@ -195,30 +201,30 @@ def check_environment(logger):
     # Check PyTorch version
     logger.info(f"PyTorch version: {torch.__version__}")
     
-    # Check for required imports with fallback handling
+    # Check for required imports
     missing_modules = []
     
     try:
-        from src.modules.datasets.blip3o_dataset import create_ultra_conservative_clip_reproduction_dataloaders
-        logger.info("✅ Ultra-conservative dataset module loaded")
+        from src.modules.datasets.blip3o_dataset import create_clip_reproduction_dataloaders
+        logger.info("✅ Dataset module loaded (NO NORMALIZATION)")
     except ImportError as e:
-        missing_modules.append(f"Ultra-conservative dataset: {e}")
+        missing_modules.append(f"Dataset: {e}")
     
     try:
         from src.modules.models.blip3o_dit import create_improved_clip_reproduction_model
-        logger.info("✅ Improved model module loaded")
+        logger.info("✅ Model module loaded")
     except ImportError as e:
         missing_modules.append(f"Model: {e}")
     
     try:
-        from src.modules.losses.blip3o_fm_loss import create_fixed_clip_reproduction_loss
-        logger.info("✅ Fixed loss module loaded")
+        from src.modules.losses.blip3o_fm_loss import create_clip_reproduction_loss
+        logger.info("✅ Loss module loaded (NO NORMALIZATION)")
     except ImportError as e:
         missing_modules.append(f"Loss: {e}")
     
     try:
-        from src.modules.trainers.blip3o_trainer import create_fixed_clip_trainer
-        logger.info("✅ Fixed trainer module loaded")
+        from src.modules.trainers.blip3o_trainer import create_clip_trainer
+        logger.info("✅ Trainer module loaded (NO NORMALIZATION)")
     except ImportError as e:
         missing_modules.append(f"Trainer: {e}")
     
@@ -237,7 +243,7 @@ def check_environment(logger):
     else:
         logger.info("✅ Environment check passed")
     
-    return len(missing_modules) == 0  # Only require modules, not optimal GPU
+    return len(missing_modules) == 0
 
 def create_model(args, logger):
     """Create model with all enhancements"""
@@ -270,12 +276,12 @@ def create_model(args, logger):
         logger.error(f"❌ Error creating model: {e}")
         raise
 
-def create_ultra_conservative_loss_function(args, logger):
-    """Create loss function with ultra-conservative approach"""
+def create_loss_function(args, logger):
+    """Create loss function without normalization"""
     try:
-        from src.modules.losses.blip3o_fm_loss import create_fixed_clip_reproduction_loss
+        from src.modules.losses.blip3o_fm_loss import create_clip_reproduction_loss
         
-        loss_fn = create_fixed_clip_reproduction_loss(
+        loss_fn = create_clip_reproduction_loss(
             prediction_type="velocity",
             flow_type="rectified",
             velocity_weight=args.velocity_weight,
@@ -285,12 +291,13 @@ def create_ultra_conservative_loss_function(args, logger):
             use_timestep_weighting=args.use_timestep_weighting,
         )
         
-        logger.info("✅ ULTRA-CONSERVATIVE loss function created:")
+        logger.info("✅ Loss function created (NO NORMALIZATION):")
         logger.info(f"  Prediction type: velocity")
         logger.info(f"  Flow type: rectified")
         logger.info(f"  Weights - Velocity: {args.velocity_weight}, Semantic: {args.semantic_weight}, Cosine: {args.cosine_weight}")
         logger.info(f"  Consistency weight: {args.consistency_weight}")
         logger.info(f"  Timestep weighting: {'✅ ENABLED' if args.use_timestep_weighting else '❌ DISABLED'}")
+        logger.info(f"  Normalization: DISABLED")
         
         return loss_fn
         
@@ -298,10 +305,10 @@ def create_ultra_conservative_loss_function(args, logger):
         logger.error(f"❌ Error creating loss function: {e}")
         raise
 
-def create_ultra_conservative_dataloaders(args, logger):
-    """Create data loaders with ultra-conservative normalization"""
+def create_dataloaders(args, logger):
+    """Create data loaders without normalization"""
     try:
-        from src.modules.datasets.blip3o_dataset import create_ultra_conservative_clip_reproduction_dataloaders
+        from src.modules.datasets.blip3o_dataset import create_clip_reproduction_dataloaders
         
         # Validate embeddings directory
         embeddings_dir = Path(args.chunked_embeddings_dir)
@@ -314,41 +321,27 @@ def create_ultra_conservative_dataloaders(args, logger):
         
         logger.info(f"Found {len(pkl_files)} .pkl files in embeddings directory")
         
-        # Create dataloaders with extensive error handling
-        try:
-            train_dataloader, eval_dataloader = create_ultra_conservative_clip_reproduction_dataloaders(
-                chunked_embeddings_dir=args.chunked_embeddings_dir,
-                batch_size=args.batch_size,
-                training_mode=args.training_mode,
-                max_shards=args.max_shards,
-                num_workers=args.num_workers,
-                pin_memory=torch.cuda.is_available(),
-                skip_corrupted_samples=True,
-                validate_tensor_shapes=True,
-            )
-        except ValueError as e:
-            if "normalization range" in str(e).lower():
-                logger.error(f"❌ Normalization error: {e}")
-                logger.warning("🔧 Attempting recovery with even more conservative settings...")
-                
-                # Try with even more conservative settings (this would require updating the dataset)
-                # For now, re-raise with helpful message
-                logger.error("💡 Recovery suggestions:")
-                logger.error("   1. Check CLIP embedding data quality")
-                logger.error("   2. Try with fewer shards: --max_shards 1")
-                logger.error("   3. Check if embeddings are pre-normalized")
-                logger.error("   4. Verify embedding extraction was correct")
-                raise ValueError(f"CLIP normalization failed: {e}. See recovery suggestions above.")
-            else:
-                raise
+        # Create dataloaders
+        train_dataloader, eval_dataloader = create_clip_reproduction_dataloaders(
+            chunked_embeddings_dir=args.chunked_embeddings_dir,
+            batch_size=args.batch_size,
+            training_mode=args.training_mode,
+            max_shards=args.max_shards,
+            num_workers=args.num_workers,
+            pin_memory=torch.cuda.is_available(),
+            simple_scale_factor=args.simple_scale_factor,
+            skip_corrupted_samples=True,
+            validate_tensor_shapes=True,
+        )
         
-        logger.info("✅ ULTRA-CONSERVATIVE dataloaders created successfully:")
+        logger.info("✅ Dataloaders created successfully (NO NORMALIZATION):")
         logger.info(f"  Training mode: {args.training_mode}")
         logger.info(f"  Batch size: {args.batch_size}")
         logger.info(f"  Max shards: {args.max_shards}")
-        logger.info(f"  🔥 ULTRA-CONSERVATIVE CLIP normalization: ✅ CONFIGURED")
+        logger.info(f"  Simple scale factor: {args.simple_scale_factor}")
+        logger.info(f"  CLIP normalization: DISABLED")
         
-        # Test dataloader with extensive validation
+        # Test dataloader
         try:
             test_batch = next(iter(train_dataloader))
             logger.info(f"✅ Dataloader test successful:")
@@ -356,32 +349,15 @@ def create_ultra_conservative_dataloaders(args, logger):
             logger.info(f"  CLIP embeddings shape: {test_batch['clip_embeddings'].shape}")
             logger.info(f"  EVA embeddings shape: {test_batch['encoder_hidden_states'].shape}")
             
-            # CRITICAL: Check CLIP normalizer
-            if hasattr(train_dataloader, 'clip_normalizer') and train_dataloader.clip_normalizer:
-                normalizer = train_dataloader.clip_normalizer
-                logger.info(f"  🔥 CLIP normalizer: ✅ AVAILABLE")
-                logger.info(f"     Stats computed: {normalizer.stats_computed}")
-                logger.info(f"     Scale factor: {normalizer.scale_factor:.2f} (ULTRA-CONSERVATIVE)")
-                
-                # Test normalization range
-                sample_clip = test_batch['clip_embeddings']
-                clip_range = (sample_clip.min().item(), sample_clip.max().item())
-                logger.info(f"     Normalized range: [{clip_range[0]:.2f}, {clip_range[1]:.2f}]")
-                
-                # Validate range is reasonable
-                max_abs_val = max(abs(clip_range[0]), abs(clip_range[1]))
-                if max_abs_val > 10:
-                    logger.warning(f"⚠️ Normalization range larger than expected: {max_abs_val:.2f}")
-                    logger.warning("   Training may be unstable - consider reducing data or checking embeddings")
-                elif max_abs_val < 0.1:
-                    logger.warning(f"⚠️ Normalization range very small: {max_abs_val:.2f}")
-                    logger.warning("   May lose semantic information")
-                else:
-                    logger.info(f"     ✅ Normalization range acceptable for training")
-            else:
-                logger.error(f"❌ CLIP normalizer: MISSING!")
-                raise ValueError("CLIP normalizer is required but not found")
+            # Check CLIP embedding range (should be raw)
+            sample_clip = test_batch['clip_embeddings']
+            clip_range = (sample_clip.min().item(), sample_clip.max().item())
+            logger.info(f"  Raw CLIP range: [{clip_range[0]:.3f}, {clip_range[1]:.3f}]")
             
+            # Show effect of scaling if applied
+            if args.simple_scale_factor != 1.0:
+                logger.info(f"  Scale factor applied: {args.simple_scale_factor}")
+                
         except Exception as e:
             logger.error(f"❌ Dataloader test failed: {e}")
             raise
@@ -392,20 +368,22 @@ def create_ultra_conservative_dataloaders(args, logger):
         logger.error(f"❌ Error creating dataloaders: {e}")
         raise
 
-def create_ultra_conservative_trainer(model, loss_fn, train_dataloader, eval_dataloader, args, device, logger):
-    """Create trainer with ultra-conservative settings"""
+def create_trainer(model, loss_fn, train_dataloader, eval_dataloader, args, device, logger):
+    """Create trainer without normalization"""
     try:
-        from src.modules.trainers.blip3o_trainer import create_fixed_clip_trainer
+        from src.modules.trainers.blip3o_trainer import create_clip_trainer
         
         # Create run name if not provided
         wandb_run_name = args.wandb_run_name
         if wandb_run_name is None and args.use_wandb:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            improvements = ["ultra_conservative"]
+            improvements = ["no_norm"]
             if args.use_eva_adapter:
                 improvements.append("eva_adapter")
             if args.use_heun_inference:
                 improvements.append("heun")
+            if args.simple_scale_factor != 1.0:
+                improvements.append(f"scale_{args.simple_scale_factor}")
             improvements_str = "_".join(improvements)
             wandb_run_name = f"blip3o_{args.model_size}_{args.training_mode}_{improvements_str}_{timestamp}"
         
@@ -415,7 +393,7 @@ def create_ultra_conservative_trainer(model, loss_fn, train_dataloader, eval_dat
             "training_mode": args.training_mode,
             "batch_size": args.batch_size,
             "max_shards": args.max_shards,
-            "experiment_version": "ULTRA_CONSERVATIVE_v1",
+            "experiment_version": "NO_NORMALIZATION_v1",
             "learning_rate": args.learning_rate,
             "weight_decay": args.weight_decay,
             "num_epochs": args.num_epochs,
@@ -430,30 +408,24 @@ def create_ultra_conservative_trainer(model, loss_fn, train_dataloader, eval_dat
             "consistency_weight": args.consistency_weight,
             
             # Architecture
-            "clip_normalization": "ULTRA_CONSERVATIVE",
+            "clip_normalization": "DISABLED",
+            "simple_scale_factor": args.simple_scale_factor,
             "eva_adapter": args.use_eva_adapter,
             "eva_adapter_layers": args.eva_adapter_layers,
             "heun_inference": args.use_heun_inference,
             "timestep_weighting": args.use_timestep_weighting,
             
-            # Improvements
-            "normalization_approach": "percentile_based_with_outlier_removal",
-            "scale_factor": "1.5_ultra_conservative",
-            "fallback_mechanisms": "identity_normalization_if_needed",
+            # Approach
+            "normalization_approach": "DISABLED",
+            "working_space": "raw_clip_embeddings",
+            "data_dependent_stats": False,
         }
         
-        # Get CLIP normalizer from dataloader
-        clip_normalizer = getattr(train_dataloader, 'clip_normalizer', None)
-        if clip_normalizer is None:
-            logger.error("❌ CRITICAL: No CLIP normalizer found in dataloader!")
-            raise ValueError("CLIP normalizer is required for proper training and evaluation")
-        
-        trainer = create_fixed_clip_trainer(
+        trainer = create_clip_trainer(
             model=model,
             loss_fn=loss_fn,
             train_dataloader=train_dataloader,
             eval_dataloader=eval_dataloader,
-            clip_normalizer=clip_normalizer,
             learning_rate=args.learning_rate,
             weight_decay=args.weight_decay,
             num_epochs=args.num_epochs,
@@ -472,11 +444,11 @@ def create_ultra_conservative_trainer(model, loss_fn, train_dataloader, eval_dat
             wandb_config=wandb_config,
         )
         
-        logger.info("✅ ULTRA-CONSERVATIVE trainer created successfully:")
+        logger.info("✅ Trainer created successfully (NO NORMALIZATION):")
         logger.info(f"  Evaluation: Every {args.eval_every_n_steps} steps")
         logger.info(f"  WandB enabled: {args.use_wandb}")
-        logger.info(f"  CLIP normalizer: {'✅ AVAILABLE' if clip_normalizer else '❌ MISSING'}")
         logger.info(f"  Heun inference: {'✅ ENABLED' if args.use_heun_inference else '❌ DISABLED'}")
+        logger.info(f"  Normalization: DISABLED")
         
         return trainer
         
@@ -489,12 +461,12 @@ def save_experiment_config(args, model, output_dir, logger):
     try:
         config = {
             'experiment_info': {
-                'name': 'ULTRA-CONSERVATIVE BLIP3-o CLIP Reproduction',
-                'version': 'ULTRA_CONSERVATIVE_v1',
+                'name': 'BLIP3-o CLIP Reproduction WITHOUT Normalization',
+                'version': 'NO_NORMALIZATION_v1',
                 'timestamp': datetime.now().isoformat(),
                 'task': 'Reproduce CLIP embeddings from EVA embeddings',
-                'method': 'BLIP3-o DiT with ULTRA-CONSERVATIVE normalization',
-                'focus': 'Training stability and robust normalization',
+                'method': 'BLIP3-o DiT without CLIP normalization',
+                'focus': 'Training without data-dependent normalization',
             },
             'args': vars(args),
             'model_config': model.config.to_dict() if hasattr(model.config, 'to_dict') else {},
@@ -502,21 +474,17 @@ def save_experiment_config(args, model, output_dir, logger):
                 'parameters': model.get_num_parameters() if hasattr(model, 'get_num_parameters') else 'unknown',
                 'model_class': model.__class__.__name__,
             },
-            'ultra_conservative_features': {
-                'normalization_scale_factor': 1.5,
-                'percentile_based_statistics': True,
-                'robust_outlier_removal': True,
-                'fallback_to_identity': True,
-                'strict_validation_ranges': True,
-                'conservative_clamping': True,
-            },
-            'normalization_details': {
-                'scale_factor': 1.5,
-                'outlier_removal_method': 'IQR_3x_conservative',
-                'statistics_method': 'percentile_based',
-                'fallback_available': True,
-                'validation_max_range': 10.0,
-                'expected_impact': 'Improved training stability',
+            'normalization_info': {
+                'clip_normalization': 'DISABLED',
+                'working_space': 'raw_clip_embeddings',
+                'simple_scale_factor': args.simple_scale_factor,
+                'data_dependent_stats': False,
+                'advantages': [
+                    'No dependency on training data statistics',
+                    'Simpler training and evaluation pipeline',
+                    'No risk of normalization-related crashes',
+                    'Direct work with original CLIP space'
+                ],
             },
         }
         
@@ -532,26 +500,25 @@ def save_experiment_config(args, model, output_dir, logger):
         return {}
 
 def main():
-    """Main ultra-conservative training function"""
+    """Main training function without normalization"""
     # Setup logging
     logger = setup_logging()
     
-    logger.info("🚀 ULTRA-CONSERVATIVE BLIP3-o CLIP Reproduction Training")
+    logger.info("🚀 BLIP3-o CLIP Reproduction Training (NO NORMALIZATION)")
     logger.info("=" * 80)
     logger.info("📋 Task: Reproduce CLIP embeddings from EVA embeddings")
-    logger.info("🧠 Model: BLIP3-o DiT with ULTRA-CONSERVATIVE normalization")
-    logger.info("🌊 Method: Rectified Flow Matching + Robust normalization")
-    logger.info("🎯 Target: CLIP embeddings [B, N, 1024] (ULTRA-CONSERVATIVE)")
+    logger.info("🧠 Model: BLIP3-o DiT WITHOUT CLIP normalization")
+    logger.info("🌊 Method: Rectified Flow Matching with raw embeddings")
+    logger.info("🎯 Target: CLIP embeddings [B, N, 1024] (RAW)")
     logger.info("🎮 Conditioning: EVA embeddings [B, N, 4096]")
-    logger.info("🔥 Focus: Training stability and robust performance")
+    logger.info("🔑 Focus: Training without data-dependent normalization")
     logger.info("=" * 80)
-    logger.info("🛠️ ULTRA-CONSERVATIVE FEATURES:")
-    logger.info("   ✅ 1. Much smaller scale factor (4.0 → 1.5)")
-    logger.info("   ✅ 2. Percentile-based statistics (robust outlier handling)")
-    logger.info("   ✅ 3. Fallback to identity normalization if needed")
-    logger.info("   ✅ 4. Strict validation ranges (±10 max)")
-    logger.info("   ✅ 5. Conservative clamping and error recovery")
-    logger.info("   ✅ 6. Enhanced error handling throughout")
+    logger.info("🛠️ KEY CHANGES:")
+    logger.info("   ✅ 1. No CLIP normalization/denormalization")
+    logger.info("   ✅ 2. Work directly with raw CLIP embeddings")
+    logger.info("   ✅ 3. No dependency on training data statistics")
+    logger.info("   ✅ 4. Simplified training and evaluation pipeline")
+    logger.info("   ✅ 5. Optional simple data-independent scaling")
     logger.info("=" * 80)
     
     try:
@@ -562,7 +529,7 @@ def main():
         if not validate_arguments(args, logger):
             return 1
         
-        logger.info(f"ULTRA-CONSERVATIVE Configuration:")
+        logger.info(f"Configuration (NO NORMALIZATION):")
         logger.info(f"  Model size: {args.model_size}")
         logger.info(f"  Training mode: {args.training_mode}")
         logger.info(f"  Embeddings dir: {args.chunked_embeddings_dir}")
@@ -571,6 +538,7 @@ def main():
         logger.info(f"  Batch size: {args.batch_size}")
         logger.info(f"  Epochs: {args.num_epochs}")
         logger.info(f"  Max shards: {args.max_shards}")
+        logger.info(f"  Simple scale factor: {args.simple_scale_factor}")
         logger.info(f"  Loss weights:")
         logger.info(f"    Velocity: {args.velocity_weight}")
         logger.info(f"    Semantic: {args.semantic_weight}")
@@ -578,6 +546,7 @@ def main():
         logger.info(f"    Consistency: {args.consistency_weight}")
         logger.info(f"  EVA adapter: {'✅ ENABLED' if args.use_eva_adapter else '❌ DISABLED'}")
         logger.info(f"  Heun inference: {'✅ ENABLED' if args.use_heun_inference else '❌ DISABLED'}")
+        logger.info(f"  Normalization: DISABLED")
         
         # Check environment
         if not check_environment(logger):
@@ -595,50 +564,28 @@ def main():
         
         # Create loss function
         logger.info("🌊 Creating loss function...")
-        loss_fn = create_ultra_conservative_loss_function(args, logger)
+        loss_fn = create_loss_function(args, logger)
         
-        # Create dataloaders (this is where the error was occurring)
-        logger.info("📊 Creating ULTRA-CONSERVATIVE dataloaders...")
-        try:
-            train_dataloader, eval_dataloader = create_ultra_conservative_dataloaders(args, logger)
-        except ValueError as e:
-            if "normalization" in str(e).lower():
-                logger.error("❌ CRITICAL NORMALIZATION ERROR:")
-                logger.error(f"   {e}")
-                logger.error("")
-                logger.error("🔧 RECOVERY OPTIONS:")
-                logger.error("   1. Try with fewer shards: --max_shards 1")
-                logger.error("   2. Check embedding data quality:")
-                logger.error("      - Are embeddings pre-normalized?")
-                logger.error("      - Are there extreme outliers?")
-                logger.error("      - Was extraction done correctly?")
-                logger.error("   3. Try different model size: --model_size small")
-                logger.error("   4. Check if CLIP embeddings need different preprocessing")
-                logger.error("")
-                logger.error("💡 DEBUG STEPS:")
-                logger.error("   - Load one .pkl file manually and check ranges")
-                logger.error("   - Verify CLIP embeddings are in expected format")
-                logger.error("   - Check for NaN/Inf values in embeddings")
-                return 1
-            else:
-                raise
+        # Create dataloaders
+        logger.info("📊 Creating dataloaders (NO NORMALIZATION)...")
+        train_dataloader, eval_dataloader = create_dataloaders(args, logger)
         
         # Create trainer
         logger.info("🏃 Creating trainer...")
-        trainer = create_ultra_conservative_trainer(model, loss_fn, train_dataloader, eval_dataloader, args, device, logger)
+        trainer = create_trainer(model, loss_fn, train_dataloader, eval_dataloader, args, device, logger)
         
         # Save configuration
         logger.info("💾 Saving experiment configuration...")
         config = save_experiment_config(args, model, output_dir, logger)
         
         # Start training
-        logger.info(f"\n🚀 Starting ULTRA-CONSERVATIVE BLIP3-o training...")
+        logger.info(f"\n🚀 Starting BLIP3-o training (NO NORMALIZATION)...")
         logger.info("=" * 80)
         logger.info("🎯 Expected Results:")
-        logger.info("   • Stable training without normalization crashes")
-        logger.info("   • Gradual improvement in CLIP similarity")
-        logger.info("   • No extreme gradient/loss spikes")
-        logger.info("   • Robust handling of outliers")
+        logger.info("   • Simplified training without normalization concerns")
+        logger.info("   • Direct work with original CLIP embedding space")
+        logger.info("   • No dependency on training data statistics")
+        logger.info("   • Easier debugging and evaluation")
         logger.info("=" * 80)
         
         start_time = datetime.now()
@@ -651,7 +598,7 @@ def main():
         
         # FINAL SUMMARY
         logger.info("\n" + "=" * 80)
-        logger.info("🎉 ULTRA-CONSERVATIVE TRAINING COMPLETED!")
+        logger.info("🎉 TRAINING COMPLETED (NO NORMALIZATION)!")
         logger.info("=" * 80)
         
         logger.info(f"📊 RESULTS:")
@@ -663,10 +610,10 @@ def main():
         # Success assessment
         best_sim = summary.get('best_eval_similarity', 0)
         if best_sim > 0.6:
-            logger.info(f"  🎉 EXCELLENT: Similarity >0.6 with stable training!")
+            logger.info(f"  🎉 EXCELLENT: Similarity >0.6 without normalization!")
             success_level = "excellent"
         elif best_sim > 0.4:
-            logger.info(f"  ✅ GOOD: Similarity >0.4 with conservative approach!")
+            logger.info(f"  ✅ GOOD: Similarity >0.4 with simplified approach!")
             success_level = "good"
         elif best_sim > 0.2:
             logger.info(f"  📈 FAIR: Similarity >0.2, training was stable!")
@@ -678,18 +625,18 @@ def main():
         # Final evaluation results
         final_eval = summary.get('final_eval', {})
         if final_eval:
-            logger.info(f"📊 Final Evaluation:")
+            logger.info(f"📊 Final Evaluation (RAW CLIP space):")
             logger.info(f"  CLIP similarity: {final_eval.get('eval_clip_similarity', 0):.4f}")
             logger.info(f"  High quality (>0.7): {final_eval.get('eval_high_quality', 0)*100:.1f}%")
             logger.info(f"  Very high quality (>0.8): {final_eval.get('eval_very_high_quality', 0)*100:.1f}%")
         
         logger.info(f"📁 Outputs:")
         logger.info(f"  Model checkpoints: {output_dir}")
-        logger.info(f"  Training logs: ultra_conservative_clip_training.log")
+        logger.info(f"  Training logs: blip3o_training_no_norm.log")
         
         logger.info("=" * 80)
-        logger.info("✅ ULTRA-CONSERVATIVE TRAINING COMPLETED SUCCESSFULLY!")
-        logger.info("🔧 The conservative approach prevented normalization crashes!")
+        logger.info("✅ TRAINING COMPLETED SUCCESSFULLY (NO NORMALIZATION)!")
+        logger.info("🔑 Working directly with raw CLIP embeddings!")
         
         logger.info("💡 Next Steps:")
         if success_level == "excellent":
@@ -697,23 +644,32 @@ def main():
             logger.info("    - Use more shards (--max_shards 10)")
             logger.info("    - Larger model (--model_size large)")
         elif success_level == "good":
-            logger.info("  • Great stability! To improve performance:")
+            logger.info("  • Great results! To improve performance:")
             logger.info("    - Train longer (--num_epochs 20)")
             logger.info("    - Try larger batch size (--batch_size 16)")
         elif success_level == "fair":
             logger.info("  • Stable foundation! To improve:")
             logger.info("    - Increase semantic weights further")
             logger.info("    - Train with more data")
+            logger.info("    - Try simple scaling factor (--simple_scale_factor 0.1)")
         else:
             logger.info("  • Investigate training progression:")
             logger.info("    - Check if loss decreased")
             logger.info("    - Verify gradients are non-zero")
-            logger.info("    - Check evaluation logs")
+            logger.info("    - Try different scaling factor")
+        
+        logger.info("=" * 80)
+        logger.info("🔧 Advantages of No Normalization:")
+        logger.info("  • No dependency on training data statistics")
+        logger.info("  • Simpler training and evaluation pipeline")
+        logger.info("  • Direct work with original CLIP space")
+        logger.info("  • Easier to debug and understand")
+        logger.info("  • No risk of normalization-related crashes")
         
         return 0 if success_level in ["excellent", "good", "fair"] else 1
         
     except Exception as e:
-        logger.error(f"❌ ULTRA-CONSERVATIVE training failed with error: {e}")
+        logger.error(f"❌ Training failed with error: {e}")
         logger.error("=" * 50)
         logger.error("FULL ERROR TRACEBACK:")
         traceback.print_exc()
@@ -730,10 +686,6 @@ def main():
         elif "FileNotFoundError" in error_str:
             logger.error("🔍 FILE NOT FOUND:")
             logger.error("   Check --chunked_embeddings_dir path")
-        elif "normaliz" in error_str.lower():
-            logger.error("🔍 NORMALIZATION ERROR:")
-            logger.error("   This is the main issue we're trying to fix!")
-            logger.error("   The ultra-conservative approach should handle this")
         
         return 1
 

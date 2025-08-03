@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
 """
-ULTRA-CONSERVATIVE BLIP3-o Trainer with Enhanced Stability
+BLIP3-o Trainer WITHOUT CLIP Normalization
 src/modules/trainers/blip3o_trainer.py
 
-ULTRA-CONSERVATIVE IMPROVEMENTS:
-1. Enhanced error handling and recovery mechanisms
-2. Conservative gradient clipping and scaling
-3. Robust evaluation with fallback mechanisms
-4. Better NaN/Inf detection and handling
-5. Adaptive learning rate adjustment on instability
+CHANGES:
+1. Removed all references to clip_normalizer
+2. Removed denormalization from evaluation
+3. Simplified evaluation to work with raw CLIP embeddings
+4. Removed normalization-related error handling
 """
 
 import torch
@@ -37,14 +36,14 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
-class UltraConservativeBLIP3oCLIPTrainer:
+class BLIP3oCLIPTrainer:
     """
-    ULTRA-CONSERVATIVE Trainer for BLIP3-o CLIP Reproduction
+    BLIP3-o Trainer WITHOUT CLIP Normalization
     
-    ULTRA-CONSERVATIVE FEATURES:
+    FEATURES:
     1. Enhanced error handling throughout training loop
     2. Conservative gradient clipping and adaptive scaling
-    3. Robust evaluation with multiple fallback mechanisms
+    3. Evaluation without normalization/denormalization
     4. Automatic learning rate reduction on instability
     5. Better monitoring and early stopping on issues
     """
@@ -55,15 +54,14 @@ class UltraConservativeBLIP3oCLIPTrainer:
         loss_fn,
         train_dataloader,
         eval_dataloader=None,
-        clip_normalizer=None,
         
         # Training configuration
         learning_rate: float = 1e-4,
         weight_decay: float = 0.01,
         num_epochs: int = 10,
         warmup_steps: int = 100,
-        max_grad_norm: float = 0.5,  # ULTRA-CONSERVATIVE: Lower grad clipping
-        fp16: bool = False,  # ULTRA-CONSERVATIVE: Disable by default for stability
+        max_grad_norm: float = 0.5,
+        fp16: bool = False,
         
         # Evaluation
         eval_every_n_steps: int = 100,
@@ -71,7 +69,7 @@ class UltraConservativeBLIP3oCLIPTrainer:
         eval_inference_steps: int = 50,
         use_heun_inference: bool = True,
         
-        # ULTRA-CONSERVATIVE: Enhanced stability features
+        # Enhanced stability features
         adaptive_grad_clipping: bool = True,
         stability_check_frequency: int = 10,
         max_consecutive_failures: int = 5,
@@ -90,7 +88,7 @@ class UltraConservativeBLIP3oCLIPTrainer:
         
         # WandB configuration
         use_wandb: bool = False,
-        wandb_project: str = "blip3o-clip-ultra-conservative",
+        wandb_project: str = "blip3o-clip-no-norm",
         wandb_run_name: Optional[str] = None,
         wandb_config: Optional[Dict] = None,
         wandb_api_key: Optional[str] = None,
@@ -101,16 +99,6 @@ class UltraConservativeBLIP3oCLIPTrainer:
         self.loss_fn = loss_fn
         self.train_dataloader = train_dataloader
         self.eval_dataloader = eval_dataloader
-        
-        # CRITICAL: CLIP normalizer validation
-        self.clip_normalizer = clip_normalizer
-        if self.clip_normalizer is None:
-            if hasattr(train_dataloader, 'clip_normalizer'):
-                self.clip_normalizer = train_dataloader.clip_normalizer
-                logger.info("✅ CLIP normalizer obtained from train dataloader")
-            else:
-                logger.error("❌ NO CLIP NORMALIZER PROVIDED!")
-                raise ValueError("CLIP normalizer is required for proper evaluation")
         
         # Training config
         self.learning_rate = learning_rate
@@ -126,7 +114,7 @@ class UltraConservativeBLIP3oCLIPTrainer:
         self.eval_inference_steps = eval_inference_steps
         self.use_heun_inference = use_heun_inference
         
-        # ULTRA-CONSERVATIVE: Stability features
+        # Stability features
         self.adaptive_grad_clipping = adaptive_grad_clipping
         self.stability_check_frequency = stability_check_frequency
         self.max_consecutive_failures = max_consecutive_failures
@@ -158,7 +146,7 @@ class UltraConservativeBLIP3oCLIPTrainer:
         self.best_eval_similarity = 0.0
         self.best_loss = float('inf')
         
-        # ULTRA-CONSERVATIVE: Enhanced monitoring
+        # Enhanced monitoring
         self.loss_history = deque(maxlen=1000)
         self.grad_norm_history = deque(maxlen=1000)
         self.lr_history = deque(maxlen=1000)
@@ -187,11 +175,11 @@ class UltraConservativeBLIP3oCLIPTrainer:
         if self.use_wandb:
             self._setup_wandb()
         
-        logger.info("✅ ULTRA-CONSERVATIVE BLIP3-o Trainer initialized")
+        logger.info("✅ BLIP3-o Trainer initialized (NO NORMALIZATION)")
         logger.info(f"  Device: {self.device}")
         logger.info(f"  Parameters: {sum(p.numel() for p in self.model.parameters()):,}")
-        logger.info(f"  CLIP normalizer: {'✅ AVAILABLE' if self.clip_normalizer else '❌ MISSING'}")
-        logger.info(f"  🔒 Ultra-conservative features: stability checks, adaptive clipping, emergency recovery")
+        logger.info(f"  CLIP normalization: DISABLED")
+        logger.info(f"  Enhanced stability features: enabled")
 
     def _estimate_steps_per_epoch(self) -> int:
         """Estimate steps per epoch with error handling"""
@@ -249,7 +237,7 @@ class UltraConservativeBLIP3oCLIPTrainer:
         logger.info(f"✅ Conservative optimizer setup complete")
 
     def _setup_wandb(self):
-        """Setup WandB with ultra-conservative configuration"""
+        """Setup WandB configuration"""
         try:
             if self.wandb_api_key:
                 os.environ["WANDB_API_KEY"] = self.wandb_api_key
@@ -261,7 +249,8 @@ class UltraConservativeBLIP3oCLIPTrainer:
                 'warmup_steps': self.warmup_steps,
                 'max_grad_norm': self.max_grad_norm,
                 'fp16': self.fp16,
-                'experiment_type': 'blip3o_clip_ULTRA_CONSERVATIVE',
+                'experiment_type': 'blip3o_clip_NO_NORMALIZATION',
+                'normalization': 'DISABLED',
                 'stability_features': {
                     'adaptive_grad_clipping': self.adaptive_grad_clipping,
                     'emergency_lr_reduction': self.emergency_lr_reduction,
@@ -277,7 +266,7 @@ class UltraConservativeBLIP3oCLIPTrainer:
                 config=wandb_config,
                 dir=str(self.output_dir),
                 resume="allow",
-                tags=["blip3o", "clip_reproduction", "ultra_conservative", "stability_focused"]
+                tags=["blip3o", "clip_reproduction", "no_normalization", "raw_embeddings"]
             )
             
             logger.info(f"✅ WandB initialized: {self.wandb_project}")
@@ -335,7 +324,7 @@ class UltraConservativeBLIP3oCLIPTrainer:
                 with torch.amp.autocast('cuda'):
                     loss, metrics = self.loss_fn(
                         model_output=model_output,
-                        target_samples=batch['clip_embeddings'],
+                        target_samples=batch['clip_embeddings'],  # Raw CLIP embeddings
                         timesteps=batch['timestep'],
                         eva_conditioning=batch['encoder_hidden_states'],
                         noise=batch.get('noise'),
@@ -345,7 +334,7 @@ class UltraConservativeBLIP3oCLIPTrainer:
             else:
                 loss, metrics = self.loss_fn(
                     model_output=model_output,
-                    target_samples=batch['clip_embeddings'],
+                    target_samples=batch['clip_embeddings'],  # Raw CLIP embeddings
                     timesteps=batch['timestep'],
                     eva_conditioning=batch['encoder_hidden_states'],
                     noise=batch.get('noise'),
@@ -388,7 +377,7 @@ class UltraConservativeBLIP3oCLIPTrainer:
                     grad_norm += param_norm.item() ** 2
             grad_norm = grad_norm ** 0.5
             
-            # ULTRA-CONSERVATIVE: Adaptive gradient clipping
+            # Adaptive gradient clipping
             if self.adaptive_grad_clipping:
                 # Reduce clipping threshold if gradients are consistently high
                 if len(self.grad_norm_history) >= 10:
@@ -546,7 +535,7 @@ class UltraConservativeBLIP3oCLIPTrainer:
                         velocity = velocity.get('velocity_prediction', velocity.get('prediction', list(velocity.values())[0]))
                     x = x + dt * velocity
                 
-                # ULTRA-CONSERVATIVE: More restrictive clamping
+                # Conservative clamping
                 x = torch.clamp(x, min=-10.0, max=10.0)
                 
                 # Check for unhealthy outputs
@@ -561,21 +550,20 @@ class UltraConservativeBLIP3oCLIPTrainer:
             return None
 
     def _safe_evaluate(self, num_samples: Optional[int] = None) -> Dict[str, float]:
-        """Evaluation with comprehensive error handling and fallbacks"""
+        """Evaluation without normalization/denormalization"""
         if self.eval_dataloader is None:
             return {}
         
         if num_samples is None:
             num_samples = self.eval_num_samples
         
-        logger.info(f"Starting ULTRA-CONSERVATIVE evaluation with {num_samples} samples")
+        logger.info(f"Starting evaluation with {num_samples} samples (NO NORMALIZATION)")
         
         self.model.eval()
         
         try:
             all_generated = []
-            all_targets_normalized = []
-            all_targets_original = []
+            all_targets = []
             samples_processed = 0
             evaluation_errors = 0
             
@@ -586,30 +574,22 @@ class UltraConservativeBLIP3oCLIPTrainer:
                     
                     try:
                         eva_features = batch['encoder_hidden_states'].to(self.device)
-                        target_clip_normalized = batch['clip_embeddings'].to(self.device)
-                        
-                        # Get original targets if available
-                        if 'clip_embeddings_original' in batch:
-                            target_clip_original = batch['clip_embeddings_original'].to(self.device)
-                        else:
-                            target_clip_original = None
+                        target_clip = batch['clip_embeddings'].to(self.device)  # Raw CLIP embeddings
                         
                         # Generate with error handling
-                        generated_clip_normalized = self._safe_generate_with_heun(
+                        generated_clip = self._safe_generate_with_heun(
                             eva_features=eva_features,
                             num_steps=self.eval_inference_steps,
                         )
                         
-                        if generated_clip_normalized is None:
+                        if generated_clip is None:
                             evaluation_errors += 1
                             logger.warning(f"⚠️ Generation failed for batch {batch_idx}")
                             continue
                         
-                        # Collect results
-                        all_generated.append(generated_clip_normalized.cpu())
-                        all_targets_normalized.append(target_clip_normalized.cpu())
-                        if target_clip_original is not None:
-                            all_targets_original.append(target_clip_original.cpu())
+                        # Collect results (both in raw CLIP space)
+                        all_generated.append(generated_clip.cpu())
+                        all_targets.append(target_clip.cpu())
                         
                         samples_processed += eva_features.shape[0]
                         
@@ -625,60 +605,20 @@ class UltraConservativeBLIP3oCLIPTrainer:
             if evaluation_errors > 0:
                 logger.warning(f"⚠️ {evaluation_errors} evaluation errors occurred")
             
-            # Process results with error handling
+            # Process results (no denormalization needed)
             try:
                 all_generated = torch.cat(all_generated, dim=0)
-                all_targets_normalized = torch.cat(all_targets_normalized, dim=0)
+                all_targets = torch.cat(all_targets, dim=0)
                 
-                if all_targets_original:
-                    all_targets_original = torch.cat(all_targets_original, dim=0)
-                
-                # Compute metrics with denormalization
-                eval_metrics = {}
-                
-                if self.clip_normalizer and self.clip_normalizer.stats_computed:
-                    try:
-                        generated_denorm = self.clip_normalizer.denormalize(all_generated)
-                        
-                        if all_targets_original is not None:
-                            target_denorm = all_targets_original
-                        else:
-                            target_denorm = self.clip_normalizer.denormalize(all_targets_normalized)
-                        
-                        # Check denormalized tensors
-                        if (self._check_tensor_health(generated_denorm, "generated_denorm") and 
-                            self._check_tensor_health(target_denorm, "target_denorm")):
-                            
-                            denorm_metrics = self._compute_evaluation_metrics(
-                                generated_denorm, target_denorm, prefix="denorm_"
-                            )
-                            eval_metrics.update(denorm_metrics)
-                        else:
-                            logger.warning("⚠️ Denormalized tensors are unhealthy")
-                            
-                    except Exception as e:
-                        logger.warning(f"⚠️ Denormalization failed: {e}")
-                
-                # Compute metrics in normalized space as fallback
-                norm_metrics = self._compute_evaluation_metrics(
-                    all_generated, all_targets_normalized, prefix="norm_"
-                )
-                eval_metrics.update(norm_metrics)
-                
-                # Set primary metrics
-                primary_prefix = "denorm_" if f"denorm_clip_similarity" in eval_metrics else "norm_"
-                
+                # Compute metrics directly in raw CLIP space
+                eval_metrics = self._compute_evaluation_metrics(all_generated, all_targets)
                 eval_metrics.update({
-                    'eval_clip_similarity': eval_metrics.get(f'{primary_prefix}clip_similarity', 0.0),
-                    'eval_mse_loss': eval_metrics.get(f'{primary_prefix}mse_loss', float('inf')),
-                    'eval_high_quality': eval_metrics.get(f'{primary_prefix}high_quality', 0.0),
-                    'eval_very_high_quality': eval_metrics.get(f'{primary_prefix}very_high_quality', 0.0),
                     'eval_samples': samples_processed,
                     'eval_errors': evaluation_errors,
                     'eval_success_rate': (samples_processed - evaluation_errors) / max(samples_processed, 1),
                 })
                 
-                logger.info(f"✅ ULTRA-CONSERVATIVE evaluation completed: {samples_processed} samples")
+                logger.info(f"✅ Evaluation completed: {samples_processed} samples")
                 logger.info(f"   CLIP similarity: {eval_metrics['eval_clip_similarity']:.4f}")
                 logger.info(f"   Success rate: {eval_metrics['eval_success_rate']*100:.1f}%")
                 
@@ -695,8 +635,8 @@ class UltraConservativeBLIP3oCLIPTrainer:
         finally:
             self.model.train()
 
-    def _compute_evaluation_metrics(self, generated: torch.Tensor, target: torch.Tensor, prefix: str = "") -> Dict[str, float]:
-        """Compute evaluation metrics with error handling"""
+    def _compute_evaluation_metrics(self, generated: torch.Tensor, target: torch.Tensor) -> Dict[str, float]:
+        """Compute evaluation metrics in raw CLIP space"""
         try:
             # Per-image metrics
             gen_per_image = generated.mean(dim=1)
@@ -710,169 +650,40 @@ class UltraConservativeBLIP3oCLIPTrainer:
             # Quality metrics
             high_quality = (similarity > 0.7).float().mean().item()
             very_high_quality = (similarity > 0.8).float().mean().item()
+            excellent_quality = (similarity > 0.9).float().mean().item()
             
             # MSE loss
             mse_loss = F.mse_loss(generated, target).item()
             
             return {
-                f'{prefix}clip_similarity': similarity.mean().item(),
-                f'{prefix}mse_loss': mse_loss,
-                f'{prefix}high_quality': high_quality,
-                f'{prefix}very_high_quality': very_high_quality,
-                f'{prefix}similarity_std': similarity.std().item(),
+                'eval_clip_similarity': similarity.mean().item(),
+                'eval_mse_loss': mse_loss,
+                'eval_high_quality': high_quality,
+                'eval_very_high_quality': very_high_quality,
+                'eval_excellent_quality': excellent_quality,
+                'eval_similarity_std': similarity.std().item(),
             }
             
         except Exception as e:
             logger.warning(f"⚠️ Error computing metrics: {e}")
             return {
-                f'{prefix}clip_similarity': 0.0,
-                f'{prefix}mse_loss': float('inf'),
-                f'{prefix}error': str(e),
+                'eval_clip_similarity': 0.0,
+                'eval_mse_loss': float('inf'),
+                'error': str(e),
             }
-
-    def _log_training_metrics(self, loss: float, metrics: Dict[str, float], grad_norm: float, epoch_failures: int):
-        """Enhanced WandB logging for training metrics"""
-        if not self.use_wandb:
-            return
-        
-        try:
-            # Prepare comprehensive WandB metrics
-            wandb_metrics = {
-                # Basic training metrics
-                "train/loss": loss,
-                "train/grad_norm": grad_norm,
-                "train/learning_rate": self.optimizer.param_groups[0]['lr'],
-                "train/epoch": self.current_epoch,
-                "train/step": self.global_step,
-                
-                # Stability metrics
-                "stability/consecutive_failures": self.consecutive_failures,
-                "stability/epoch_failures": epoch_failures,
-                "stability/emergency_lr_reductions": self.emergency_lr_reductions,
-                "stability/stability_alerts": self.stability_alerts,
-                "stability/steps_since_last_stable": self.global_step - self.last_stable_step,
-                
-                # Loss explosion detection
-                "stability/loss_explosion_detected": loss > self.loss_explosion_threshold,
-                "stability/loss_explosion_threshold": self.loss_explosion_threshold,
-                
-                # System metrics
-                "system/gpu_memory_allocated": torch.cuda.memory_allocated() / 1e9 if torch.cuda.is_available() else 0,
-                "system/gpu_memory_reserved": torch.cuda.memory_reserved() / 1e9 if torch.cuda.is_available() else 0,
-            }
-            
-            # Add loss component metrics if available
-            if metrics:
-                for key, value in metrics.items():
-                    if isinstance(value, (int, float)) and not math.isnan(value) and not math.isinf(value):
-                        if key.startswith('eval_'):
-                            continue  # Skip eval metrics here
-                        wandb_metrics[f"train/{key}"] = value
-            
-            # Moving averages for stability
-            if len(self.loss_history) >= 10:
-                recent_losses = list(self.loss_history)[-10:]
-                wandb_metrics["train/loss_ma_10"] = sum(recent_losses) / len(recent_losses)
-            
-            if len(self.grad_norm_history) >= 10:
-                recent_grads = list(self.grad_norm_history)[-10:]
-                wandb_metrics["train/grad_norm_ma_10"] = sum(recent_grads) / len(recent_grads)
-            
-            # Adaptive gradient clipping metrics
-            if self.adaptive_grad_clipping and len(self.grad_norm_history) >= 10:
-                recent_grad_norms = list(self.grad_norm_history)[-10:]
-                avg_recent_grad = sum(recent_grad_norms) / len(recent_grad_norms)
-                effective_grad_norm = self.max_grad_norm * 0.5 if avg_recent_grad > self.max_grad_norm * 2 else self.max_grad_norm
-                wandb_metrics["train/effective_grad_clip"] = effective_grad_norm
-                wandb_metrics["train/grad_clip_adaptive"] = avg_recent_grad > self.max_grad_norm * 2
-            
-            # Best metrics tracking
-            wandb_metrics["train/best_eval_similarity"] = self.best_eval_similarity
-            wandb_metrics["train/best_loss"] = self.best_loss
-            
-            # Update best loss
-            if loss < self.best_loss:
-                self.best_loss = loss
-                wandb_metrics["train/new_best_loss"] = True
-            
-            # Log to WandB
-            wandb.log(wandb_metrics, step=self.global_step)
-            
-        except Exception as e:
-            logger.warning(f"⚠️ Failed to log training metrics to WandB: {e}")
-
-    def _log_evaluation_metrics(self, eval_metrics: Dict[str, float]):
-        """Enhanced WandB logging for evaluation metrics"""
-        if not self.use_wandb or not eval_metrics:
-            return
-        
-        try:
-            wandb_eval_metrics = {}
-            
-            # Core evaluation metrics
-            for key, value in eval_metrics.items():
-                if isinstance(value, (int, float)) and not math.isnan(value) and not math.isinf(value):
-                    if key.startswith('eval_'):
-                        wandb_eval_metrics[f"eval/{key[5:]}"] = value
-                    elif key.startswith('denorm_'):
-                        wandb_eval_metrics[f"eval/denorm_{key[7:]}"] = value
-                    elif key.startswith('norm_'):
-                        wandb_eval_metrics[f"eval/norm_{key[5:]}"] = value
-                    else:
-                        wandb_eval_metrics[f"eval/{key}"] = value
-            
-            # Special handling for key metrics
-            if 'eval_clip_similarity' in eval_metrics:
-                similarity = eval_metrics['eval_clip_similarity']
-                wandb_eval_metrics["eval/clip_similarity"] = similarity
-                
-                # Quality indicators
-                wandb_eval_metrics["eval/quality_excellent"] = similarity > 0.8
-                wandb_eval_metrics["eval/quality_good"] = similarity > 0.6
-                wandb_eval_metrics["eval/quality_fair"] = similarity > 0.4
-                wandb_eval_metrics["eval/quality_poor"] = similarity <= 0.2
-                
-                # Update best similarity
-                if similarity > self.best_eval_similarity:
-                    self.best_eval_similarity = similarity
-                    wandb_eval_metrics["eval/new_best_similarity"] = True
-                    wandb_eval_metrics["eval/best_similarity_step"] = self.global_step
-            
-            # Success rate and error tracking
-            if 'eval_success_rate' in eval_metrics:
-                wandb_eval_metrics["eval/success_rate"] = eval_metrics['eval_success_rate']
-                wandb_eval_metrics["eval/failure_rate"] = 1.0 - eval_metrics['eval_success_rate']
-            
-            if 'eval_errors' in eval_metrics:
-                wandb_eval_metrics["eval/error_count"] = eval_metrics['eval_errors']
-            
-            # Normalization health
-            if 'denorm_clip_similarity' in eval_metrics and 'norm_clip_similarity' in eval_metrics:
-                denorm_sim = eval_metrics['denorm_clip_similarity']
-                norm_sim = eval_metrics['norm_clip_similarity']
-                wandb_eval_metrics["eval/denorm_vs_norm_diff"] = abs(denorm_sim - norm_sim)
-                wandb_eval_metrics["eval/denormalization_working"] = abs(denorm_sim - norm_sim) < 0.1
-            
-            # Log to WandB
-            wandb.log(wandb_eval_metrics, step=self.global_step)
-            
-        except Exception as e:
-            logger.warning(f"⚠️ Failed to log evaluation metrics to WandB: {e}")
 
     def train(self) -> Dict[str, Any]:
-        """ULTRA-CONSERVATIVE main training loop with comprehensive WandB logging"""
-        logger.info("🚀 Starting ULTRA-CONSERVATIVE BLIP3-o training...")
-        logger.info(f"  🔒 Ultra-conservative features enabled")
-        logger.info(f"  🔒 Enhanced stability monitoring active")
-        logger.info(f"  📊 WandB logging: {'✅ ENABLED' if self.use_wandb else '❌ DISABLED'}")
+        """Main training loop without normalization"""
+        logger.info("🚀 Starting BLIP3-o training (NO NORMALIZATION)...")
+        logger.info(f"  Enhanced stability monitoring active")
+        logger.info(f"  WandB logging: {'✅ ENABLED' if self.use_wandb else '❌ DISABLED'}")
         
         # Log initial setup to WandB
         if self.use_wandb:
             wandb.log({
                 "setup/training_started": True,
                 "setup/model_parameters": sum(p.numel() for p in self.model.parameters()),
-                "setup/clip_normalizer_available": self.clip_normalizer is not None,
-                "setup/ultra_conservative_features": True,
+                "setup/normalization": "DISABLED",
                 "setup/estimated_steps_per_epoch": self.estimated_steps_per_epoch,
                 "setup/total_estimated_steps": self.estimated_steps_per_epoch * self.num_epochs,
             }, step=0)
@@ -889,13 +700,6 @@ class UltraConservativeBLIP3oCLIPTrainer:
                 epoch_steps = 0
                 epoch_failures = 0
                 epoch_start_time = time.time()
-                
-                # Log epoch start
-                if self.use_wandb:
-                    wandb.log({
-                        "epoch/started": epoch + 1,
-                        "epoch/timestamp": time.time(),
-                    }, step=self.global_step)
                 
                 try:
                     dataloader_iter = iter(self.train_dataloader)
@@ -917,14 +721,6 @@ class UltraConservativeBLIP3oCLIPTrainer:
                         if not is_stable:
                             self._handle_training_instability()
                             epoch_failures += 1
-                            
-                            # Log failure to WandB
-                            if self.use_wandb:
-                                wandb.log({
-                                    "failures/step_failed": True,
-                                    "failures/reason": "unstable_loss",
-                                    "failures/loss_value": loss.item() if torch.isfinite(loss) else float('inf'),
-                                }, step=self.global_step)
                             continue
                         
                         # Backward pass with stability checks
@@ -933,14 +729,6 @@ class UltraConservativeBLIP3oCLIPTrainer:
                         if not step_success:
                             self._handle_training_instability()
                             epoch_failures += 1
-                            
-                            # Log failure to WandB
-                            if self.use_wandb:
-                                wandb.log({
-                                    "failures/step_failed": True,
-                                    "failures/reason": "unstable_gradients",
-                                    "failures/grad_norm": grad_norm if not math.isinf(grad_norm) else float('inf'),
-                                }, step=self.global_step)
                             continue
                         
                         # Success - reset failure counter
@@ -956,17 +744,15 @@ class UltraConservativeBLIP3oCLIPTrainer:
                         self.grad_norm_history.append(grad_norm)
                         self.lr_history.append(self.optimizer.param_groups[0]['lr'])
                         
-                        # Step timing
-                        step_time = time.time() - step_start_time
-                        
-                        # Log training metrics to WandB
-                        self._log_training_metrics(loss.item(), metrics, grad_norm, epoch_failures)
-                        
-                        # Additional per-step WandB logging
+                        # Log to WandB
                         if self.use_wandb:
                             wandb.log({
-                                "timing/step_time": step_time,
-                                "timing/samples_per_second": batch.get('batch_size', 8) / step_time if step_time > 0 else 0,
+                                "train/loss": loss.item(),
+                                "train/grad_norm": grad_norm,
+                                "train/learning_rate": self.optimizer.param_groups[0]['lr'],
+                                "train/epoch": self.current_epoch,
+                                "stability/consecutive_failures": self.consecutive_failures,
+                                "stability/epoch_failures": epoch_failures,
                             }, step=self.global_step)
                         
                         # Console logging
@@ -976,53 +762,30 @@ class UltraConservativeBLIP3oCLIPTrainer:
                         # Evaluation
                         if self.global_step % self.eval_every_n_steps == 0:
                             logger.info(f"Running evaluation at step {self.global_step}...")
-                            eval_start_time = time.time()
                             
                             eval_metrics = self._safe_evaluate()
-                            eval_time = time.time() - eval_start_time
                             
                             if eval_metrics and 'eval_clip_similarity' in eval_metrics:
                                 similarity = eval_metrics['eval_clip_similarity']
                                 logger.info(f"✅ Evaluation: CLIP similarity = {similarity:.4f}")
                                 
-                                # Log evaluation metrics to WandB
-                                self._log_evaluation_metrics(eval_metrics)
-                                
-                                # Additional evaluation timing
                                 if self.use_wandb:
-                                    wandb.log({
-                                        "timing/eval_time": eval_time,
-                                        "eval/timestamp": time.time(),
-                                    }, step=self.global_step)
+                                    wandb_eval = {f"eval/{k.replace('eval_', '')}": v for k, v in eval_metrics.items() 
+                                                if isinstance(v, (int, float)) and not math.isnan(v)}
+                                    wandb.log(wandb_eval, step=self.global_step)
                                 
                                 if similarity > self.best_eval_similarity:
                                     self.best_eval_similarity = similarity
                                     logger.info(f"🎉 NEW BEST similarity: {similarity:.4f}")
                             else:
                                 logger.warning("⚠️ Evaluation failed or returned no metrics")
-                                if self.use_wandb:
-                                    wandb.log({
-                                        "eval/failed": True,
-                                        "eval/error": eval_metrics.get('eval_error', 'unknown') if eval_metrics else 'no_metrics',
-                                    }, step=self.global_step)
                         
                         # Save checkpoint
                         if self.global_step % self.save_every_n_steps == 0:
-                            checkpoint_success = self._save_checkpoint()
-                            if self.use_wandb:
-                                wandb.log({
-                                    "checkpoints/saved": checkpoint_success,
-                                    "checkpoints/step": self.global_step,
-                                }, step=self.global_step)
+                            self._save_checkpoint()
                 
                 except Exception as e:
                     logger.error(f"❌ Error during epoch {epoch + 1}: {e}")
-                    if self.use_wandb:
-                        wandb.log({
-                            "errors/epoch_error": True,
-                            "errors/epoch": epoch + 1,
-                            "errors/message": str(e),
-                        }, step=self.global_step)
                     continue
                 
                 # End of epoch summary
@@ -1033,27 +796,12 @@ class UltraConservativeBLIP3oCLIPTrainer:
                 logger.info(f"Epoch {epoch + 1} summary:")
                 logger.info(f"  Average loss: {avg_loss:.6f}")
                 logger.info(f"  Failure rate: {failure_rate*100:.1f}%")
-                logger.info(f"  Emergency LR reductions: {self.emergency_lr_reductions}")
                 logger.info(f"  Best similarity: {self.best_eval_similarity:.4f}")
                 logger.info(f"  Epoch time: {epoch_time:.1f}s")
-                
-                # Log epoch summary to WandB
-                if self.use_wandb:
-                    wandb.log({
-                        "epoch/completed": epoch + 1,
-                        "epoch/avg_loss": avg_loss,
-                        "epoch/failure_rate": failure_rate,
-                        "epoch/time_seconds": epoch_time,
-                        "epoch/steps": epoch_steps,
-                        "epoch/batches": batch_count,
-                        "epoch/failures": epoch_failures,
-                    }, step=self.global_step)
             
             # Final evaluation
             logger.info("Running final evaluation...")
-            final_eval_start_time = time.time()
             final_eval = self._safe_evaluate(num_samples=self.eval_num_samples * 2)
-            final_eval_time = time.time() - final_eval_start_time
             
             total_time = time.time() - start_time
             
@@ -1067,59 +815,33 @@ class UltraConservativeBLIP3oCLIPTrainer:
                 'emergency_lr_reductions': self.emergency_lr_reductions,
                 'stability_alerts': self.stability_alerts,
                 'final_eval': final_eval,
-                'ultra_conservative_features': {
-                    'stability_monitoring': True,
-                    'adaptive_grad_clipping': self.adaptive_grad_clipping,
-                    'emergency_recovery': True,
-                    'robust_evaluation': True,
-                },
+                'normalization_disabled': True,
             }
             
-            # Log final summary to WandB
             if self.use_wandb:
-                final_wandb_metrics = {
+                wandb.log({
                     "final/training_completed": True,
                     "final/total_time_seconds": total_time,
-                    "final/total_steps": self.global_step,
                     "final/best_eval_similarity": self.best_eval_similarity,
-                    "final/best_loss": self.best_loss,
-                    "final/emergency_lr_reductions": self.emergency_lr_reductions,
-                    "final/stability_alerts": self.stability_alerts,
-                    "final/eval_time": final_eval_time,
-                }
-                
-                # Add final evaluation metrics
-                if final_eval:
-                    for key, value in final_eval.items():
-                        if isinstance(value, (int, float)) and not math.isnan(value) and not math.isinf(value):
-                            final_wandb_metrics[f"final/{key}"] = value
-                
-                wandb.log(final_wandb_metrics, step=self.global_step)
-                
-                # Mark run as finished
+                    "final/normalization": "DISABLED",
+                }, step=self.global_step)
                 wandb.finish()
             
-            logger.info("🎉 ULTRA-CONSERVATIVE training completed!")
+            logger.info("🎉 Training completed (NO NORMALIZATION)!")
             logger.info(f"  Total time: {total_time:.1f} seconds")
             logger.info(f"  Best similarity: {self.best_eval_similarity:.4f}")
-            logger.info(f"  Best loss: {self.best_loss:.6f}")
-            logger.info(f"  Emergency interventions: {self.emergency_lr_reductions}")
-            logger.info(f"  🔒 Training stability maintained through conservative approach")
+            logger.info(f"  Training stability maintained")
             
             return summary
             
         except Exception as e:
             logger.error(f"❌ Training failed: {e}")
             if self.use_wandb:
-                wandb.log({
-                    "final/training_failed": True,
-                    "final/error": str(e),
-                }, step=self.global_step)
                 wandb.finish()
             raise
 
     def _save_checkpoint(self) -> bool:
-        """Save checkpoint with ultra-conservative state"""
+        """Save checkpoint"""
         try:
             checkpoint_path = self.output_dir / f"checkpoint_step_{self.global_step}.pt"
             
@@ -1129,16 +851,13 @@ class UltraConservativeBLIP3oCLIPTrainer:
                 'model_state_dict': self.model.state_dict(),
                 'optimizer_state_dict': self.optimizer.state_dict(),
                 'scheduler_state_dict': self.scheduler.state_dict(),
-                'ultra_conservative_state': {
+                'training_state': {
                     'emergency_lr_reductions': self.emergency_lr_reductions,
                     'stability_alerts': self.stability_alerts,
                     'consecutive_failures': self.consecutive_failures,
                     'last_stable_step': self.last_stable_step,
                 },
-                'clip_normalizer_state': {
-                    'stats_computed': self.clip_normalizer.stats_computed if self.clip_normalizer else False,
-                    'scale_factor': self.clip_normalizer.scale_factor if self.clip_normalizer else None,
-                } if self.clip_normalizer else None,
+                'normalization': 'DISABLED',
             }
             
             if self.scaler is not None:
@@ -1153,27 +872,25 @@ class UltraConservativeBLIP3oCLIPTrainer:
             return False
 
 
-def create_ultra_conservative_clip_trainer(
+def create_clip_trainer(
     model,
     loss_fn,
     train_dataloader,
     eval_dataloader=None,
-    clip_normalizer=None,
     learning_rate: float = 1e-4,
     num_epochs: int = 10,
     output_dir: str = "./checkpoints",
     use_wandb: bool = False,
-    wandb_project: str = "blip3o-clip-ultra-conservative",
+    wandb_project: str = "blip3o-clip-no-norm",
     **kwargs
-) -> UltraConservativeBLIP3oCLIPTrainer:
-    """Factory function to create ULTRA-CONSERVATIVE CLIP trainer"""
+) -> BLIP3oCLIPTrainer:
+    """Factory function to create CLIP trainer without normalization"""
     
-    return UltraConservativeBLIP3oCLIPTrainer(
+    return BLIP3oCLIPTrainer(
         model=model,
         loss_fn=loss_fn,
         train_dataloader=train_dataloader,
         eval_dataloader=eval_dataloader,
-        clip_normalizer=clip_normalizer,
         learning_rate=learning_rate,
         num_epochs=num_epochs,
         output_dir=output_dir,
@@ -1184,7 +901,5 @@ def create_ultra_conservative_clip_trainer(
 
 
 # Backward compatibility aliases
-BLIP3oCLIPTrainer = UltraConservativeBLIP3oCLIPTrainer
-FixedBLIP3oCLIPTrainer = UltraConservativeBLIP3oCLIPTrainer
-create_clip_trainer = create_ultra_conservative_clip_trainer
-create_fixed_clip_trainer = create_ultra_conservative_clip_trainer
+create_ultra_conservative_clip_trainer = create_clip_trainer
+create_fixed_clip_trainer = create_clip_trainer

@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
 """
-ROBUST Flow Matching Loss with Enhanced Stability
+Flow Matching Loss WITHOUT CLIP Normalization
 src/modules/losses/blip3o_fm_loss.py
 
-ROBUST IMPROVEMENTS:
-1. Enhanced numerical stability with gradient clipping
-2. Better NaN/Inf detection and handling
-3. Adaptive loss weighting based on training progress
-4. Conservative scaling with overflow protection
-5. Robust similarity computation with fallbacks
+CHANGES:
+1. Removed denormalization from compute_eval_loss
+2. Simplified evaluation metrics to work with raw CLIP embeddings
+3. Removed references to denormalize_fn
+4. All computation now in raw CLIP space
 """
 
 import torch
@@ -21,16 +20,10 @@ import math
 logger = logging.getLogger(__name__)
 
 
-class RobustSemanticPreservingFlowMatchingLoss(nn.Module):
+class SemanticPreservingFlowMatchingLoss(nn.Module):
     """
-    ROBUST Flow Matching Loss with enhanced stability and error handling
-    
-    ROBUST IMPROVEMENTS:
-    1. Enhanced numerical stability throughout
-    2. Better NaN/Inf detection and recovery
-    3. Adaptive loss scaling to prevent overflow
-    4. Conservative similarity computation
-    5. Robust error handling with fallbacks
+    Flow Matching Loss without CLIP normalization
+    All computations work directly with raw CLIP embeddings
     """
     
     def __init__(
@@ -38,7 +31,7 @@ class RobustSemanticPreservingFlowMatchingLoss(nn.Module):
         prediction_type: str = "velocity",
         flow_type: str = "rectified",
         
-        # Loss weights (kept from previous version)
+        # Loss weights
         velocity_weight: float = 1.0,
         semantic_weight: float = 0.5,
         cosine_weight: float = 0.2,
@@ -49,14 +42,14 @@ class RobustSemanticPreservingFlowMatchingLoss(nn.Module):
         early_timestep_threshold: float = 0.3,
         late_timestep_threshold: float = 0.5,
         
-        # ROBUST: Enhanced stability parameters
+        # Stability parameters
         eps: float = 1e-8,
         min_timestep: float = 1e-3,
         max_timestep: float = 1.0 - 1e-3,
-        max_loss_value: float = 100.0,  # Clamp loss to prevent overflow
-        gradient_clip_value: float = 10.0,  # Clip gradients in loss computation
-        adaptive_scaling: bool = True,  # Adaptively scale loss weights
-        robust_similarity: bool = True,  # Use robust similarity computation
+        max_loss_value: float = 100.0,
+        gradient_clip_value: float = 10.0,
+        adaptive_scaling: bool = True,
+        robust_similarity: bool = True,
     ):
         super().__init__()
         
@@ -74,7 +67,7 @@ class RobustSemanticPreservingFlowMatchingLoss(nn.Module):
         self.early_timestep_threshold = early_timestep_threshold
         self.late_timestep_threshold = late_timestep_threshold
         
-        # ROBUST: Enhanced stability parameters
+        # Stability parameters
         self.eps = eps
         self.min_timestep = min_timestep
         self.max_timestep = max_timestep
@@ -92,12 +85,12 @@ class RobustSemanticPreservingFlowMatchingLoss(nn.Module):
         assert prediction_type in ["velocity", "noise", "sample"]
         assert flow_type in ["rectified", "reflow"]
         
-        logger.info(f"✅ ROBUST Flow Matching Loss initialized:")
+        logger.info(f"✅ Flow Matching Loss initialized (NO NORMALIZATION):")
         logger.info(f"  Prediction type: {prediction_type}")
         logger.info(f"  Flow type: {flow_type}")
         logger.info(f"  Weights - Velocity: {velocity_weight}, Semantic: {semantic_weight}, Cosine: {cosine_weight}")
         logger.info(f"  Consistency weight: {consistency_weight}")
-        logger.info(f"  🔒 Robust features: stability checks, adaptive scaling, overflow protection")
+        logger.info(f"  Normalization: DISABLED")
 
     def _clamp_timesteps(self, timesteps: torch.Tensor) -> torch.Tensor:
         """Clamp timesteps to avoid numerical issues"""
@@ -120,7 +113,7 @@ class RobustSemanticPreservingFlowMatchingLoss(nn.Module):
         
         # Compute norm with protection against overflow
         norm = torch.norm(tensor, p=2, dim=dim, keepdim=True)
-        norm = torch.clamp(norm, min=eps, max=1e6)  # Prevent division by zero and overflow
+        norm = torch.clamp(norm, min=eps, max=1e6)
         
         normalized = tensor / norm
         
@@ -144,7 +137,7 @@ class RobustSemanticPreservingFlowMatchingLoss(nn.Module):
             # Compute similarity
             similarity = torch.sum(x_norm * y_norm, dim=dim)
             
-            # Clamp to valid range [-1, 1] with small margin for numerical errors
+            # Clamp to valid range [-1, 1]
             similarity = torch.clamp(similarity, min=-1.0 + self.eps, max=1.0 - self.eps)
         else:
             # Standard cosine similarity
@@ -235,16 +228,16 @@ class RobustSemanticPreservingFlowMatchingLoss(nn.Module):
             # Check for loss explosion
             recent_mean = sum(self.recent_losses[-10:]) / 10
             if recent_mean > 10.0:
-                self.loss_scale_factor *= 0.9  # Reduce scaling
+                self.loss_scale_factor *= 0.9
                 logger.warning(f"⚠️ High loss detected, reducing scale factor to {self.loss_scale_factor:.3f}")
             elif recent_mean < 0.1:
-                self.loss_scale_factor *= 1.01  # Increase scaling slightly
-                self.loss_scale_factor = min(self.loss_scale_factor, 2.0)  # Cap at 2x
+                self.loss_scale_factor *= 1.01
+                self.loss_scale_factor = min(self.loss_scale_factor, 2.0)
 
     def forward(
         self,
         model_output: torch.Tensor,
-        target_samples: torch.Tensor,
+        target_samples: torch.Tensor,  # Raw CLIP embeddings
         timesteps: torch.Tensor,
         eva_conditioning: torch.Tensor,
         noise: Optional[torch.Tensor] = None,
@@ -253,14 +246,15 @@ class RobustSemanticPreservingFlowMatchingLoss(nn.Module):
         **kwargs
     ) -> Tuple[torch.Tensor, Optional[Dict[str, float]]]:
         """
-        ROBUST: Multi-component flow matching loss with enhanced stability
+        Multi-component flow matching loss without normalization
+        All computations work directly with raw CLIP embeddings
         """
         
         batch_size, num_tokens, embed_dim = model_output.shape
         device = model_output.device
         dtype = model_output.dtype
         
-        # ROBUST: Check input tensors
+        # Check input tensors
         if not self._check_tensor_health(model_output, "model_output"):
             logger.error("❌ Unhealthy model output detected!")
             return torch.tensor(float('inf'), device=device), {}
@@ -303,7 +297,7 @@ class RobustSemanticPreservingFlowMatchingLoss(nn.Module):
         velocity_loss = velocity_loss.mean(dim=(1, 2))  # [B]
         velocity_loss = (velocity_loss * weights['velocity_weights']).mean()
         
-        # ROBUST: Clamp velocity loss
+        # Clamp velocity loss
         velocity_loss = torch.clamp(velocity_loss, max=self.max_loss_value)
         
         # COMPONENT 2: SEMANTIC CONSISTENCY LOSS
@@ -327,10 +321,9 @@ class RobustSemanticPreservingFlowMatchingLoss(nn.Module):
             pred_subset = predicted_clean[cosine_mask]
             target_subset = target_samples[cosine_mask]
             
-            # ROBUST: Use robust cosine similarity
             cosine_sim = self._robust_cosine_similarity(pred_subset, target_subset, dim=-1)
             cosine_loss = 1.0 - cosine_sim.mean()
-            cosine_loss = torch.clamp(cosine_loss, min=0.0, max=2.0)  # Valid range for 1-cosine
+            cosine_loss = torch.clamp(cosine_loss, min=0.0, max=2.0)
         else:
             cosine_loss = torch.tensor(0.0, device=device, dtype=dtype)
         
@@ -338,17 +331,16 @@ class RobustSemanticPreservingFlowMatchingLoss(nn.Module):
         consistency_mask = weights['consistency_weights'] > 0
         if consistency_mask.any():
             # Per-image CLIP similarity
-            pred_per_image = predicted_clean[consistency_mask].mean(dim=1)  # [B_valid, embed_dim]
-            target_per_image = target_samples[consistency_mask].mean(dim=1)  # [B_valid, embed_dim]
+            pred_per_image = predicted_clean[consistency_mask].mean(dim=1)
+            target_per_image = target_samples[consistency_mask].mean(dim=1)
             
-            # ROBUST: Use robust cosine similarity
             clip_consistency = self._robust_cosine_similarity(pred_per_image, target_per_image, dim=-1)
             consistency_loss = 1.0 - clip_consistency.mean()
             consistency_loss = torch.clamp(consistency_loss, min=0.0, max=2.0)
         else:
             consistency_loss = torch.tensor(0.0, device=device, dtype=dtype)
         
-        # ROBUST: Apply adaptive scaling
+        # Apply adaptive scaling
         scale_factor = self.loss_scale_factor if self.adaptive_scaling else 1.0
         
         # TOTAL LOSS COMBINATION
@@ -359,7 +351,7 @@ class RobustSemanticPreservingFlowMatchingLoss(nn.Module):
             self.consistency_weight * consistency_loss
         )
         
-        # ROBUST: Final safety checks
+        # Final safety checks
         if not self._check_tensor_health(total_loss, "total_loss"):
             logger.error("❌ Unhealthy total loss detected! Using fallback loss.")
             total_loss = torch.tensor(1.0, device=device, dtype=dtype, requires_grad=True)
@@ -436,9 +428,9 @@ class RobustSemanticPreservingFlowMatchingLoss(nn.Module):
                         'active_cosine_ratio': active_cosine_ratio,
                         'active_consistency_ratio': active_consistency_ratio,
                         
-                        # ROBUST: Stability metrics
+                        # Stability metrics
                         'loss_scale_factor': self.loss_scale_factor,
-                        'numerical_stability': 1.0,  # All checks passed
+                        'numerical_stability': 1.0,
                         'adaptive_scaling_active': float(self.adaptive_scaling),
                         
                         # Disconnect detection
@@ -454,7 +446,7 @@ class RobustSemanticPreservingFlowMatchingLoss(nn.Module):
                     metrics = {
                         'total_loss': total_loss.item(),
                         'metrics_error': str(e),
-                        'numerical_stability': 0.0,  # Error occurred
+                        'numerical_stability': 0.0,
                     }
         
         return total_loss, metrics
@@ -463,10 +455,10 @@ class RobustSemanticPreservingFlowMatchingLoss(nn.Module):
         self,
         generated: torch.Tensor,
         target: torch.Tensor,
-        denormalize_fn: Optional[callable] = None,
     ) -> Dict[str, float]:
         """
-        ROBUST: Compute evaluation metrics with enhanced stability
+        Compute evaluation metrics without denormalization
+        All computations work directly with raw CLIP embeddings
         """
         with torch.no_grad():
             eval_metrics = {}
@@ -479,38 +471,17 @@ class RobustSemanticPreservingFlowMatchingLoss(nn.Module):
                     'eval_mse_loss': float('inf'),
                 }
             
-            # Denormalize if function provided
-            if denormalize_fn is not None:
-                try:
-                    generated_denorm = denormalize_fn(generated)
-                    target_denorm = denormalize_fn(target)
-                    
-                    # Check denormalized tensors
-                    if (self._check_tensor_health(generated_denorm, "generated_denorm") and 
-                        self._check_tensor_health(target_denorm, "target_denorm")):
-                        eval_metrics.update(self._compute_similarity_metrics(
-                            generated_denorm, target_denorm, prefix="denorm_"
-                        ))
-                    else:
-                        logger.warning("⚠️ Denormalization produced unhealthy tensors")
-                except Exception as e:
-                    logger.warning(f"Denormalization failed: {e}")
-            
-            # Compute metrics in current space
-            eval_metrics.update(self._compute_similarity_metrics(
-                generated, target, prefix="norm_"
-            ))
+            # Compute metrics directly in raw CLIP space
+            eval_metrics.update(self._compute_similarity_metrics(generated, target))
             
             # Set primary metrics
-            primary_prefix = "denorm_" if f"denorm_clip_similarity" in eval_metrics else "norm_"
-            
             eval_metrics.update({
-                'eval_clip_similarity': eval_metrics.get(f'{primary_prefix}clip_similarity', 0.0),
-                'eval_mse_loss': eval_metrics.get(f'{primary_prefix}mse_loss', float('inf')),
-                'eval_high_quality': eval_metrics.get(f'{primary_prefix}high_quality', 0.0),
-                'eval_very_high_quality': eval_metrics.get(f'{primary_prefix}very_high_quality', 0.0),
-                'eval_excellent_quality': eval_metrics.get(f'{primary_prefix}excellent_quality', 0.0),
-                'eval_similarity_std': eval_metrics.get(f'{primary_prefix}similarity_std', 0.0),
+                'eval_clip_similarity': eval_metrics.get('clip_similarity', 0.0),
+                'eval_mse_loss': eval_metrics.get('mse_loss', float('inf')),
+                'eval_high_quality': eval_metrics.get('high_quality', 0.0),
+                'eval_very_high_quality': eval_metrics.get('very_high_quality', 0.0),
+                'eval_excellent_quality': eval_metrics.get('excellent_quality', 0.0),
+                'eval_similarity_std': eval_metrics.get('similarity_std', 0.0),
             })
             
             return eval_metrics
@@ -518,17 +489,16 @@ class RobustSemanticPreservingFlowMatchingLoss(nn.Module):
     def _compute_similarity_metrics(
         self, 
         generated: torch.Tensor, 
-        target: torch.Tensor, 
-        prefix: str = ""
+        target: torch.Tensor,
     ) -> Dict[str, float]:
-        """ROBUST: Compute similarity metrics with enhanced stability"""
+        """Compute similarity metrics in raw CLIP space"""
         
         try:
             # Per-image similarity (primary metric)
             generated_per_img = generated.mean(dim=1)
             target_per_img = target.mean(dim=1)
             
-            # ROBUST: Use robust cosine similarity
+            # Use robust cosine similarity
             similarity = self._robust_cosine_similarity(generated_per_img, target_per_img, dim=-1)
             
             # Per-token similarity
@@ -536,7 +506,7 @@ class RobustSemanticPreservingFlowMatchingLoss(nn.Module):
             
             # MSE loss with clamping
             mse_loss = F.mse_loss(generated, target)
-            mse_loss = min(mse_loss.item(), 1000.0)  # Clamp to prevent overflow
+            mse_loss = min(mse_loss.item(), 1000.0)
             
             # Quality metrics
             high_quality = (similarity > 0.7).float().mean().item()
@@ -551,28 +521,28 @@ class RobustSemanticPreservingFlowMatchingLoss(nn.Module):
             norm_ratio = generated_norm_val / max(target_norm_val, 1e-8)
             
             return {
-                f'{prefix}clip_similarity': similarity.mean().item(),
-                f'{prefix}token_similarity': token_similarity.mean().item(),
-                f'{prefix}mse_loss': mse_loss,
-                f'{prefix}high_quality': high_quality,
-                f'{prefix}very_high_quality': very_high_quality,
-                f'{prefix}excellent_quality': excellent_quality,
-                f'{prefix}similarity_std': similarity.std().item(),
-                f'{prefix}generated_norm': generated_norm_val,
-                f'{prefix}target_norm': target_norm_val,
-                f'{prefix}norm_ratio': norm_ratio,
+                'clip_similarity': similarity.mean().item(),
+                'token_similarity': token_similarity.mean().item(),
+                'mse_loss': mse_loss,
+                'high_quality': high_quality,
+                'very_high_quality': very_high_quality,
+                'excellent_quality': excellent_quality,
+                'similarity_std': similarity.std().item(),
+                'generated_norm': generated_norm_val,
+                'target_norm': target_norm_val,
+                'norm_ratio': norm_ratio,
             }
             
         except Exception as e:
             logger.warning(f"⚠️ Error computing similarity metrics: {e}")
             return {
-                f'{prefix}clip_similarity': 0.0,
-                f'{prefix}mse_loss': float('inf'),
-                f'{prefix}error': str(e),
+                'clip_similarity': 0.0,
+                'mse_loss': float('inf'),
+                'error': str(e),
             }
 
 
-def create_robust_clip_reproduction_loss(
+def create_clip_reproduction_loss(
     prediction_type: str = "velocity",
     flow_type: str = "rectified", 
     velocity_weight: float = 1.0,
@@ -584,10 +554,10 @@ def create_robust_clip_reproduction_loss(
     adaptive_scaling: bool = True,
     robust_similarity: bool = True,
     **kwargs
-) -> RobustSemanticPreservingFlowMatchingLoss:
-    """Factory function for ROBUST CLIP reproduction loss"""
+) -> SemanticPreservingFlowMatchingLoss:
+    """Factory function for CLIP reproduction loss without normalization"""
     
-    return RobustSemanticPreservingFlowMatchingLoss(
+    return SemanticPreservingFlowMatchingLoss(
         prediction_type=prediction_type,
         flow_type=flow_type,
         velocity_weight=velocity_weight,
@@ -603,7 +573,7 @@ def create_robust_clip_reproduction_loss(
 
 
 # Backward compatibility aliases
-BLIP3oCLIPFlowMatchingLoss = RobustSemanticPreservingFlowMatchingLoss
-FixedSemanticPreservingFlowMatchingLoss = RobustSemanticPreservingFlowMatchingLoss
-create_clip_reproduction_loss = create_robust_clip_reproduction_loss
-create_fixed_clip_reproduction_loss = create_robust_clip_reproduction_loss
+BLIP3oCLIPFlowMatchingLoss = SemanticPreservingFlowMatchingLoss
+RobustSemanticPreservingFlowMatchingLoss = SemanticPreservingFlowMatchingLoss
+create_robust_clip_reproduction_loss = create_clip_reproduction_loss
+create_fixed_clip_reproduction_loss = create_clip_reproduction_loss

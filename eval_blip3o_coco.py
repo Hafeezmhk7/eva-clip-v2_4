@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-FIXED COCO Evaluation - Replicating Exact Training Approach
-eval_blip3o_coco_fixed_simple.py
+COCO Evaluation WITHOUT CLIP Normalization
+eval_blip3o_coco.py
 
-KEY FIX: Use EXACTLY the same approach as training evaluation:
-1. Same dataset format as training 
-2. Same collate function as training
-3. Same normalizer as training
-4. Just adapt COCO data to training format
+CHANGES:
+1. Removed all normalization/denormalization logic
+2. Works directly with raw CLIP embeddings
+3. Simplified evaluation to work in original CLIP space
+4. Removed clip_normalizer dependencies
 """
 
 import os
@@ -32,13 +32,9 @@ logger = logging.getLogger(__name__)
 # Setup paths
 sys.path.insert(0, str(Path(__file__).parent))
 
-# Import BLIP3-o modules - EXACT same as training
+# Import BLIP3-o modules
 try:
     from src.modules.models.blip3o_dit import ImprovedBLIP3oCLIPDiTModel, BLIP3oCLIPDiTConfig
-    from src.modules.datasets.blip3o_dataset import (
-        UltraConservativeCLIPNormalizer, 
-        ultra_conservative_clip_reproduction_collate_fn  # EXACT same collate function as training!
-    )
     logger.info("✅ BLIP3-o modules imported successfully")
 except ImportError as e:
     logger.error(f"❌ Failed to import BLIP3-o modules: {e}")
@@ -47,8 +43,8 @@ except ImportError as e:
 
 class COCODatasetAsTrainingFormat(Dataset):
     """
-    CRITICAL FIX: COCO dataset that returns items in EXACT same format as training dataset
-    This ensures the same collate function works without modification
+    COCO dataset that returns items in same format as training dataset
+    Works with raw CLIP embeddings (no normalization)
     """
     
     def __init__(self, embeddings_file: str, max_samples: int = None, training_mode: str = "patch_only"):
@@ -58,7 +54,7 @@ class COCODatasetAsTrainingFormat(Dataset):
         
         logger.info(f"📂 Loading COCO embeddings: {self.embeddings_file}")
         logger.info(f"🎯 Training mode: {training_mode} ({self.expected_tokens} tokens)")
-        logger.info(f"🔑 KEY: Using EXACT same format as training dataset!")
+        logger.info(f"🔑 Working with RAW CLIP embeddings (NO NORMALIZATION)")
         
         # Load embeddings
         self._load_embeddings()
@@ -78,7 +74,7 @@ class COCODatasetAsTrainingFormat(Dataset):
         logger.info(f"   EVA shape: {self.eva_embeddings.shape}")
     
     def _load_embeddings(self):
-        """Load and process COCO embeddings to match training format"""
+        """Load and process COCO embeddings"""
         with open(self.embeddings_file, 'rb') as f:
             data = pickle.load(f)
         
@@ -142,11 +138,8 @@ class COCODatasetAsTrainingFormat(Dataset):
         return self.num_samples
     
     def __getitem__(self, idx):
-        """
-        CRITICAL: Return item in EXACT same format as training dataset
-        This is the key to making the existing collate function work!
-        """
-        # Get embeddings
+        """Return item in same format as training dataset"""
+        # Get embeddings (raw CLIP embeddings - no normalization)
         eva_emb = self.eva_embeddings[idx]  # [seq_len, 4096]
         clip_emb = self.clip_embeddings[idx]  # [seq_len, 1024]
         
@@ -159,10 +152,10 @@ class COCODatasetAsTrainingFormat(Dataset):
             caption = str(metadata_item)
             image_id = idx
         
-        # Return in EXACT same format as training dataset
+        # Return in same format as training dataset
         return {
             'eva_embeddings': eva_emb,
-            'clip_embeddings': clip_emb,
+            'clip_embeddings': clip_emb,  # Raw CLIP embeddings
             'caption': caption,
             'key': f"coco_{image_id}",
             'sample_idx': idx,
@@ -229,7 +222,8 @@ class SimpleModelLoader:
 
 class COCOEvaluator:
     """
-    COCO Evaluator using EXACT same approach as training evaluation
+    COCO Evaluator without CLIP normalization
+    Works directly with raw CLIP embeddings
     """
     
     def __init__(self, model_path: str, device: torch.device, 
@@ -238,48 +232,18 @@ class COCOEvaluator:
         self.num_inference_steps = num_inference_steps
         self.use_heun = use_heun
         
-        logger.info(f"🔬 COCO Evaluator - Exact Training Replication")
-        logger.info(f"🎯 KEY: Using same evaluation approach as training!")
+        logger.info(f"🔬 COCO Evaluator (NO NORMALIZATION)")
+        logger.info(f"🔑 Working with raw CLIP embeddings")
         
         # Load model
         loader = SimpleModelLoader(model_path, device)
         self.model, self.config, self.checkpoint = loader.load_model()
         self.model = self.model.half()  # Use half precision
         
-        # Load normalizer from checkpoint
-        self.clip_normalizer = self._load_normalizer_from_checkpoint()
-        
-        logger.info("✅ Setup complete")
-
-    def _load_normalizer_from_checkpoint(self):
-        """Load normalizer from checkpoint (same as training)"""
-        normalizer_state = self.checkpoint.get('clip_normalizer_state')
-        if normalizer_state and normalizer_state.get('stats_computed', False):
-            try:
-                normalizer = UltraConservativeCLIPNormalizer(embedding_dim=1024)
-                normalizer.scale_factor = normalizer_state.get('scale_factor', 1.5)
-                normalizer.stats_computed = True
-                
-                if ('clip_mean' in normalizer_state and 'clip_std' in normalizer_state):
-                    normalizer.clip_mean = torch.tensor(normalizer_state['clip_mean'])
-                    normalizer.clip_std = torch.tensor(normalizer_state['clip_std'])
-                
-                logger.info("✅ Normalizer loaded from checkpoint")
-                return normalizer
-            except Exception as e:
-                logger.warning(f"⚠️ Failed to load normalizer: {e}")
-        
-        # Fallback normalizer
-        logger.info("🔄 Using fallback normalizer")
-        normalizer = UltraConservativeCLIPNormalizer(embedding_dim=1024)
-        normalizer.scale_factor = 1.5
-        normalizer.stats_computed = True
-        normalizer.clip_mean = torch.full((1, 1, 1024), -0.697)
-        normalizer.clip_std = torch.full((1, 1, 1024), 2.897)
-        return normalizer
+        logger.info("✅ Setup complete (NO NORMALIZATION)")
 
     def _generate_with_heun(self, eva_features: torch.Tensor) -> torch.Tensor:
-        """Generate using same method as training evaluation"""
+        """Generate using Heun's method"""
         batch_size, seq_len, _ = eva_features.shape
         
         eva_features = eva_features.to(self.device, dtype=torch.float16)
@@ -346,40 +310,36 @@ class COCOEvaluator:
     def evaluate(self, embeddings_file: str, max_samples: int = None, 
                 batch_size: int = 4, training_mode: str = "patch_only") -> Dict[str, Any]:
         """
-        CRITICAL: Evaluate using EXACT same approach as training
+        Evaluate without normalization - all in raw CLIP space
         """
         start_time = time.time()
         
-        logger.info(f"🔬 Starting COCO evaluation (EXACT training replication)")
+        logger.info(f"🔬 Starting COCO evaluation (NO NORMALIZATION)")
         logger.info(f"📂 File: {embeddings_file}")
-        logger.info(f"🔑 Using EXACT same dataset format and collate function as training!")
+        logger.info(f"🔑 Working with raw CLIP embeddings")
         
-        # Create dataset in EXACT same format as training
+        # Create dataset working with raw embeddings
         dataset = COCODatasetAsTrainingFormat(
             embeddings_file=embeddings_file,
             max_samples=max_samples,
             training_mode=training_mode
         )
         
-        # Create evaluation collate function - EXACT same approach as training
+        # Simple collate function (no normalization)
         def eval_collate_fn(batch):
-            """EXACT same approach as training evaluation"""
-            # Use the EXACT same collate function as training
-            result = ultra_conservative_clip_reproduction_collate_fn(batch)
+            """Simple collate function without normalization"""
+            eva_embeddings = torch.stack([item['eva_embeddings'] for item in batch])
+            clip_embeddings = torch.stack([item['clip_embeddings'] for item in batch])  # Raw
             
-            # Apply normalization EXACTLY like training evaluation
-            if self.clip_normalizer and self.clip_normalizer.stats_computed:
-                result['clip_embeddings_original'] = result['clip_embeddings'].clone()
-                result['clip_embeddings'] = self.clip_normalizer.normalize(result['clip_embeddings'])
-                # Update targets
-                result['velocity_target'] = result['clip_embeddings'] - result['noise']
-                # Update noisy input
-                t_expanded = result['timestep'].view(-1, 1, 1)
-                result['hidden_states'] = (1 - t_expanded) * result['noise'] + t_expanded * result['clip_embeddings']
-            
-            return result
+            return {
+                'encoder_hidden_states': eva_embeddings,
+                'clip_embeddings': clip_embeddings,  # Raw CLIP embeddings
+                'batch_size': len(batch),
+                'captions': [item['caption'] for item in batch],
+                'keys': [item['key'] for item in batch],
+            }
         
-        # Create dataloader EXACTLY like training
+        # Create dataloader
         dataloader = DataLoader(
             dataset,
             batch_size=batch_size,
@@ -389,32 +349,26 @@ class COCOEvaluator:
             drop_last=False
         )
         
-        logger.info(f"✅ Created dataloader using EXACT same approach as training")
+        logger.info(f"✅ Created dataloader (NO NORMALIZATION)")
         logger.info(f"   Dataset size: {len(dataset)}")
         logger.info(f"   Batch size: {batch_size}")
         
-        # Process batches - EXACT same approach as training evaluation
+        # Process batches
         all_generated = []
-        all_targets_original = []
+        all_targets = []
         samples_processed = 0
         
         with torch.no_grad():
             for batch_idx, batch in enumerate(tqdm(dataloader, desc="Evaluating")):
                 eva_features = batch['encoder_hidden_states'].to(self.device)
+                target_clip = batch['clip_embeddings'].to(self.device)  # Raw CLIP
                 
-                if 'clip_embeddings_original' in batch:
-                    target_original = batch['clip_embeddings_original'].to(self.device)
-                else:
-                    target_original = batch['clip_embeddings'].to(self.device)
-                    if self.clip_normalizer and self.clip_normalizer.stats_computed:
-                        target_original = self.clip_normalizer.denormalize(target_original)
-                
-                # Generate - same method as training evaluation
+                # Generate (returns raw CLIP embeddings)
                 generated = self._generate_with_heun(eva_features)
                 
-                # Store results
+                # Store results (both in raw CLIP space)
                 all_generated.append(generated.cpu().float())
-                all_targets_original.append(target_original.cpu().float())
+                all_targets.append(target_clip.cpu().float())
                 
                 samples_processed += eva_features.shape[0]
                 
@@ -422,13 +376,13 @@ class COCOEvaluator:
                 del eva_features, generated
                 torch.cuda.empty_cache()
         
-        # Compute metrics - EXACT same as training evaluation
+        # Compute metrics (all in raw CLIP space)
         all_generated = torch.cat(all_generated, dim=0)
-        all_targets_original = torch.cat(all_targets_original, dim=0)
+        all_targets = torch.cat(all_targets, dim=0)
         
-        # Per-image similarity (same as training)
+        # Per-image similarity (raw CLIP space)
         gen_per_image = all_generated.mean(dim=1)
-        tgt_per_image = all_targets_original.mean(dim=1)
+        tgt_per_image = all_targets.mean(dim=1)
         
         gen_norm = F.normalize(gen_per_image, p=2, dim=-1)
         tgt_norm = F.normalize(tgt_per_image, p=2, dim=-1)
@@ -440,7 +394,7 @@ class COCOEvaluator:
         excellent_quality = (similarity > 0.9).float().mean().item()
         
         # MSE loss
-        mse_loss = F.mse_loss(all_generated, all_targets_original).item()
+        mse_loss = F.mse_loss(all_generated, all_targets).item()
         
         eval_metrics = {
             'eval_clip_similarity': similarity.mean().item(),
@@ -453,7 +407,8 @@ class COCOEvaluator:
             'evaluation_time_seconds': time.time() - start_time,
             'inference_steps': self.num_inference_steps,
             'use_heun_solver': self.use_heun,
-            'exact_training_replication': True,  # This is the key!
+            'normalization': 'DISABLED',
+            'raw_clip_space': True,
         }
         
         # Print results
@@ -464,18 +419,13 @@ class COCOEvaluator:
     def print_results(self, metrics):
         """Print results"""
         logger.info("\n" + "="*80)
-        logger.info("📊 COCO EVALUATION RESULTS (EXACT TRAINING REPLICATION)")
+        logger.info("📊 COCO EVALUATION RESULTS (NO NORMALIZATION)")
         logger.info("="*80)
         
         similarity = metrics['eval_clip_similarity']
-        training_ref = 0.912
         
         logger.info(f"📊 Results:")
-        logger.info(f"   CLIP Similarity: {similarity:.4f}")
-        logger.info(f"   Training Reference: {training_ref:.4f}")
-        
-        diff_pct = ((similarity - training_ref) / training_ref) * 100
-        logger.info(f"   Difference: {diff_pct:+.1f}%")
+        logger.info(f"   CLIP Similarity: {similarity:.4f} (RAW CLIP space)")
         
         logger.info(f"🏆 Quality:")
         logger.info(f"   High (>0.7): {metrics['eval_high_quality']*100:.1f}%")
@@ -485,13 +435,14 @@ class COCOEvaluator:
         logger.info(f"⚙️ Details:")
         logger.info(f"   Samples: {metrics['eval_samples']:,}")
         logger.info(f"   Time: {metrics['evaluation_time_seconds']:.1f}s")
-        logger.info(f"   Exact Training Replication: ✅")
+        logger.info(f"   Normalization: DISABLED")
+        logger.info(f"   Space: Raw CLIP embeddings")
         
         logger.info("="*80)
 
 
 def main():
-    parser = argparse.ArgumentParser(description="COCO Evaluation - Exact Training Replication")
+    parser = argparse.ArgumentParser(description="COCO Evaluation without CLIP normalization")
     parser.add_argument("--model_path", type=str, required=True,
                        help="Path to model directory")
     parser.add_argument("--coco_embeddings_file", type=str, required=True,
@@ -510,10 +461,10 @@ def main():
     
     args = parser.parse_args()
     
-    logger.info("🔬 COCO Evaluation - Exact Training Replication")
+    logger.info("🔬 COCO Evaluation (NO NORMALIZATION)")
     logger.info("="*70)
-    logger.info("🎯 KEY FIX: Using EXACT same approach as training evaluation!")
-    logger.info("📋 Same dataset format + Same collate function + Same normalizer")
+    logger.info("🔑 Working with raw CLIP embeddings")
+    logger.info("📋 No normalization/denormalization applied")
     logger.info("="*70)
     
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -536,10 +487,8 @@ def main():
         if results:
             logger.info("🎉 COCO evaluation completed successfully!")
             similarity = results['eval_clip_similarity']
-            logger.info(f"📊 Final CLIP similarity: {similarity:.4f}")
-            
-            if results.get('exact_training_replication', False):
-                logger.info("✅ Used EXACT same approach as training - this should work!")
+            logger.info(f"📊 Final CLIP similarity: {similarity:.4f} (RAW CLIP space)")
+            logger.info(f"🔑 Evaluation performed without normalization")
             
             return 0
         else:

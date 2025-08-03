@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=blip3o_clip_clean
+#SBATCH --job-name=blip3o_no_norm
 #SBATCH --partition=gpu_h100
 #SBATCH --nodes=1
 #SBATCH --gpus=1
@@ -7,16 +7,16 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --time=12:00:00
 #SBATCH --mem=64G
-#SBATCH --output=./slurm_out/blip3o_5shards_%j.out
-#SBATCH --error=./slurm_out/blip3o_5shards_%j.err
+#SBATCH --output=./slurm_out/blip3o_no_norm_%j.out
+#SBATCH --error=./slurm_out/blip3o_no_norm_%j.err
 
 # =============================================================================
-# Clean BLIP3-o CLIP Reproduction Training
+# BLIP3-o CLIP Reproduction Training WITHOUT Normalization
 # Task: Reproduce CLIP embeddings [B, N, 1024] from EVA embeddings [B, N, 4096]
-# Method: Rectified Flow Matching with BLIP3-o DiT
+# Method: Rectified Flow Matching with BLIP3-o DiT (NO NORMALIZATION)
 # =============================================================================
 
-echo "🚀 Clean BLIP3-o CLIP Reproduction Training"
+echo "🚀 BLIP3-o CLIP Reproduction Training (NO NORMALIZATION)"
 echo "=========================================="
 echo "Job ID: ${SLURM_JOB_ID}"
 echo "Node: $(hostname)"
@@ -33,49 +33,57 @@ module load Miniconda3/24.7.1-0
 module load CUDA/12.6.0
 source activate eva_clip_env
 
-# ✅ FIXED: Set WandB API key
+# ✅ Set WandB API key
 export WANDB_API_KEY="0d9895af249ee18e4fa141e8a2350e0f4adb920f"
-export WANDB_MODE="online"  # Ensure online mode
-export WANDB_CACHE_DIR="${TMPDIR}/wandb_cache"  # Use temp dir for cache
+export WANDB_MODE="online"
+export WANDB_CACHE_DIR="${TMPDIR}/wandb_cache"
 mkdir -p "${WANDB_CACHE_DIR}"
 
 # Verify WandB login
 echo "🔐 Verifying WandB authentication..."
 python -c "import wandb; wandb.login(key='$WANDB_API_KEY'); print('✅ WandB login successful')"
 
-
 # Configuration
 EMBEDDINGS_DIR="/scratch-shared/azadaianchuk1/blip3o_workspace/embeddings/patch_only_256_tokens"
-OUTPUT_DIR="./checkpoints/blip3o_clean_$(date +%Y%m%d_%H%M%S)"
+OUTPUT_DIR="./checkpoints/blip3o_no_norm_$(date +%Y%m%d_%H%M%S)"
 TRAINING_MODE="patch_only"
 MODEL_SIZE="base"
 
 # Training hyperparameters
 NUM_EPOCHS=15
 BATCH_SIZE=128
-LEARNING_RATE=4e-4
+LEARNING_RATE=1e-4
 WEIGHT_DECAY=0.01
-WARMUP_STEPS=500
+WARMUP_STEPS=100
 MAX_GRAD_NORM=1.0
 
+# Loss weights (same as before)
+VELOCITY_WEIGHT=1.0
+SEMANTIC_WEIGHT=0.5
+COSINE_WEIGHT=0.2
+CONSISTENCY_WEIGHT=0.3
+
+# Simple scaling factor (data-independent)
+SIMPLE_SCALE_FACTOR=1.0  # Can be adjusted if needed
+
 # Evaluation parameters
-EVAL_EVERY_N_STEPS=10000
+EVAL_EVERY_N_STEPS=50
 EVAL_NUM_SAMPLES=100
 EVAL_INFERENCE_STEPS=50
 
 # Data configuration
-MAX_SHARDS=30
+MAX_SHARDS=3
 
 # Create output directory
 mkdir -p "${OUTPUT_DIR}"
 mkdir -p ./slurm_out
 
 echo ""
-echo "⚙️ Clean BLIP3-o Configuration:"
+echo "⚙️ BLIP3-o Configuration (NO NORMALIZATION):"
 echo "============================="
 echo "Task: Reproduce CLIP embeddings from EVA embeddings"
-echo "Method: BLIP3-o DiT with Rectified Flow Matching"
-echo "Target: CLIP embeddings [B, N, 1024]"
+echo "Method: BLIP3-o DiT WITHOUT CLIP normalization"
+echo "Target: CLIP embeddings [B, N, 1024] (RAW)"
 echo "Conditioning: EVA embeddings [B, N, 4096]"
 echo ""
 echo "Embeddings: $EMBEDDINGS_DIR"
@@ -83,6 +91,7 @@ echo "Output: $OUTPUT_DIR"
 echo "Training mode: $TRAINING_MODE"
 echo "Model size: $MODEL_SIZE"
 echo "Max shards: $MAX_SHARDS"
+echo "Simple scale factor: $SIMPLE_SCALE_FACTOR"
 echo ""
 echo "📊 Training Hyperparameters:"
 echo "  Epochs: $NUM_EPOCHS"
@@ -91,6 +100,12 @@ echo "  Learning rate: $LEARNING_RATE"
 echo "  Weight decay: $WEIGHT_DECAY"
 echo "  Warmup steps: $WARMUP_STEPS"
 echo "  Max grad norm: $MAX_GRAD_NORM"
+echo ""
+echo "🎯 Loss Weights:"
+echo "  Velocity: $VELOCITY_WEIGHT"
+echo "  Semantic: $SEMANTIC_WEIGHT"
+echo "  Cosine: $COSINE_WEIGHT"
+echo "  Consistency: $CONSISTENCY_WEIGHT"
 echo ""
 echo "🔍 Evaluation Configuration:"
 echo "  Eval every: $EVAL_EVERY_N_STEPS steps"
@@ -103,7 +118,14 @@ echo "  • Sandwich Normalization (RMSNorm)"
 echo "  • Grouped-Query Attention"
 echo "  • Rectified Flow Matching"
 echo "  • Simple Linear Timestep Schedule"
-echo "  • Clean Euler Integration"
+echo "  • Heun's Integration Method"
+echo "  • EVA-CLIP Adapter Layers"
+echo ""
+echo "🔑 KEY CHANGE: NO CLIP NORMALIZATION"
+echo "  • Works directly with raw CLIP embeddings"
+echo "  • No dependency on training data statistics"
+echo "  • Simplified training and evaluation pipeline"
+echo "  • Optional simple data-independent scaling"
 echo ""
 
 # Verify embeddings exist
@@ -134,24 +156,26 @@ fi
 echo "✅ Training script ready"
 
 echo ""
-echo "🚀 Starting Clean BLIP3-o Training..."
+echo "🚀 Starting BLIP3-o Training (NO NORMALIZATION)..."
 echo "===================================="
 echo "🎯 Expected Behavior:"
+echo "  ✅ No normalization-related crashes"
+echo "  ✅ Direct work with raw CLIP embeddings"
+echo "  ✅ Simplified training pipeline"
 echo "  ✅ Non-zero gradients from first step"
 echo "  ✅ Decreasing loss within first few epochs"
-echo "  ✅ Velocity similarity increasing from ~0.01 to >0.1"
-echo "  ✅ CLIP similarity during evaluation >0.1 (good), >0.4 (excellent)"
-echo "  ✅ No NaN/Inf issues or tensor shape mismatches"
+echo "  ✅ CLIP similarity during evaluation"
+echo "  ✅ No dependency on training data statistics"
 echo ""
 echo "🏗️ Architecture:"
 echo "  • BLIP3-o DiT with 3D RoPE and Sandwich Normalization"
 echo "  • Rectified Flow Matching"
 echo "  • Simple Linear Timestep Schedule"
-echo "  • Clean Euler Integration"
-echo "  • EVA [4096] → CLIP [1024] mapping"
+echo "  • Heun's Integration Method"
+echo "  • EVA [4096] → CLIP [1024] mapping (NO NORMALIZATION)"
 echo ""
 
-# Launch clean BLIP3-o training
+# Launch BLIP3-o training WITHOUT normalization
 python train_dit.py \
     --chunked_embeddings_dir "$EMBEDDINGS_DIR" \
     --output_dir "$OUTPUT_DIR" \
@@ -163,21 +187,31 @@ python train_dit.py \
     --warmup_steps $WARMUP_STEPS \
     --weight_decay $WEIGHT_DECAY \
     --max_grad_norm $MAX_GRAD_NORM \
+    --velocity_weight $VELOCITY_WEIGHT \
+    --semantic_weight $SEMANTIC_WEIGHT \
+    --cosine_weight $COSINE_WEIGHT \
+    --consistency_weight $CONSISTENCY_WEIGHT \
+    --simple_scale_factor $SIMPLE_SCALE_FACTOR \
     --eval_every_n_steps $EVAL_EVERY_N_STEPS \
     --eval_num_samples $EVAL_NUM_SAMPLES \
     --eval_inference_steps $EVAL_INFERENCE_STEPS \
     --max_shards $MAX_SHARDS \
-    --fp16
+    --use_eva_adapter \
+    --use_heun_inference \
+    --use_timestep_weighting \
+    --fp16 \
+    --use_wandb \
+    --wandb_project "blip3o-clip-no-norm"
 
 TRAINING_EXIT_CODE=$?
 
 echo ""
 echo "======================================"
-echo "📊 Clean BLIP3-o Training Results"
+echo "📊 BLIP3-o Training Results (NO NORMALIZATION)"
 echo "======================================"
 
 if [ $TRAINING_EXIT_CODE -eq 0 ]; then
-    echo "✅ Clean BLIP3-o training completed successfully!"
+    echo "✅ BLIP3-o training completed successfully (NO NORMALIZATION)!"
     
     echo ""
     echo "📋 Training Summary:"
@@ -209,7 +243,7 @@ try:
     final_eval = data.get('final_eval', {})
     if final_eval:
         print(f'')
-        print(f'🔍 Final Evaluation:')
+        print(f'🔍 Final Evaluation (RAW CLIP space):')
         clip_sim = final_eval.get('eval_clip_similarity', 0)
         high_qual = final_eval.get('eval_high_quality', 0) * 100
         very_high_qual = final_eval.get('eval_very_high_quality', 0) * 100
@@ -221,15 +255,15 @@ try:
         
         # Assessment
         if clip_sim > 0.8:
-            print(f'   🎉 EXCELLENT: Outstanding CLIP reproduction!')
+            print(f'   🎉 EXCELLENT: Outstanding CLIP reproduction without normalization!')
         elif clip_sim > 0.6:
-            print(f'   ✅ VERY GOOD: Strong CLIP reproduction!')
+            print(f'   ✅ VERY GOOD: Strong CLIP reproduction with simplified approach!')
         elif clip_sim > 0.4:
-            print(f'   ✅ GOOD: Solid CLIP reproduction!')
+            print(f'   ✅ GOOD: Solid CLIP reproduction without data-dependent stats!')
         elif clip_sim > 0.2:
-            print(f'   📈 FAIR: Decent reproduction, shows learning!')
+            print(f'   📈 FAIR: Decent reproduction, shows learning works!')
         else:
-            print(f'   ⚠️ NEEDS WORK: Low similarity, check hyperparameters')
+            print(f'   ⚠️ NEEDS WORK: Try adjusting simple_scale_factor or loss weights')
     
 except Exception as e:
     print(f'Could not parse training summary: {e}')
@@ -259,15 +293,17 @@ except Exception as e:
     echo "   • Increase NUM_EPOCHS for longer training"
     echo "   • Adjust BATCH_SIZE based on memory usage"
     echo "3. Run comprehensive evaluation on test set"
+    echo "4. Try different simple_scale_factor values if needed"
     echo ""
     echo "🔍 SUCCESS INDICATORS:"
     echo "  ✅ Non-zero gradients throughout training"
     echo "  ✅ Decreasing loss trend"
     echo "  ✅ Increasing similarity metrics"
     echo "  ✅ Final CLIP similarity >0.2 (fair), >0.4 (good), >0.6 (excellent)"
+    echo "  ✅ No normalization-related crashes"
     
     echo ""
-    echo "✅ SUCCESS: Clean BLIP3-o training completed!"
+    echo "✅ SUCCESS: BLIP3-o training completed (NO NORMALIZATION)!"
     
 else
     echo "❌ FAILED: Training exit code $TRAINING_EXIT_CODE"
@@ -278,11 +314,13 @@ else
     echo "  • Check embeddings directory structure and file formats"
     echo "  • Monitor GPU memory usage with nvidia-smi"
     echo "  • Try reducing batch_size if out-of-memory errors"
+    echo "  • Try different simple_scale_factor values"
     echo ""
     echo "🔧 Quick Recovery Options:"
     echo "  • Use smaller model: --model_size small or tiny"
     echo "  • Reduce batch size: --batch_size 4"
     echo "  • Use fewer shards: MAX_SHARDS=2"
+    echo "  • Try scaling factor: --simple_scale_factor 0.1"
 fi
 
 echo ""
@@ -294,10 +332,121 @@ echo ""
 echo "🏁 Job completed at $(date)"
 echo "Total job time: $(echo "scale=2; ($(date +%s) - $SECONDS) / 3600" | bc -l) hours"
 echo ""
-echo "📚 CLEAN BLIP3-o SUMMARY:"
-echo "This job trains a clean BLIP3-o DiT to reproduce CLIP embeddings from EVA embeddings."
-echo "Success indicates the architecture can perform cross-modal embedding translation effectively."
-echo "The implementation follows the BLIP3-o paper with simple linear timestep scheduling."
+echo "📚 BLIP3-o SUMMARY (NO NORMALIZATION):"
+echo "This job trains BLIP3-o DiT to reproduce CLIP embeddings from EVA embeddings"
+echo "WITHOUT using data-dependent CLIP normalization. This approach:"
+echo "• Works directly with raw CLIP embeddings"
+echo "• Has no dependency on training data statistics"
+echo "• Simplifies training and evaluation pipelines"
+echo "• Eliminates normalization-related crashes"
+echo "• Makes the model easier to deploy and understand"
+echo "Success indicates the architecture works well without complex normalization."
 echo "=========================================="
 
 exit $TRAINING_EXIT_CODE
+
+# =============================================================================
+# EVALUATION JOB SCRIPT (NO NORMALIZATION)
+# =============================================================================
+
+# Separate evaluation job script
+cat > evaluate_blip3o_no_norm.job << 'EOF'
+#!/bin/bash
+#SBATCH --job-name=blip3o_eval_no_norm
+#SBATCH --partition=gpu_h100
+#SBATCH --nodes=1
+#SBATCH --gpus=1
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=8
+#SBATCH --time=2:00:00
+#SBATCH --mem=32G
+#SBATCH --output=./slurm_out/blip3o_eval_no_norm_%j.out
+#SBATCH --error=./slurm_out/blip3o_eval_no_norm_%j.err
+
+echo "🔬 BLIP3-o MS-COCO Evaluation (NO NORMALIZATION)"
+echo "Job ID: ${SLURM_JOB_ID} | Node: $(hostname) | Time: $(date)"
+
+cd $SLURM_SUBMIT_DIR
+
+# Setup environment
+module purge
+module load 2024
+module load Miniconda3/24.7.1-0
+module load CUDA/12.6.0
+source activate eva_clip_env
+
+# Configuration
+STANDARD_EMBEDDINGS_BASE="/scratch-shared/azadaianchuk1/blip3o_workspace/embeddings"
+COCO_EMBEDDINGS_FILE="${STANDARD_EMBEDDINGS_BASE}/coco_embeddings/coco_embeddings_consolidated.pkl"
+MODEL_PATH="/home/azadaianchuk1/eva-clip-v6_2/checkpoints/blip3o_no_norm_latest"
+OUTPUT_DIR="./coco_eval_no_norm_$(date +%Y%m%d_%H%M%S)"
+
+# Parameters
+MAX_SAMPLES=1000
+BATCH_SIZE=8
+NUM_INFERENCE_STEPS=50
+
+# Parse arguments
+[ -n "$1" ] && MODEL_PATH="$1"
+[ -n "$2" ] && MAX_SAMPLES="$2"
+[ -n "$3" ] && BATCH_SIZE="$3"
+
+echo "Model: $MODEL_PATH"
+echo "COCO Embeddings: $COCO_EMBEDDINGS_FILE"
+echo "Max Samples: $MAX_SAMPLES | Batch Size: $BATCH_SIZE"
+echo "🔑 Evaluation WITHOUT normalization"
+
+# Verify files exist
+if [ ! -d "$MODEL_PATH" ]; then
+    echo "❌ Model not found: $MODEL_PATH"
+    exit 1
+fi
+
+if [ ! -f "$COCO_EMBEDDINGS_FILE" ]; then
+    echo "❌ COCO embeddings not found: $COCO_EMBEDDINGS_FILE"
+    exit 1
+fi
+
+# Check evaluation script
+EVAL_SCRIPT="eval_blip3o_coco.py"
+if [ ! -f "$EVAL_SCRIPT" ]; then
+    echo "❌ Evaluation script not found: $EVAL_SCRIPT"
+    echo "Please ensure the modified evaluation script is available"
+    exit 1
+fi
+
+mkdir -p "${OUTPUT_DIR}" ./slurm_out
+
+echo "🚀 Starting evaluation (NO NORMALIZATION)..."
+
+# Run evaluation using the modified script (NO NORMALIZATION)
+python $EVAL_SCRIPT \
+    --model_path "$MODEL_PATH" \
+    --coco_embeddings_file "$COCO_EMBEDDINGS_FILE" \
+    --batch_size $BATCH_SIZE \
+    --num_inference_steps $NUM_INFERENCE_STEPS \
+    --max_samples $MAX_SAMPLES \
+    --use_heun \
+    --training_mode patch_only
+
+EVAL_EXIT_CODE=$?
+
+echo ""
+echo "📊 Evaluation Results (NO NORMALIZATION)"
+echo "===================="
+
+if [ $EVAL_EXIT_CODE -eq 0 ]; then
+    echo "✅ Evaluation completed successfully!"
+    echo "🔑 Evaluated in raw CLIP embedding space"
+    echo "📊 No normalization/denormalization applied"
+    
+else
+    echo "❌ Evaluation failed (exit code: $EVAL_EXIT_CODE)"
+    echo "Check logs in ./slurm_out/ for details"
+fi
+
+echo "🏁 Job completed at $(date)"
+exit $EVAL_EXIT_CODE
+EOF
+
+echo "📝 Created evaluation job script: evaluate_blip3o_no_norm.job"

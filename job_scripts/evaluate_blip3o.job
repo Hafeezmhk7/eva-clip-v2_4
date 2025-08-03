@@ -25,7 +25,7 @@ source activate eva_clip_env
 # Configuration
 STANDARD_EMBEDDINGS_BASE="/scratch-shared/azadaianchuk1/blip3o_workspace/embeddings"
 COCO_EMBEDDINGS_FILE="${STANDARD_EMBEDDINGS_BASE}/coco_embeddings/coco_embeddings_consolidated.pkl"
-MODEL_PATH="/home/azadaianchuk1/eva-clip-v6_2/checkpoints/blip3o_clean_20250803_015324"
+MODEL_PATH="/home/azadaianchuk1/eva-clip-v6_2//checkpoints/blip3o_no_norm_20250803_143845"
 OUTPUT_DIR="./coco_eval_$(date +%Y%m%d_%H%M%S)"
 
 # Parameters
