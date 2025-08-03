@@ -1,27 +1,27 @@
 #!/bin/bash
-#SBATCH --job-name=blip3o_eval
+#SBATCH --job-name=blip3o_coco_eval
 #SBATCH --partition=gpu_h100
 #SBATCH --nodes=1
 #SBATCH --gpus=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
-#SBATCH --time=2:00:00
-#SBATCH --mem=32G
-#SBATCH --output=./slurm_out/blip3o_eval_50epoch%j.out
-#SBATCH --error=./slurm_out/blip3o_eval_50epoch%j.err
+#SBATCH --time=4:00:00
+#SBATCH --mem=64G
+#SBATCH --output=./slurm_out/blip3o_coco_eval_%j.out
+#SBATCH --error=./slurm_out/blip3o_coco_eval_%j.err
 
 # =============================================================================
-# BLIP3-o Evaluation - Comprehensive Model Assessment
-# Evaluates trained model to verify training/inference alignment
+# BLIP3-o MS-COCO Evaluation - Comprehensive Model Assessment
+# Evaluates trained model on MS-COCO val2017 dataset for CLIP reproduction
 # =============================================================================
 
-echo "🔍 BLIP3-o Comprehensive Evaluation"
-echo "==================================="
+echo "🔬 BLIP3-o MS-COCO Comprehensive Evaluation"
+echo "==========================================="
 echo "Job ID: ${SLURM_JOB_ID}"
 echo "Node: $(hostname)"
 echo "Time: $(date)"
 echo "GPU: $(nvidia-smi --query-gpu=name --format=csv,noheader,nounits | head -1)"
-echo "==================================="
+echo "==========================================="
 
 cd $SLURM_SUBMIT_DIR
 
@@ -33,35 +33,56 @@ module load CUDA/12.6.0
 source activate eva_clip_env
 
 # Configuration
-EMBEDDINGS_DIR="/scratch-shared/azadaianchuk1/blip3o_workspace/embeddings/patch_only_256_tokens"
-OUTPUT_DIR="./eval_results_$(date +%Y%m%d_%H%M%S)"
-MODEL_PATH="/home/azadaianchuk1/eva-clip-v5/checkpoints/blip3o_training_20250726_012152"
+MODEL_PATH="/home/azadaianchuk1/eva-clip-v6_2/checkpoints/blip3o_clean_20250803_015324"
+# /home/azadaianchuk1/eva-clip-v6_2/checkpoints/blip3o_clean_20250803_015324
+COCO_ROOT="./data/coco"
+OUTPUT_DIR="./coco_eval_results_$(date +%Y%m%d_%H%M%S)"
+MAX_SAMPLES=1000  # Evaluate on subset for faster testing, set to null for full dataset
 
-# # Model path - can be provided as argument or auto-detected
-# if [ -n "$1" ]; then
-#     MODEL_PATH="$1"
-#     echo "📂 Using provided model path: $MODEL_PATH"
-# else
-#     echo "🔍 Auto-detecting most recent model..."
-#     MODEL_PATH=$(find ./checkpoints -name "*blip3o*" -type d | sort | tail -1)
-#     if [ -z "$MODEL_PATH" ]; then
-#         echo "❌ No model found! Please provide model path as argument."
-#         echo "Usage: sbatch job_scripts/evaluate_blip3o.job <model_path>"
-#         exit 1
-#     fi
-#     echo "📂 Found model: $MODEL_PATH"
-# fi
+# Evaluation parameters
+BATCH_SIZE=8
+NUM_INFERENCE_STEPS=50
+USE_HEUN=true
+
+# Model path - can be provided as argument or use default
+if [ -n "$1" ]; then
+    MODEL_PATH="$1"
+    echo "📂 Using provided model path: $MODEL_PATH"
+else
+    echo "📂 Using default model path: $MODEL_PATH"
+    # Auto-detect most recent model if default doesn't exist
+    if [ ! -d "$MODEL_PATH" ]; then
+        echo "🔍 Auto-detecting most recent model..."
+        MODEL_PATH=$(find ./checkpoints -name "*blip3o*" -type d | sort | tail -1)
+        if [ -z "$MODEL_PATH" ]; then
+            echo "❌ No model found! Please provide model path as argument."
+            echo "Usage: sbatch job_scripts/evaluate_blip3o_coco.job <model_path>"
+            exit 1
+        fi
+        echo "📂 Found model: $MODEL_PATH"
+    fi
+fi
+
+# COCO root can be provided as second argument
+if [ -n "$2" ]; then
+    COCO_ROOT="$2"
+    echo "📂 Using provided COCO root: $COCO_ROOT"
+fi
 
 # Create output directory
 mkdir -p "${OUTPUT_DIR}"
 mkdir -p ./slurm_out
 
 echo ""
-echo "⚙️ Evaluation Configuration:"
-echo "============================"
+echo "⚙️ MS-COCO Evaluation Configuration:"
+echo "===================================="
 echo "Model: $MODEL_PATH"
-echo "Embeddings: $EMBEDDINGS_DIR"
+echo "COCO Root: $COCO_ROOT"
 echo "Output: $OUTPUT_DIR"
+echo "Max Samples: $MAX_SAMPLES"
+echo "Batch Size: $BATCH_SIZE"
+echo "Inference Steps: $NUM_INFERENCE_STEPS"
+echo "Use Heun Solver: $USE_HEUN"
 echo ""
 
 # Verify model exists
@@ -74,20 +95,22 @@ fi
 
 # Check for required model files
 MODEL_CONFIG="$MODEL_PATH/config.json"
-if [ ! -f "$MODEL_CONFIG" ]; then
-    echo "❌ Model config not found: $MODEL_CONFIG"
-    echo "Model directory contents:"
-    ls -la "$MODEL_PATH"
-    exit 1
-fi
-
-# Check for model weights
 MODEL_WEIGHTS_SAFETENSORS="$MODEL_PATH/model.safetensors"
 MODEL_WEIGHTS_BIN="$MODEL_PATH/pytorch_model.bin"
+CHECKPOINT_FILES="$MODEL_PATH/checkpoint_step_*.pt"
 
-if [ ! -f "$MODEL_WEIGHTS_SAFETENSORS" ] && [ ! -f "$MODEL_WEIGHTS_BIN" ]; then
-    echo "❌ No model weights found in: $MODEL_PATH"
-    echo "Expected: model.safetensors or pytorch_model.bin"
+# Check what format the model is in
+if [ -f "$MODEL_CONFIG" ] && ([ -f "$MODEL_WEIGHTS_SAFETENSORS" ] || [ -f "$MODEL_WEIGHTS_BIN" ]); then
+    echo "✅ HuggingFace format model detected"
+elif ls $CHECKPOINT_FILES 1> /dev/null 2>&1; then
+    echo "✅ Checkpoint format model detected"
+    LATEST_CHECKPOINT=$(ls -t $CHECKPOINT_FILES | head -1)
+    echo "   Latest checkpoint: $LATEST_CHECKPOINT"
+else
+    echo "❌ No valid model files found in: $MODEL_PATH"
+    echo "Expected:"
+    echo "  - HuggingFace format: config.json + (model.safetensors OR pytorch_model.bin)"
+    echo "  - Checkpoint format: checkpoint_step_*.pt"
     echo "Model directory contents:"
     ls -la "$MODEL_PATH"
     exit 1
@@ -95,167 +118,236 @@ fi
 
 echo "✅ Model verified: $MODEL_PATH"
 
-# Verify embeddings
-if [ ! -d "$EMBEDDINGS_DIR" ]; then
-    echo "❌ Embeddings not found: $EMBEDDINGS_DIR"
-    echo "Available embeddings:"
-    ls -la "/scratch-shared/azadaianchuk1/blip3o_workspace/embeddings/" 2>/dev/null
+# Check if COCO dataset exists
+if [ ! -d "$COCO_ROOT" ]; then
+    echo "❌ COCO dataset not found: $COCO_ROOT"
+    echo ""
+    echo "💡 To download COCO dataset:"
+    echo "   python src/data_hand/download_coco.py --coco_root $COCO_ROOT"
+    echo ""
+    echo "Or download manually:"
+    echo "   mkdir -p $COCO_ROOT"
+    echo "   # Download val2017.zip and annotations_trainval2017.zip"
+    echo "   # Extract to create $COCO_ROOT/images/val2017/ and $COCO_ROOT/annotations/"
     exit 1
 fi
 
-echo "✅ Embeddings verified: $EMBEDDINGS_DIR"
+# Verify COCO structure
+COCO_IMAGES="$COCO_ROOT/val2017/"
+COCO_ANNOTATIONS="$COCO_ROOT/annotations/captions_val2017.json"
+
+if [ ! -d "$COCO_IMAGES" ]; then
+    echo "❌ COCO images directory not found: $COCO_IMAGES"
+    exit 1
+fi
+
+if [ ! -f "$COCO_ANNOTATIONS" ]; then
+    echo "❌ COCO annotations file not found: $COCO_ANNOTATIONS"
+    exit 1
+fi
+
+# Count available images
+IMAGE_COUNT=$(find "$COCO_IMAGES" -name "*.jpg" | wc -l)
+echo "✅ COCO dataset verified:"
+echo "   Images directory: $COCO_IMAGES"
+echo "   Annotations file: $COCO_ANNOTATIONS"
+echo "   Available images: $IMAGE_COUNT"
+
+if [ $IMAGE_COUNT -eq 0 ]; then
+    echo "❌ No images found in COCO images directory"
+    exit 1
+fi
 
 # Verify evaluation script
-if [ ! -f "eval_blip3o_patch_similarity.py" ]; then
-    echo "❌ Evaluation script not found!"
+if [ ! -f "eval_blip3o_coco.py" ]; then
+    echo "❌ Evaluation script not found: eval_blip3o_coco.py"
+    echo "Please ensure the MS-COCO evaluation script is in the current directory"
     exit 1
 fi
 
 echo "✅ Evaluation script found"
 
-# Check if we have training info to compare against
-TRAINING_INFO="$MODEL_PATH/training_info.json"
-if [ -f "$TRAINING_INFO" ]; then
-    echo "✅ Training info found - will compare metrics"
-    COMPARE_FLAG="--compare_with_training"
+echo ""
+echo "🚀 Starting MS-COCO Evaluation..."
+echo "================================="
+echo "Task: Evaluate BLIP3-o model's ability to reproduce CLIP embeddings"
+echo "Method: Generate CLIP embeddings from EVA features and compare with ground truth"
+echo "Dataset: MS-COCO val2017 ($IMAGE_COUNT images available)"
+echo "Expected: Cosine similarity between generated and ground truth CLIP embeddings"
+echo ""
+
+# Launch MS-COCO evaluation
+if [ "$USE_HEUN" = true ]; then
+    HEUN_FLAG="--use_heun"
 else
-    echo "⚠️ No training info found - standalone evaluation"
-    COMPARE_FLAG=""
+    HEUN_FLAG=""
 fi
 
-echo ""
-echo "🚀 Starting Comprehensive Evaluation..."
-echo "======================================="
-echo "Goal: Verify that inference metrics match training metrics"
-echo "Expected: Overall cosine similarity should match final training values"
+# Build command
+EVAL_CMD="python eval_blip3o_coco.py \
+    --model_path \"$MODEL_PATH\" \
+    --coco_root \"$COCO_ROOT\" \
+    --output_dir \"$OUTPUT_DIR\" \
+    --batch_size $BATCH_SIZE \
+    --num_inference_steps $NUM_INFERENCE_STEPS \
+    --save_results \
+    --max_samples 1000 \
+    $HEUN_FLAG"
+
+# Add max_samples if specified
+if [ "$MAX_SAMPLES" != "null" ] && [ -n "$MAX_SAMPLES" ]; then
+    EVAL_CMD="$EVAL_CMD --max_samples $MAX_SAMPLES"
+fi
+
+echo "Executing: $EVAL_CMD"
 echo ""
 
-# Launch evaluation
-python eval_blip3o_patch_similarity.py \
-    --model_path "$MODEL_PATH" \
-    --chunked_embeddings_dir "$EMBEDDINGS_DIR" \
-    --output_dir "$OUTPUT_DIR" \
-    --training_mode auto \
-    --num_samples 5000 \
-    --batch_size 16 \
-    --num_inference_steps 50 \
-    --same_data_eval \
-    --normalize_embeddings \
-    --device auto \
-    --torch_dtype float32 \
-    $COMPARE_FLAG
+# Run evaluation
+eval $EVAL_CMD
 
 EVAL_EXIT_CODE=$?
 
 echo ""
 echo "========================================"
-echo "📊 Evaluation Results"
+echo "📊 MS-COCO Evaluation Results"
 echo "========================================"
 
 if [ $EVAL_EXIT_CODE -eq 0 ]; then
-    echo "✅ Evaluation completed successfully!"
+    echo "✅ MS-COCO evaluation completed successfully!"
     
     # Find and display results
-    RESULTS_FILE=$(find "$OUTPUT_DIR" -name "*results*.json" | head -1)
+    RESULTS_FILE="$OUTPUT_DIR/evaluation_results.json"
+    METRICS_FILE="$OUTPUT_DIR/metrics_summary.json"
+    PLOTS_FILE="$OUTPUT_DIR/evaluation_plots.png"
     
-    if [ -f "$RESULTS_FILE" ]; then
+    if [ -f "$METRICS_FILE" ]; then
         echo ""
         echo "📋 Results Summary:"
         echo "=================="
         
-        # Extract key metrics
+        # Extract key metrics using Python
         python -c "
 import json
+import sys
 try:
-    with open('$RESULTS_FILE', 'r') as f:
-        data = json.load(f)
+    with open('$METRICS_FILE', 'r') as f:
+        metrics = json.load(f)
     
-    if 'results_summary' in data:
-        r = data['results_summary']
-        print(f'🎯 Overall Embedding Similarity: {r.get(\"overall_embedding_similarity\", 0):.4f}')
-        print(f'📊 High Quality Images (>0.7): {r.get(\"high_quality_images_percentage\", 0):.1f}%')
-        print(f'📊 Very High Quality Images (>0.8): {r.get(\"very_high_quality_images_percentage\", 0):.1f}%')
-        print(f'📊 Excellent Quality Images (>0.9): {r.get(\"excellent_quality_images_percentage\", 0):.1f}%')
-        print(f'📈 Images Evaluated: {r.get(\"total_images\", 0):,}')
-        print(f'⏱️ Avg Generation Time: {r.get(\"avg_generation_time_per_batch\", 0):.2f}s per batch')
-        
-        # Assessment
-        sim = r.get('overall_embedding_similarity', 0)
-        if sim > 0.3:
-            print('🎉 EXCELLENT: Very high quality embeddings!')
-        elif sim > 0.2:
-            print('✅ VERY GOOD: High quality embeddings!')
-        elif sim > 0.1:
-            print('🔄 GOOD: Solid embedding quality!')
-        elif sim > 0.05:
-            print('📈 LEARNING: Shows clear improvement!')
-        else:
-            print('⚠️ NEEDS WORK: Low similarity')
+    print(f'🎯 Mean Cosine Similarity: {metrics.get(\"cosine_similarity_mean\", 0):.4f}')
+    print(f'📊 Median Cosine Similarity: {metrics.get(\"cosine_similarity_median\", 0):.4f}')
+    print(f'📊 Std Deviation: {metrics.get(\"cosine_similarity_std\", 0):.4f}')
+    print(f'📊 Min Similarity: {metrics.get(\"cosine_similarity_min\", 0):.4f}')
+    print(f'📊 Max Similarity: {metrics.get(\"cosine_similarity_max\", 0):.4f}')
+    print(f'')
+    print(f'🏆 Quality Distribution:')
+    print(f'   High Quality (>0.7): {metrics.get(\"high_quality_percentage\", 0):.1f}%')
+    print(f'   Very High Quality (>0.8): {metrics.get(\"very_high_quality_percentage\", 0):.1f}%')
+    print(f'   Excellent Quality (>0.9): {metrics.get(\"excellent_quality_percentage\", 0):.1f}%')
+    print(f'')
+    print(f'📊 Additional Metrics:')
+    print(f'   MSE Loss: {metrics.get(\"mse_loss\", 0):.6f}')
+    print(f'   L1 Loss: {metrics.get(\"l1_loss\", 0):.6f}')
+    print(f'   Token Similarity: {metrics.get(\"token_similarity_mean\", 0):.4f}')
+    print(f'   Samples Evaluated: {metrics.get(\"num_samples\", 0):,}')
+    print(f'   Evaluation Time: {metrics.get(\"evaluation_time_seconds\", 0):.1f} seconds')
+    print(f'   Samples/Second: {metrics.get(\"samples_per_second\", 0):.1f}')
     
-    # Check training comparison if available
-    if 'training_comparison' in data and data['training_comparison']:
-        print('')
-        print('🔍 Training vs Evaluation Comparison:')
-        print('====================================')
-        training_info = data['training_comparison']
-        
-        if 'final_results' in training_info:
-            final_results = training_info['final_results']
-            
-            if 'training_summary' in final_results:
-                training_summary = final_results['training_summary']
-                training_emb_sim = training_summary.get('best_embedding_sim', 0)
-                eval_emb_sim = r.get('overall_embedding_similarity', 0)
-                
-                print(f'📊 Training Best Embedding Sim: {training_emb_sim:.4f}')
-                print(f'📊 Evaluation Embedding Sim:    {eval_emb_sim:.4f}')
-                print(f'📊 Difference:                   {abs(eval_emb_sim - training_emb_sim):.4f}')
-                
-                if abs(eval_emb_sim - training_emb_sim) < 0.02:
-                    print('🎉 PERFECT: Training and evaluation metrics match!')
-                elif abs(eval_emb_sim - training_emb_sim) < 0.05:
-                    print('✅ GOOD: Training and evaluation metrics are close')
-                else:
-                    print('⚠️ CONCERN: Training and evaluation metrics differ significantly')
-        
+    # Performance assessment
+    mean_sim = metrics.get('cosine_similarity_mean', 0)
+    if mean_sim > 0.8:
+        print(f'\\n🎉 ASSESSMENT: EXCELLENT performance!')
+        print(f'   The model shows outstanding CLIP reproduction capability.')
+    elif mean_sim > 0.6:
+        print(f'\\n✅ ASSESSMENT: VERY GOOD performance!')
+        print(f'   The model demonstrates strong CLIP reproduction.')
+    elif mean_sim > 0.4:
+        print(f'\\n👍 ASSESSMENT: GOOD performance!')
+        print(f'   The model shows solid CLIP reproduction capability.')
+    elif mean_sim > 0.2:
+        print(f'\\n📈 ASSESSMENT: FAIR performance!')
+        print(f'   The model shows decent reproduction with room for improvement.')
     else:
-        print('')
-        print('ℹ️ No training comparison available')
-            
+        print(f'\\n⚠️ ASSESSMENT: Needs improvement.')
+        print(f'   Consider training adjustments or architecture modifications.')
+    
+    # Denormalization status
+    if metrics.get('denormalized', False):
+        print(f'\\n✅ CLIP denormalization was successfully applied.')
+    else:
+        print(f'\\n⚠️ CLIP denormalization was not applied - results may not reflect true performance.')
+        
 except Exception as e:
     print(f'Could not parse results: {e}')
+    sys.exit(1)
 "
         
         echo ""
         echo "📁 Results saved to: $OUTPUT_DIR"
-        echo "📄 Full results: $RESULTS_FILE"
+        if [ -f "$RESULTS_FILE" ]; then
+            echo "📄 Full results: $RESULTS_FILE"
+        fi
+        if [ -f "$PLOTS_FILE" ]; then
+            echo "📊 Visualizations: $PLOTS_FILE"
+        fi
     else
-        echo "⚠️ No results file found"
+        echo "⚠️ No metrics file found"
+        echo "Checking output directory contents:"
+        ls -la "$OUTPUT_DIR" 2>/dev/null || echo "Output directory not found"
     fi
     
     echo ""
-    echo "🎯 Interpretation:"
-    echo "=================="
-    echo "• If metrics match training: Implementation is correct ✅"
-    echo "• If metrics differ significantly: Check implementation ⚠️"
-    echo "• Overall similarity >0.1: Model is learning properly 📈"
-    echo "• Overall similarity >0.3: Excellent performance 🎉"
+    echo "🎯 Interpretation Guide:"
+    echo "======================"
+    echo "• Cosine Similarity Range: [-1, 1], higher is better"
+    echo "• >0.8: Excellent CLIP reproduction"
+    echo "• >0.6: Very good CLIP reproduction"
+    echo "• >0.4: Good CLIP reproduction"
+    echo "• >0.2: Fair CLIP reproduction"
+    echo "• <0.2: Needs improvement"
+    echo ""
+    echo "📊 Quality Thresholds:"
+    echo "• High Quality (>0.7): Images with strong semantic alignment"
+    echo "• Very High Quality (>0.8): Images with very strong alignment"
+    echo "• Excellent Quality (>0.9): Images with near-perfect alignment"
     
     echo ""
-    echo "✅ SUCCESS: Evaluation completed!"
+    echo "✅ SUCCESS: MS-COCO evaluation completed!"
     
 else
     echo "❌ FAILED: Evaluation exit code $EVAL_EXIT_CODE"
     echo ""
     echo "💡 Troubleshooting:"
-    echo "  • Check log files in ./slurm_out/"
-    echo "  • Verify model and embeddings paths"
-    echo "  • Try smaller batch size: --batch_size 8"
-    echo "  • Try fewer samples: --num_samples 1000"
+    echo "==================="
+    echo "• Check log files in ./slurm_out/ for detailed error messages"
+    echo "• Verify model path and format:"
+    echo "  - HuggingFace: config.json + model weights"
+    echo "  - Checkpoint: checkpoint_step_*.pt files"
+    echo "• Ensure COCO dataset is properly downloaded and extracted"
+    echo "• Check GPU memory usage - try smaller batch size if OOM"
+    echo "• Verify all required Python packages are installed"
+    echo ""
+    echo "🔧 Quick fixes:"
+    echo "• Reduce batch size: --batch_size 4"
+    echo "• Reduce samples: --max_samples 100"
+    echo "• Check model compatibility with current codebase"
 fi
 
 echo ""
 echo "🏁 Job completed at $(date)"
+echo "========================================"
+
+# Show final resource usage
+echo ""
+echo "📊 GPU Resource Usage Summary:"
+nvidia-smi --query-gpu=name,memory.total,memory.used,utilization.gpu --format=csv,noheader,nounits | \
+    awk 'BEGIN{print "GPU | Total Memory | Used Memory | Utilization"} {printf "%s | %s MB | %s MB | %s%%\n", $1, $2, $3, $4}'
+
+echo ""
+echo "📚 MS-COCO EVALUATION SUMMARY:"
+echo "This job evaluates the trained BLIP3-o model on MS-COCO val2017 dataset."
+echo "It measures how well the model can reproduce CLIP embeddings from EVA embeddings."
+echo "The primary metric is cosine similarity between generated and ground truth CLIP embeddings."
+echo "Results include quality distribution, statistical analysis, and visualizations."
 echo "========================================"
 
 exit $EVAL_EXIT_CODE
