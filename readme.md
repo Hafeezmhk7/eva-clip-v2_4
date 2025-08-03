@@ -192,14 +192,14 @@ Where `c` is the EVA conditioning.
 
 ```mermaid
 graph LR
-    flowchart TD
-    A["Start: Random Noise (ε ~ N(0, I))"]
-    A --> B["Initial t = 1.0"]
-    B --> C["Compute velocity: v_θ(xₜ, t)"]
-    C --> D["Heun's Method Step"]
-    D --> E["Update t (Decreasing Schedule)"]
-    E --> F["Repeat until t = 0.0"]
-    F --> G["Final Output: x₀ (CLIP 1024-d)"]
+    subgraph "Inference"
+        A["Start: Random Noise (ε ~ N(0, I))"]
+        A --> B["Initial t = 1.0"]
+        B --> C["Compute velocity: v_θ(xₜ, t)"]
+        C --> D["Heun's Method Step"]
+        D --> E["Update t (Decreasing Schedule)"]
+        E --> F["Repeat until t = 0.0"]
+        F --> G["Final Output: x₀ (CLIP 1024-d)"]
 
 ```
 
