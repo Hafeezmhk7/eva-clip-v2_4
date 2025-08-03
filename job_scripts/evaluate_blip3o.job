@@ -25,12 +25,12 @@ source activate eva_clip_env
 # Configuration
 STANDARD_EMBEDDINGS_BASE="/scratch-shared/azadaianchuk1/blip3o_workspace/embeddings"
 COCO_EMBEDDINGS_FILE="${STANDARD_EMBEDDINGS_BASE}/coco_embeddings/coco_embeddings_consolidated.pkl"
-MODEL_PATH="/home/azadaianchuk1/eva-clip-v6_2//checkpoints/blip3o_no_norm_20250803_143845"
+MODEL_PATH="/home/azadaianchuk1/eva-clip-v2_3/checkpoints/blip3o_no_norm_20250803_151326"
 OUTPUT_DIR="./coco_eval_$(date +%Y%m%d_%H%M%S)"
 
 # Parameters
 MAX_SAMPLES=1000
-BATCH_SIZE=8
+BATCH_SIZE=64
 NUM_INFERENCE_STEPS=50
 
 # Parse arguments
