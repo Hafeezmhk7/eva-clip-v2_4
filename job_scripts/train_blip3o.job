@@ -50,11 +50,11 @@ TRAINING_MODE="patch_only"
 MODEL_SIZE="base"
 
 # Training hyperparameters
-NUM_EPOCHS=15
+NUM_EPOCHS=10
 BATCH_SIZE=128
-LEARNING_RATE=1e-5
-WEIGHT_DECAY=0.01
-WARMUP_STEPS=100
+LEARNING_RATE=4e-5
+WEIGHT_DECAY=0.04
+WARMUP_STEPS=300
 MAX_GRAD_NORM=1.0
 
 # Loss weights (same as before)
@@ -67,12 +67,12 @@ CONSISTENCY_WEIGHT=0.3
 SIMPLE_SCALE_FACTOR=1.0  # Can be adjusted if needed
 
 # Evaluation parameters
-EVAL_EVERY_N_STEPS=50
+EVAL_EVERY_N_STEPS=500
 EVAL_NUM_SAMPLES=100
 EVAL_INFERENCE_STEPS=50
 
 # Data configuration
-MAX_SHARDS=3
+MAX_SHARDS=35
 
 # Create output directory
 mkdir -p "${OUTPUT_DIR}"

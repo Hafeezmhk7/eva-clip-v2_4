@@ -121,7 +121,7 @@ def parse_arguments():
                        help="Enable WandB logging")
     parser.add_argument("--wandb_project", type=str, default="blip3o-clip-no-norm",
                        help="WandB project name")
-    parser.add_argument("--wandb_run_name", type=str, default="3shard_sf1",
+    parser.add_argument("--wandb_run_name", type=str, default="35shard_sf1",
                        help="WandB run name")
     
     return parser.parse_args()
