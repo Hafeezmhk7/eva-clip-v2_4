@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=blip3o_coco_eval
+#SBATCH --job-name=blip3o_coco_eval_training_stats
 #SBATCH --partition=gpu_h100
 #SBATCH --nodes=1
 #SBATCH --gpus=1
@@ -7,21 +7,21 @@
 #SBATCH --cpus-per-task=16
 #SBATCH --time=4:00:00
 #SBATCH --mem=64G
-#SBATCH --output=./slurm_out/blip3o_coco_eval_%j.out
-#SBATCH --error=./slurm_out/blip3o_coco_eval_%j.err
+#SBATCH --output=./slurm_out/blip3o_coco_eval_training_stats_%j.out
+#SBATCH --error=./slurm_out/blip3o_coco_eval_training_stats_%j.err
 
 # =============================================================================
-# BLIP3-o MS-COCO Evaluation - Comprehensive Model Assessment
-# Evaluates trained model on MS-COCO val2017 dataset for CLIP reproduction
+# BLIP3-o MS-COCO Evaluation with Training Statistics Integration
+# Evaluates trained model using EXACT training normalization statistics
 # =============================================================================
 
-echo "🔬 BLIP3-o MS-COCO Comprehensive Evaluation"
-echo "==========================================="
+echo "🔬 BLIP3-o MS-COCO Evaluation with Training Statistics Integration"
+echo "=================================================================="
 echo "Job ID: ${SLURM_JOB_ID}"
 echo "Node: $(hostname)"
 echo "Time: $(date)"
 echo "GPU: $(nvidia-smi --query-gpu=name --format=csv,noheader,nounits | head -1)"
-echo "==========================================="
+echo "=================================================================="
 
 cd $SLURM_SUBMIT_DIR
 
@@ -32,14 +32,16 @@ module load Miniconda3/24.7.1-0
 module load CUDA/12.6.0
 source activate eva_clip_env
 
-# Configuration
+# Configuration based on training setup
 MODEL_PATH="/home/azadaianchuk1/eva-clip-v6_2/checkpoints/blip3o_clean_20250803_015324"
-# /home/azadaianchuk1/eva-clip-v6_2/checkpoints/blip3o_clean_20250803_015324
 COCO_ROOT="./data/coco"
-OUTPUT_DIR="./coco_eval_results_$(date +%Y%m%d_%H%M%S)"
-MAX_SAMPLES=1000  # Evaluate on subset for faster testing, set to null for full dataset
+OUTPUT_DIR="./coco_eval_training_stats_$(date +%Y%m%d_%H%M%S)"
 
-# Evaluation parameters
+# 🔥 CRITICAL: Training embeddings directory (from training logs)
+TRAINING_EMBEDDINGS_DIR="/scratch-shared/azadaianchuk1/blip3o_workspace/embeddings/patch_only_256_tokens"
+
+# Evaluation parameters (matching training setup)
+MAX_SAMPLES=1000  # Evaluate on subset for faster testing
 BATCH_SIZE=8
 NUM_INFERENCE_STEPS=50
 USE_HEUN=true
@@ -56,7 +58,7 @@ else
         MODEL_PATH=$(find ./checkpoints -name "*blip3o*" -type d | sort | tail -1)
         if [ -z "$MODEL_PATH" ]; then
             echo "❌ No model found! Please provide model path as argument."
-            echo "Usage: sbatch job_scripts/evaluate_blip3o_coco.job <model_path>"
+            echo "Usage: sbatch job_scripts/evaluate_blip3o_coco_training_stats.job <model_path>"
             exit 1
         fi
         echo "📂 Found model: $MODEL_PATH"
@@ -69,20 +71,33 @@ if [ -n "$2" ]; then
     echo "📂 Using provided COCO root: $COCO_ROOT"
 fi
 
+# Training embeddings dir can be provided as third argument
+if [ -n "$3" ]; then
+    TRAINING_EMBEDDINGS_DIR="$3"
+    echo "📂 Using provided training embeddings dir: $TRAINING_EMBEDDINGS_DIR"
+fi
+
 # Create output directory
 mkdir -p "${OUTPUT_DIR}"
 mkdir -p ./slurm_out
 
 echo ""
-echo "⚙️ MS-COCO Evaluation Configuration:"
-echo "===================================="
+echo "⚙️ MS-COCO Evaluation Configuration (Training Statistics Integration):"
+echo "======================================================================="
 echo "Model: $MODEL_PATH"
 echo "COCO Root: $COCO_ROOT"
+echo "Training Embeddings: $TRAINING_EMBEDDINGS_DIR"
 echo "Output: $OUTPUT_DIR"
 echo "Max Samples: $MAX_SAMPLES"
 echo "Batch Size: $BATCH_SIZE"
 echo "Inference Steps: $NUM_INFERENCE_STEPS"
 echo "Use Heun Solver: $USE_HEUN"
+echo ""
+echo "🔥 Training Statistics Integration:"
+echo "   Source: patch_only_256_tokens embeddings"
+echo "   Method: Ultra-conservative percentile-based"
+echo "   Scale factor: 1.5"
+echo "   Expected similarity: ~0.912 (training reference)"
 echo ""
 
 # Verify model exists
@@ -118,7 +133,46 @@ fi
 
 echo "✅ Model verified: $MODEL_PATH"
 
+# 🔥 CRITICAL: Verify training embeddings directory exists
+echo ""
+echo "🔍 Verifying training embeddings directory..."
+if [ ! -d "$TRAINING_EMBEDDINGS_DIR" ]; then
+    echo "❌ Training embeddings directory not found: $TRAINING_EMBEDDINGS_DIR"
+    echo ""
+    echo "⚠️ IMPORTANT: Training embeddings are needed for accurate normalization!"
+    echo ""
+    echo "Expected structure:"
+    echo "  $TRAINING_EMBEDDINGS_DIR/"
+    echo "  ├── embeddings_shard_00000_patch_only.pkl"
+    echo "  ├── embeddings_shard_00001_patch_only.pkl"
+    echo "  └── ..."
+    echo ""
+    echo "Options:"
+    echo "  1. Provide correct path as 3rd argument"
+    echo "  2. Evaluation will use approximate fallback normalization"
+    echo ""
+    echo "⚠️ Proceeding with fallback - results may not be fully accurate"
+    TRAINING_EMBEDDINGS_STATUS="❌ NOT FOUND (using fallback)"
+else
+    # Check for .pkl files
+    PKL_COUNT=$(find "$TRAINING_EMBEDDINGS_DIR" -name "*.pkl" | wc -l)
+    if [ $PKL_COUNT -eq 0 ]; then
+        echo "❌ No .pkl files found in training embeddings directory"
+        echo "Directory contents:"
+        ls -la "$TRAINING_EMBEDDINGS_DIR"
+        TRAINING_EMBEDDINGS_STATUS="❌ NO FILES (using fallback)"
+    else
+        echo "✅ Training embeddings directory verified:"
+        echo "   Directory: $TRAINING_EMBEDDINGS_DIR"
+        echo "   Found: $PKL_COUNT .pkl files"
+        echo "   📊 Will recompute EXACT training statistics"
+        TRAINING_EMBEDDINGS_STATUS="✅ AVAILABLE (exact statistics)"
+    fi
+fi
+
 # Check if COCO dataset exists
+echo ""
+echo "🔍 Verifying COCO dataset..."
 if [ ! -d "$COCO_ROOT" ]; then
     echo "❌ COCO dataset not found: $COCO_ROOT"
     echo ""
@@ -168,30 +222,37 @@ fi
 echo "✅ Evaluation script found"
 
 echo ""
-echo "🚀 Starting MS-COCO Evaluation..."
-echo "================================="
-echo "Task: Evaluate BLIP3-o model's ability to reproduce CLIP embeddings"
-echo "Method: Generate CLIP embeddings from EVA features and compare with ground truth"
+echo "🚀 Starting MS-COCO Evaluation with Training Statistics Integration..."
+echo "====================================================================="
+echo "🎯 Objective: Evaluate model using EXACT training normalization"
+echo "📊 Method: Reproduce training evaluation conditions exactly"
+echo "🔥 Key Features:"
+echo "   • Same CLIP normalizer statistics as training"
+echo "   • Same denormalization process"
+echo "   • Same generation method (Heun's solver)"
+echo "   • Same metrics computation"
+echo "   • Training reference comparison"
+echo ""
 echo "Dataset: MS-COCO val2017 ($IMAGE_COUNT images available)"
-echo "Expected: Cosine similarity between generated and ground truth CLIP embeddings"
+echo "Training Embeddings: $TRAINING_EMBEDDINGS_STATUS"
+echo "Expected Training Similarity: ~0.912 (91.2%)"
 echo ""
 
-# Launch MS-COCO evaluation
+# Build evaluation command with training statistics integration
 if [ "$USE_HEUN" = true ]; then
     HEUN_FLAG="--use_heun"
 else
     HEUN_FLAG=""
 fi
 
-# Build command
 EVAL_CMD="python eval_blip3o_coco.py \
     --model_path \"$MODEL_PATH\" \
     --coco_root \"$COCO_ROOT\" \
+    --training_embeddings_dir \"$TRAINING_EMBEDDINGS_DIR\" \
     --output_dir \"$OUTPUT_DIR\" \
     --batch_size $BATCH_SIZE \
     --num_inference_steps $NUM_INFERENCE_STEPS \
     --save_results \
-    --max_samples 1000 \
     $HEUN_FLAG"
 
 # Add max_samples if specified
@@ -208,24 +269,24 @@ eval $EVAL_CMD
 EVAL_EXIT_CODE=$?
 
 echo ""
-echo "========================================"
-echo "📊 MS-COCO Evaluation Results"
-echo "========================================"
+echo "=================================================================="
+echo "📊 MS-COCO Evaluation Results (Training Statistics Integration)"
+echo "=================================================================="
 
 if [ $EVAL_EXIT_CODE -eq 0 ]; then
     echo "✅ MS-COCO evaluation completed successfully!"
     
     # Find and display results
-    RESULTS_FILE="$OUTPUT_DIR/evaluation_results.json"
-    METRICS_FILE="$OUTPUT_DIR/metrics_summary.json"
-    PLOTS_FILE="$OUTPUT_DIR/evaluation_plots.png"
+    RESULTS_FILE="$OUTPUT_DIR/coco_evaluation_training_integrated.json"
+    METRICS_FILE="$OUTPUT_DIR/coco_metrics_training_integrated.json"
+    PLOTS_FILE="$OUTPUT_DIR/coco_evaluation_training_integrated.png"
     
     if [ -f "$METRICS_FILE" ]; then
         echo ""
-        echo "📋 Results Summary:"
-        echo "=================="
+        echo "📋 Results Summary (Training Statistics Integration):"
+        echo "==================================================="
         
-        # Extract key metrics using Python
+        # Extract key metrics using Python with training comparison
         python -c "
 import json
 import sys
@@ -233,48 +294,75 @@ try:
     with open('$METRICS_FILE', 'r') as f:
         metrics = json.load(f)
     
-    print(f'🎯 Mean Cosine Similarity: {metrics.get(\"cosine_similarity_mean\", 0):.4f}')
-    print(f'📊 Median Cosine Similarity: {metrics.get(\"cosine_similarity_median\", 0):.4f}')
-    print(f'📊 Std Deviation: {metrics.get(\"cosine_similarity_std\", 0):.4f}')
-    print(f'📊 Min Similarity: {metrics.get(\"cosine_similarity_min\", 0):.4f}')
-    print(f'📊 Max Similarity: {metrics.get(\"cosine_similarity_max\", 0):.4f}')
+    # Main results
+    current_sim = metrics.get('eval_clip_similarity', 0)
+    training_ref = 0.912  # From training logs
+    diff_pct = ((current_sim - training_ref) / training_ref) * 100 if training_ref > 0 else 0
+    
+    print(f'🎯 Current CLIP Similarity: {current_sim:.4f}')
+    print(f'📚 Training Reference: {training_ref:.4f}')
+    print(f'📊 Difference: {diff_pct:+.1f}%')
+    
+    # Status assessment
+    if abs(diff_pct) < 5:
+        print(f'✅ STATUS: Very close to training performance!')
+    elif abs(diff_pct) < 15:
+        print(f'📊 STATUS: Reasonably close to training performance')
+    else:
+        print(f'⚠️ STATUS: Significant difference from training')
+    
+    print(f'')
+    print(f'🔥 Training Integration Status:')
+    training_stats = metrics.get('training_statistics_applied', False)
+    denorm_applied = metrics.get('denormalization_applied', False)
+    print(f'   Training Statistics: {\"✅ APPLIED\" if training_stats else \"❌ NOT APPLIED\"}')
+    print(f'   Denormalization: {\"✅ APPLIED\" if denorm_applied else \"❌ NOT APPLIED\"}')
+    print(f'   Primary Metrics: {metrics.get(\"primary_metrics_source\", \"unknown\")} space')
+    
+    if 'denorm_clip_similarity' in metrics and 'norm_clip_similarity' in metrics:
+        denorm_sim = metrics['denorm_clip_similarity']
+        norm_sim = metrics['norm_clip_similarity']
+        print(f'')
+        print(f'🔄 Normalized vs Denormalized:')
+        print(f'   Normalized (model space): {norm_sim:.4f}')
+        print(f'   Denormalized (training space): {denorm_sim:.4f}')
+        print(f'   📊 Training-comparable: {denorm_sim:.4f}')
+    
     print(f'')
     print(f'🏆 Quality Distribution:')
-    print(f'   High Quality (>0.7): {metrics.get(\"high_quality_percentage\", 0):.1f}%')
-    print(f'   Very High Quality (>0.8): {metrics.get(\"very_high_quality_percentage\", 0):.1f}%')
-    print(f'   Excellent Quality (>0.9): {metrics.get(\"excellent_quality_percentage\", 0):.1f}%')
+    print(f'   High Quality (>0.7): {metrics.get(\"eval_high_quality\", 0)*100:.1f}%')
+    print(f'   Very High Quality (>0.8): {metrics.get(\"eval_very_high_quality\", 0)*100:.1f}%')
+    print(f'   Excellent Quality (>0.9): {metrics.get(\"eval_excellent_quality\", 0)*100:.1f}%')
+    
     print(f'')
-    print(f'📊 Additional Metrics:')
-    print(f'   MSE Loss: {metrics.get(\"mse_loss\", 0):.6f}')
-    print(f'   L1 Loss: {metrics.get(\"l1_loss\", 0):.6f}')
-    print(f'   Token Similarity: {metrics.get(\"token_similarity_mean\", 0):.4f}')
-    print(f'   Samples Evaluated: {metrics.get(\"num_samples\", 0):,}')
+    print(f'📊 Evaluation Details:')
+    print(f'   Samples Evaluated: {metrics.get(\"eval_samples\", 0):,}')
+    print(f'   Success Rate: {metrics.get(\"eval_success_rate\", 0)*100:.1f}%')
     print(f'   Evaluation Time: {metrics.get(\"evaluation_time_seconds\", 0):.1f} seconds')
-    print(f'   Samples/Second: {metrics.get(\"samples_per_second\", 0):.1f}')
+    print(f'   Inference Steps: {metrics.get(\"inference_steps\", 0)}')
+    print(f'   Solver: {\"Heun\" if metrics.get(\"use_heun_solver\", False) else \"Euler\"}')
     
-    # Performance assessment
-    mean_sim = metrics.get('cosine_similarity_mean', 0)
-    if mean_sim > 0.8:
-        print(f'\\n🎉 ASSESSMENT: EXCELLENT performance!')
-        print(f'   The model shows outstanding CLIP reproduction capability.')
-    elif mean_sim > 0.6:
-        print(f'\\n✅ ASSESSMENT: VERY GOOD performance!')
-        print(f'   The model demonstrates strong CLIP reproduction.')
-    elif mean_sim > 0.4:
-        print(f'\\n👍 ASSESSMENT: GOOD performance!')
-        print(f'   The model shows solid CLIP reproduction capability.')
-    elif mean_sim > 0.2:
-        print(f'\\n📈 ASSESSMENT: FAIR performance!')
-        print(f'   The model shows decent reproduction with room for improvement.')
-    else:
-        print(f'\\n⚠️ ASSESSMENT: Needs improvement.')
-        print(f'   Consider training adjustments or architecture modifications.')
+    # Training embeddings source info
+    training_source = metrics.get('training_embeddings_source', 'unknown')
+    print(f'')
+    print(f'📂 Training Statistics Source:')
+    print(f'   Directory: {training_source}')
     
-    # Denormalization status
-    if metrics.get('denormalized', False):
-        print(f'\\n✅ CLIP denormalization was successfully applied.')
+    # Performance assessment based on training comparison
+    print(f'')
+    if training_stats and denorm_applied:
+        if abs(diff_pct) < 5:
+            print(f'🎉 ASSESSMENT: EXCELLENT - Evaluation successfully replicates training!')
+            print(f'   The model performs very similarly to training conditions.')
+        elif abs(diff_pct) < 15:
+            print(f'✅ ASSESSMENT: GOOD - Close to training performance')
+            print(f'   Small differences likely due to dataset or evaluation differences.')
+        else:
+            print(f'⚠️ ASSESSMENT: INVESTIGATION NEEDED - Significant difference')
+            print(f'   Check model compatibility or normalization issues.')
     else:
-        print(f'\\n⚠️ CLIP denormalization was not applied - results may not reflect true performance.')
+        print(f'⚠️ ASSESSMENT: Incomplete training integration')
+        print(f'   Results may not be fully comparable to training performance.')
         
 except Exception as e:
     print(f'Could not parse results: {e}')
@@ -296,45 +384,50 @@ except Exception as e:
     fi
     
     echo ""
-    echo "🎯 Interpretation Guide:"
-    echo "======================"
-    echo "• Cosine Similarity Range: [-1, 1], higher is better"
-    echo "• >0.8: Excellent CLIP reproduction"
-    echo "• >0.6: Very good CLIP reproduction"
-    echo "• >0.4: Good CLIP reproduction"
-    echo "• >0.2: Fair CLIP reproduction"
-    echo "• <0.2: Needs improvement"
+    echo "🎯 Training Statistics Integration Guide:"
+    echo "========================================"
+    echo "• Training Reference: 0.912 (91.2% CLIP similarity from training)"
+    echo "• Expected Range: 0.85-0.95 (close to training)"
+    echo "• Normalization: Ultra-conservative (scale 1.5, percentile-based)"
+    echo "• Denormalization: Required for training-comparable metrics"
     echo ""
-    echo "📊 Quality Thresholds:"
-    echo "• High Quality (>0.7): Images with strong semantic alignment"
-    echo "• Very High Quality (>0.8): Images with very strong alignment"
-    echo "• Excellent Quality (>0.9): Images with near-perfect alignment"
+    echo "📊 Quality Interpretation:"
+    echo "• >0.9: Excellent reproduction (matching training quality)"
+    echo "• 0.8-0.9: Very good reproduction"
+    echo "• 0.7-0.8: Good reproduction"
+    echo "• <0.7: May indicate issues with model or normalization"
     
     echo ""
-    echo "✅ SUCCESS: MS-COCO evaluation completed!"
+    echo "✅ SUCCESS: MS-COCO evaluation with training statistics integration completed!"
     
 else
     echo "❌ FAILED: Evaluation exit code $EVAL_EXIT_CODE"
     echo ""
-    echo "💡 Troubleshooting:"
-    echo "==================="
+    echo "💡 Troubleshooting (Training Statistics Integration):"
+    echo "=================================================="
     echo "• Check log files in ./slurm_out/ for detailed error messages"
-    echo "• Verify model path and format:"
-    echo "  - HuggingFace: config.json + model weights"
-    echo "  - Checkpoint: checkpoint_step_*.pt files"
-    echo "• Ensure COCO dataset is properly downloaded and extracted"
-    echo "• Check GPU memory usage - try smaller batch size if OOM"
-    echo "• Verify all required Python packages are installed"
+    echo "• Verify model path and checkpoint format compatibility"
+    echo "• Ensure training embeddings directory is accessible:"
+    echo "  - Path: $TRAINING_EMBEDDINGS_DIR"
+    echo "  - Should contain: *.pkl files from training"
+    echo "• Check COCO dataset structure"
+    echo "• Verify GPU memory - try smaller batch size if OOM"
     echo ""
     echo "🔧 Quick fixes:"
     echo "• Reduce batch size: --batch_size 4"
     echo "• Reduce samples: --max_samples 100"
-    echo "• Check model compatibility with current codebase"
+    echo "• Check training embeddings path:"
+    echo "  sbatch this_script.job <model_path> <coco_root> <training_embeddings_dir>"
+    echo ""
+    echo "🔥 Training Statistics Issues:"
+    echo "• If training embeddings not found, evaluation will use fallback normalization"
+    echo "• Results may not be fully comparable to training without exact statistics"
+    echo "• Ensure the training embeddings directory from training is accessible"
 fi
 
 echo ""
 echo "🏁 Job completed at $(date)"
-echo "========================================"
+echo "=================================================================="
 
 # Show final resource usage
 echo ""
@@ -343,11 +436,15 @@ nvidia-smi --query-gpu=name,memory.total,memory.used,utilization.gpu --format=cs
     awk 'BEGIN{print "GPU | Total Memory | Used Memory | Utilization"} {printf "%s | %s MB | %s MB | %s%%\n", $1, $2, $3, $4}'
 
 echo ""
-echo "📚 MS-COCO EVALUATION SUMMARY:"
-echo "This job evaluates the trained BLIP3-o model on MS-COCO val2017 dataset."
-echo "It measures how well the model can reproduce CLIP embeddings from EVA embeddings."
-echo "The primary metric is cosine similarity between generated and ground truth CLIP embeddings."
-echo "Results include quality distribution, statistical analysis, and visualizations."
-echo "========================================"
+echo "📚 EVALUATION SUMMARY (Training Statistics Integration):"
+echo "This evaluation integrates with the EXACT training normalization statistics."
+echo "It reproduces the training evaluation conditions to provide comparable results."
+echo "Key features:"
+echo "  • Training CLIP normalizer statistics (percentile-based, scale 1.5)"
+echo "  • Same denormalization process as training"
+echo "  • Training reference comparison (0.912 similarity)"
+echo "  • Enhanced error handling and fallback mechanisms"
+echo "Results should be directly comparable to training performance metrics."
+echo "=================================================================="
 
 exit $EVAL_EXIT_CODE
