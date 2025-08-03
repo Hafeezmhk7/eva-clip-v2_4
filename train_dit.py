@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-BLIP3-o Training Script WITHOUT CLIP Normalization
+BLIP3-o Training Script WITHOUT CLIP Normalization - Updated with Temp Directory Support
 train_dit.py
 
 CHANGES:
@@ -8,6 +8,7 @@ CHANGES:
 2. Works directly with raw CLIP embeddings
 3. Simplified training pipeline without normalization concerns
 4. Optional simple scaling factor (data-independent)
+5. UPDATED: Automatic temp directory detection and checkpoint management
 
 Usage:
     python train_dit.py --chunked_embeddings_dir /path/to/embeddings --output_dir ./checkpoints_no_norm
@@ -39,10 +40,51 @@ def setup_logging():
     )
     return logging.getLogger(__name__)
 
+def detect_temp_checkpoint_directory():
+    """Detect if temp checkpoint directory is available"""
+    # Check for the specific path mentioned by the user
+    user_temp_path = Path("/scratch-shared/azadaianchuk1/blip3o_workspace/checkpoints")
+    if user_temp_path.exists():
+        return str(user_temp_path)
+    
+    # Check environment variables for temp directories
+    temp_paths_to_check = [
+        os.environ.get("BLIP3O_CHECKPOINTS"),
+        os.environ.get("BLIP3O_WORKSPACE", "").rstrip("/") + "/checkpoints" if os.environ.get("BLIP3O_WORKSPACE") else "",
+        os.environ.get("SCRATCH_SHARED", "").rstrip("/") + f"/{os.environ.get('USER', 'user')}/blip3o_workspace/checkpoints" if os.environ.get("SCRATCH_SHARED") else "",
+    ]
+    
+    # Try to create temp directory in scratch locations
+    scratch_locations = [
+        "/scratch-shared",
+        "/scratch-local", 
+        "/scratch",
+        os.environ.get("TMPDIR", ""),
+    ]
+    
+    user = os.environ.get("USER", "user")
+    job_id = os.environ.get("SLURM_JOB_ID", "local")
+    
+    for base_path in scratch_locations:
+        if base_path and Path(base_path).exists():
+            temp_checkpoint_path = Path(base_path) / user / "blip3o_workspace" / "checkpoints"
+            try:
+                temp_checkpoint_path.mkdir(parents=True, exist_ok=True)
+                return str(temp_checkpoint_path)
+            except (PermissionError, OSError):
+                continue
+    
+    # Check existing paths
+    for temp_path in temp_paths_to_check:
+        if temp_path and Path(temp_path).exists():
+            return temp_path
+    
+    return None
+
 def parse_arguments():
     """Parse command line arguments"""
     parser = argparse.ArgumentParser(
-        description="BLIP3-o CLIP Reproduction Training (NO NORMALIZATION)",
+        description="BLIP3-o CLIP Reproduction Training (NO NORMALIZATION) - Updated with Temp Directory Support",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
     
@@ -50,7 +92,17 @@ def parse_arguments():
     parser.add_argument("--chunked_embeddings_dir", type=str, required=True,
                        help="Path to chunked embeddings directory")
     parser.add_argument("--output_dir", type=str, required=True,
-                       help="Output directory for checkpoints")
+                       help="Output directory for checkpoints (local)")
+    
+    # NEW: Temp directory support
+    parser.add_argument("--temp_checkpoint_dir", type=str, default=None,
+                       help="Temp directory for checkpoints (auto-detected if not specified)")
+    parser.add_argument("--auto_detect_temp_dir", action="store_true", default=True,
+                       help="Automatically detect temp checkpoint directory")
+    parser.add_argument("--keep_local_checkpoints", type=int, default=3,
+                       help="Number of checkpoints to keep locally")
+    parser.add_argument("--save_to_temp_every_n_steps", type=int, default=1000,
+                       help="Save to temp directory every N steps")
     
     # Model configuration
     parser.add_argument("--model_size", type=str, default="base",
@@ -245,6 +297,43 @@ def check_environment(logger):
     
     return len(missing_modules) == 0
 
+def setup_checkpoint_directories(args, logger):
+    """Setup checkpoint directories with temp directory support"""
+    # Create local output directory
+    output_dir = Path(args.output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    logger.info(f"✅ Local checkpoint directory: {output_dir}")
+    
+    # Setup temp directory
+    temp_checkpoint_dir = None
+    
+    if args.temp_checkpoint_dir:
+        # Use explicitly provided temp directory
+        temp_checkpoint_dir = args.temp_checkpoint_dir
+        logger.info(f"📁 Using provided temp directory: {temp_checkpoint_dir}")
+    elif args.auto_detect_temp_dir:
+        # Auto-detect temp directory
+        temp_checkpoint_dir = detect_temp_checkpoint_directory()
+        if temp_checkpoint_dir:
+            logger.info(f"🔍 Auto-detected temp directory: {temp_checkpoint_dir}")
+        else:
+            logger.info("⚠️ No temp directory detected - using local only")
+    
+    if temp_checkpoint_dir:
+        temp_path = Path(temp_checkpoint_dir)
+        try:
+            temp_path.mkdir(parents=True, exist_ok=True)
+            # Test write access
+            test_file = temp_path / ".write_test"
+            test_file.write_text("test")
+            test_file.unlink()
+            logger.info(f"✅ Temp checkpoint directory ready: {temp_path}")
+        except (PermissionError, OSError) as e:
+            logger.warning(f"⚠️ Cannot use temp directory {temp_path}: {e}")
+            temp_checkpoint_dir = None
+    
+    return str(output_dir), temp_checkpoint_dir
+
 def create_model(args, logger):
     """Create model with all enhancements"""
     try:
@@ -368,8 +457,8 @@ def create_dataloaders(args, logger):
         logger.error(f"❌ Error creating dataloaders: {e}")
         raise
 
-def create_trainer(model, loss_fn, train_dataloader, eval_dataloader, args, device, logger):
-    """Create trainer without normalization"""
+def create_trainer(model, loss_fn, train_dataloader, eval_dataloader, args, device, output_dir, temp_checkpoint_dir, logger):
+    """Create trainer without normalization with temp directory support"""
     try:
         from src.modules.trainers.blip3o_trainer import create_clip_trainer
         
@@ -384,6 +473,8 @@ def create_trainer(model, loss_fn, train_dataloader, eval_dataloader, args, devi
                 improvements.append("heun")
             if args.simple_scale_factor != 1.0:
                 improvements.append(f"scale_{args.simple_scale_factor}")
+            if temp_checkpoint_dir:
+                improvements.append("temp_checkpoints")
             improvements_str = "_".join(improvements)
             wandb_run_name = f"blip3o_{args.model_size}_{args.training_mode}_{improvements_str}_{timestamp}"
         
@@ -393,7 +484,7 @@ def create_trainer(model, loss_fn, train_dataloader, eval_dataloader, args, devi
             "training_mode": args.training_mode,
             "batch_size": args.batch_size,
             "max_shards": args.max_shards,
-            "experiment_version": "NO_NORMALIZATION_v1",
+            "experiment_version": "NO_NORMALIZATION_TEMP_CHECKPOINTS_v1",
             "learning_rate": args.learning_rate,
             "weight_decay": args.weight_decay,
             "num_epochs": args.num_epochs,
@@ -414,6 +505,11 @@ def create_trainer(model, loss_fn, train_dataloader, eval_dataloader, args, devi
             "eva_adapter_layers": args.eva_adapter_layers,
             "heun_inference": args.use_heun_inference,
             "timestep_weighting": args.use_timestep_weighting,
+            
+            # Checkpoint management
+            "temp_checkpoint_dir": temp_checkpoint_dir,
+            "keep_local_checkpoints": args.keep_local_checkpoints,
+            "save_to_temp_every_n_steps": args.save_to_temp_every_n_steps,
             
             # Approach
             "normalization_approach": "DISABLED",
@@ -436,7 +532,10 @@ def create_trainer(model, loss_fn, train_dataloader, eval_dataloader, args, devi
             eval_num_samples=args.eval_num_samples,
             eval_inference_steps=args.eval_inference_steps,
             use_heun_inference=args.use_heun_inference,
-            output_dir=args.output_dir,
+            output_dir=output_dir,
+            temp_checkpoint_dir=temp_checkpoint_dir,  # NEW parameter
+            keep_local_checkpoints=args.keep_local_checkpoints,  # NEW parameter
+            save_to_temp_every_n_steps=args.save_to_temp_every_n_steps,  # NEW parameter
             device=device,
             use_wandb=args.use_wandb,
             wandb_project=args.wandb_project,
@@ -444,11 +543,16 @@ def create_trainer(model, loss_fn, train_dataloader, eval_dataloader, args, devi
             wandb_config=wandb_config,
         )
         
-        logger.info("✅ Trainer created successfully (NO NORMALIZATION):")
+        logger.info("✅ Trainer created successfully (NO NORMALIZATION + TEMP CHECKPOINTS):")
         logger.info(f"  Evaluation: Every {args.eval_every_n_steps} steps")
         logger.info(f"  WandB enabled: {args.use_wandb}")
         logger.info(f"  Heun inference: {'✅ ENABLED' if args.use_heun_inference else '❌ DISABLED'}")
         logger.info(f"  Normalization: DISABLED")
+        logger.info(f"  Local checkpoints: {args.keep_local_checkpoints}")
+        logger.info(f"  Temp checkpoints: {'✅ ENABLED' if temp_checkpoint_dir else '❌ DISABLED'}")
+        if temp_checkpoint_dir:
+            logger.info(f"  Temp directory: {temp_checkpoint_dir}")
+            logger.info(f"  Save to temp every: {args.save_to_temp_every_n_steps} steps")
         
         return trainer
         
@@ -456,17 +560,17 @@ def create_trainer(model, loss_fn, train_dataloader, eval_dataloader, args, devi
         logger.error(f"❌ Error creating trainer: {e}")
         raise
 
-def save_experiment_config(args, model, output_dir, logger):
+def save_experiment_config(args, model, output_dir, temp_checkpoint_dir, logger):
     """Save detailed experiment configuration"""
     try:
         config = {
             'experiment_info': {
-                'name': 'BLIP3-o CLIP Reproduction WITHOUT Normalization',
-                'version': 'NO_NORMALIZATION_v1',
+                'name': 'BLIP3-o CLIP Reproduction WITHOUT Normalization + Temp Checkpoints',
+                'version': 'NO_NORMALIZATION_TEMP_CHECKPOINTS_v1',
                 'timestamp': datetime.now().isoformat(),
                 'task': 'Reproduce CLIP embeddings from EVA embeddings',
                 'method': 'BLIP3-o DiT without CLIP normalization',
-                'focus': 'Training without data-dependent normalization',
+                'focus': 'Training without data-dependent normalization + smart checkpoint management',
             },
             'args': vars(args),
             'model_config': model.config.to_dict() if hasattr(model.config, 'to_dict') else {},
@@ -486,13 +590,31 @@ def save_experiment_config(args, model, output_dir, logger):
                     'Direct work with original CLIP space'
                 ],
             },
+            'checkpoint_management': {
+                'local_output_dir': str(output_dir),
+                'temp_checkpoint_dir': temp_checkpoint_dir,
+                'keep_local_checkpoints': args.keep_local_checkpoints,
+                'save_to_temp_every_n_steps': args.save_to_temp_every_n_steps,
+                'strategy': 'local_plus_temp' if temp_checkpoint_dir else 'local_only',
+            },
         }
         
-        config_path = output_dir / 'experiment_config.json'
+        config_path = Path(output_dir) / 'experiment_config.json'
         with open(config_path, 'w') as f:
             json.dump(config, f, indent=2, default=str)
         
         logger.info(f"✅ Configuration saved to {config_path}")
+        
+        # Also save to temp directory if available
+        if temp_checkpoint_dir:
+            temp_config_path = Path(temp_checkpoint_dir) / 'experiment_config.json'
+            try:
+                with open(temp_config_path, 'w') as f:
+                    json.dump(config, f, indent=2, default=str)
+                logger.info(f"✅ Configuration also saved to temp: {temp_config_path}")
+            except Exception as e:
+                logger.warning(f"⚠️ Could not save config to temp directory: {e}")
+        
         return config
         
     except Exception as e:
@@ -500,11 +622,11 @@ def save_experiment_config(args, model, output_dir, logger):
         return {}
 
 def main():
-    """Main training function without normalization"""
+    """Main training function without normalization with temp directory support"""
     # Setup logging
     logger = setup_logging()
     
-    logger.info("🚀 BLIP3-o CLIP Reproduction Training (NO NORMALIZATION)")
+    logger.info("🚀 BLIP3-o CLIP Reproduction Training (NO NORMALIZATION + TEMP CHECKPOINTS)")
     logger.info("=" * 80)
     logger.info("📋 Task: Reproduce CLIP embeddings from EVA embeddings")
     logger.info("🧠 Model: BLIP3-o DiT WITHOUT CLIP normalization")
@@ -512,6 +634,7 @@ def main():
     logger.info("🎯 Target: CLIP embeddings [B, N, 1024] (RAW)")
     logger.info("🎮 Conditioning: EVA embeddings [B, N, 4096]")
     logger.info("🔑 Focus: Training without data-dependent normalization")
+    logger.info("📦 NEW: Smart checkpoint management with temp directory support")
     logger.info("=" * 80)
     logger.info("🛠️ KEY CHANGES:")
     logger.info("   ✅ 1. No CLIP normalization/denormalization")
@@ -519,6 +642,8 @@ def main():
     logger.info("   ✅ 3. No dependency on training data statistics")
     logger.info("   ✅ 4. Simplified training and evaluation pipeline")
     logger.info("   ✅ 5. Optional simple data-independent scaling")
+    logger.info("   🆕 6. Intelligent checkpoint management for large-scale training")
+    logger.info("   🆕 7. Automatic temp directory detection")
     logger.info("=" * 80)
     
     try:
@@ -529,11 +654,18 @@ def main():
         if not validate_arguments(args, logger):
             return 1
         
-        logger.info(f"Configuration (NO NORMALIZATION):")
+        # Setup checkpoint directories
+        output_dir, temp_checkpoint_dir = setup_checkpoint_directories(args, logger)
+        
+        logger.info(f"Configuration (NO NORMALIZATION + TEMP CHECKPOINTS):")
         logger.info(f"  Model size: {args.model_size}")
         logger.info(f"  Training mode: {args.training_mode}")
         logger.info(f"  Embeddings dir: {args.chunked_embeddings_dir}")
-        logger.info(f"  Output dir: {args.output_dir}")
+        logger.info(f"  Output dir: {output_dir}")
+        logger.info(f"  Temp checkpoint dir: {temp_checkpoint_dir or 'None'}")
+        logger.info(f"  Keep local checkpoints: {args.keep_local_checkpoints}")
+        if temp_checkpoint_dir:
+            logger.info(f"  Save to temp every: {args.save_to_temp_every_n_steps} steps")
         logger.info(f"  Learning rate: {args.learning_rate}")
         logger.info(f"  Batch size: {args.batch_size}")
         logger.info(f"  Epochs: {args.num_epochs}")
@@ -553,11 +685,6 @@ def main():
             logger.error("❌ Environment check failed - cannot proceed!")
             return 1
         
-        # Create output directory
-        output_dir = Path(args.output_dir)
-        output_dir.mkdir(parents=True, exist_ok=True)
-        logger.info(f"✅ Output directory ready: {output_dir}")
-        
         # Create model
         logger.info("🏗️ Creating model...")
         model, device = create_model(args, logger)
@@ -572,20 +699,23 @@ def main():
         
         # Create trainer
         logger.info("🏃 Creating trainer...")
-        trainer = create_trainer(model, loss_fn, train_dataloader, eval_dataloader, args, device, logger)
+        trainer = create_trainer(model, loss_fn, train_dataloader, eval_dataloader, args, device, output_dir, temp_checkpoint_dir, logger)
         
         # Save configuration
         logger.info("💾 Saving experiment configuration...")
-        config = save_experiment_config(args, model, output_dir, logger)
+        config = save_experiment_config(args, model, output_dir, temp_checkpoint_dir, logger)
         
         # Start training
-        logger.info(f"\n🚀 Starting BLIP3-o training (NO NORMALIZATION)...")
+        logger.info(f"\n🚀 Starting BLIP3-o training (NO NORMALIZATION + TEMP CHECKPOINTS)...")
         logger.info("=" * 80)
         logger.info("🎯 Expected Results:")
         logger.info("   • Simplified training without normalization concerns")
         logger.info("   • Direct work with original CLIP embedding space")
         logger.info("   • No dependency on training data statistics")
         logger.info("   • Easier debugging and evaluation")
+        logger.info("   • Smart checkpoint management for large-scale training")
+        if temp_checkpoint_dir:
+            logger.info(f"   • Checkpoints saved to temp: {temp_checkpoint_dir}")
         logger.info("=" * 80)
         
         start_time = datetime.now()
@@ -598,7 +728,7 @@ def main():
         
         # FINAL SUMMARY
         logger.info("\n" + "=" * 80)
-        logger.info("🎉 TRAINING COMPLETED (NO NORMALIZATION)!")
+        logger.info("🎉 TRAINING COMPLETED (NO NORMALIZATION + TEMP CHECKPOINTS)!")
         logger.info("=" * 80)
         
         logger.info(f"📊 RESULTS:")
@@ -631,12 +761,15 @@ def main():
             logger.info(f"  Very high quality (>0.8): {final_eval.get('eval_very_high_quality', 0)*100:.1f}%")
         
         logger.info(f"📁 Outputs:")
-        logger.info(f"  Model checkpoints: {output_dir}")
+        logger.info(f"  Local checkpoints: {output_dir}")
+        if temp_checkpoint_dir:
+            logger.info(f"  Temp checkpoints: {temp_checkpoint_dir}")
         logger.info(f"  Training logs: blip3o_training_no_norm.log")
         
         logger.info("=" * 80)
-        logger.info("✅ TRAINING COMPLETED SUCCESSFULLY (NO NORMALIZATION)!")
+        logger.info("✅ TRAINING COMPLETED SUCCESSFULLY (NO NORMALIZATION + TEMP CHECKPOINTS)!")
         logger.info("🔑 Working directly with raw CLIP embeddings!")
+        logger.info("📦 Smart checkpoint management active!")
         
         logger.info("💡 Next Steps:")
         if success_level == "excellent":
@@ -659,12 +792,16 @@ def main():
             logger.info("    - Try different scaling factor")
         
         logger.info("=" * 80)
-        logger.info("🔧 Advantages of No Normalization:")
+        logger.info("🔧 Advantages of No Normalization + Temp Checkpoints:")
         logger.info("  • No dependency on training data statistics")
         logger.info("  • Simpler training and evaluation pipeline")
         logger.info("  • Direct work with original CLIP space")
         logger.info("  • Easier to debug and understand")
         logger.info("  • No risk of normalization-related crashes")
+        logger.info("  • Automatic checkpoint management for large-scale training")
+        logger.info("  • Space-efficient local checkpoint retention")
+        if temp_checkpoint_dir:
+            logger.info("  • Long-term checkpoint storage in temp directory")
         
         return 0 if success_level in ["excellent", "good", "fair"] else 1
         
@@ -686,6 +823,9 @@ def main():
         elif "FileNotFoundError" in error_str:
             logger.error("🔍 FILE NOT FOUND:")
             logger.error("   Check --chunked_embeddings_dir path")
+        elif "Permission denied" in error_str:
+            logger.error("🔍 PERMISSION ERROR:")
+            logger.error("   Check temp directory permissions")
         
         return 1
 

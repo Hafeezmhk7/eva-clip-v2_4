@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-BLIP3-o Trainer WITHOUT CLIP Normalization
+BLIP3-o Trainer WITHOUT CLIP Normalization - Updated with Temp Directory Checkpoints
 src/modules/trainers/blip3o_trainer.py
 
 CHANGES:
@@ -8,6 +8,7 @@ CHANGES:
 2. Removed denormalization from evaluation
 3. Simplified evaluation to work with raw CLIP embeddings
 4. Removed normalization-related error handling
+5. UPDATED: Save checkpoints to temp directory for large-scale training
 """
 
 import torch
@@ -24,6 +25,7 @@ import gc
 from collections import deque
 import math
 import os
+import shutil
 
 # WandB import with error handling
 try:
@@ -38,7 +40,7 @@ logger = logging.getLogger(__name__)
 
 class BLIP3oCLIPTrainer:
     """
-    BLIP3-o Trainer WITHOUT CLIP Normalization
+    BLIP3-o Trainer WITHOUT CLIP Normalization - Updated with Temp Directory Support
     
     FEATURES:
     1. Enhanced error handling throughout training loop
@@ -46,6 +48,7 @@ class BLIP3oCLIPTrainer:
     3. Evaluation without normalization/denormalization
     4. Automatic learning rate reduction on instability
     5. Better monitoring and early stopping on issues
+    6. UPDATED: Intelligent checkpoint management with temp directory support
     """
     
     def __init__(
@@ -80,8 +83,11 @@ class BLIP3oCLIPTrainer:
         log_every_n_steps: int = 10,
         save_every_n_steps: int = 500,
         
-        # Output
+        # Output - UPDATED for temp directory support
         output_dir: str = "./checkpoints",
+        temp_checkpoint_dir: Optional[str] = None,  # NEW: For large-scale training
+        keep_local_checkpoints: int = 3,  # NEW: Number of checkpoints to keep locally
+        save_to_temp_every_n_steps: int = 1000,  # NEW: Save to temp directory frequency
         
         # Device
         device: Optional[torch.device] = None,
@@ -125,9 +131,20 @@ class BLIP3oCLIPTrainer:
         self.log_every_n_steps = log_every_n_steps
         self.save_every_n_steps = save_every_n_steps
         
-        # Output
+        # UPDATED: Checkpoint management
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
+        
+        # NEW: Temp directory support for large-scale training
+        self.temp_checkpoint_dir = None
+        if temp_checkpoint_dir:
+            self.temp_checkpoint_dir = Path(temp_checkpoint_dir)
+            self.temp_checkpoint_dir.mkdir(parents=True, exist_ok=True)
+            logger.info(f"🗂️ Temp checkpoint directory: {self.temp_checkpoint_dir}")
+        
+        self.keep_local_checkpoints = keep_local_checkpoints
+        self.save_to_temp_every_n_steps = save_to_temp_every_n_steps
+        self.local_checkpoints = []  # Track local checkpoints for cleanup
         
         # Device
         self.device = device or (torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu"))
@@ -180,6 +197,7 @@ class BLIP3oCLIPTrainer:
         logger.info(f"  Parameters: {sum(p.numel() for p in self.model.parameters()):,}")
         logger.info(f"  CLIP normalization: DISABLED")
         logger.info(f"  Enhanced stability features: enabled")
+        logger.info(f"  Checkpoint strategy: {'Local + Temp' if self.temp_checkpoint_dir else 'Local only'}")
 
     def _estimate_steps_per_epoch(self) -> int:
         """Estimate steps per epoch with error handling"""
@@ -251,6 +269,7 @@ class BLIP3oCLIPTrainer:
                 'fp16': self.fp16,
                 'experiment_type': 'blip3o_clip_NO_NORMALIZATION',
                 'normalization': 'DISABLED',
+                'checkpoint_strategy': 'temp_directory_enabled' if self.temp_checkpoint_dir else 'local_only',
                 'stability_features': {
                     'adaptive_grad_clipping': self.adaptive_grad_clipping,
                     'emergency_lr_reduction': self.emergency_lr_reduction,
@@ -266,7 +285,7 @@ class BLIP3oCLIPTrainer:
                 config=wandb_config,
                 dir=str(self.output_dir),
                 resume="allow",
-                tags=["blip3o", "clip_reproduction", "no_normalization", "raw_embeddings"]
+                tags=["blip3o", "clip_reproduction", "no_normalization", "raw_embeddings", "temp_checkpoints"]
             )
             
             logger.info(f"✅ WandB initialized: {self.wandb_project}")
@@ -672,11 +691,146 @@ class BLIP3oCLIPTrainer:
                 'error': str(e),
             }
 
+    # NEW: Enhanced checkpoint management methods
+    def _cleanup_local_checkpoints(self):
+        """Clean up old local checkpoints to save space"""
+        if len(self.local_checkpoints) > self.keep_local_checkpoints:
+            checkpoints_to_remove = self.local_checkpoints[:-self.keep_local_checkpoints]
+            for checkpoint_path in checkpoints_to_remove:
+                try:
+                    if checkpoint_path.exists():
+                        if checkpoint_path.is_dir():
+                            shutil.rmtree(checkpoint_path)
+                        else:
+                            checkpoint_path.unlink()
+                        logger.info(f"🗑️ Removed old local checkpoint: {checkpoint_path.name}")
+                except Exception as e:
+                    logger.warning(f"⚠️ Failed to remove checkpoint {checkpoint_path}: {e}")
+            
+            # Update tracking list
+            self.local_checkpoints = self.local_checkpoints[-self.keep_local_checkpoints:]
+
+    def _save_checkpoint_to_temp(self, checkpoint_path: Path) -> bool:
+        """Copy checkpoint to temp directory"""
+        if not self.temp_checkpoint_dir:
+            return False
+        
+        try:
+            temp_checkpoint_path = self.temp_checkpoint_dir / checkpoint_path.name
+            
+            if checkpoint_path.is_dir():
+                if temp_checkpoint_path.exists():
+                    shutil.rmtree(temp_checkpoint_path)
+                shutil.copytree(checkpoint_path, temp_checkpoint_path)
+            else:
+                shutil.copy2(checkpoint_path, temp_checkpoint_path)
+            
+            logger.info(f"📦 Checkpoint copied to temp: {temp_checkpoint_path}")
+            
+            # Log disk usage info
+            file_size_mb = self._get_path_size(temp_checkpoint_path) / (1024 * 1024)
+            logger.info(f"   Temp checkpoint size: {file_size_mb:.1f} MB")
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to copy checkpoint to temp: {e}")
+            return False
+
+    def _get_path_size(self, path: Path) -> int:
+        """Get total size of a file or directory"""
+        if path.is_file():
+            return path.stat().st_size
+        elif path.is_dir():
+            return sum(f.stat().st_size for f in path.rglob('*') if f.is_file())
+        return 0
+
+    def _save_checkpoint(self, is_best: bool = False, force_temp: bool = False) -> bool:
+        """Enhanced checkpoint saving with temp directory support"""
+        try:
+            # Determine checkpoint filename
+            if is_best:
+                checkpoint_filename = f"best_checkpoint_step_{self.global_step}.pt"
+            else:
+                checkpoint_filename = f"checkpoint_step_{self.global_step}.pt"
+            
+            checkpoint_path = self.output_dir / checkpoint_filename
+            
+            # Create checkpoint data
+            checkpoint = {
+                'global_step': self.global_step,
+                'current_epoch': self.current_epoch,
+                'best_eval_similarity': self.best_eval_similarity,
+                'best_loss': self.best_loss,
+                'model_state_dict': self.model.state_dict(),
+                'optimizer_state_dict': self.optimizer.state_dict(),
+                'scheduler_state_dict': self.scheduler.state_dict(),
+                'training_state': {
+                    'emergency_lr_reductions': self.emergency_lr_reductions,
+                    'stability_alerts': self.stability_alerts,
+                    'consecutive_failures': self.consecutive_failures,
+                    'last_stable_step': self.last_stable_step,
+                },
+                'normalization': 'DISABLED',
+                'checkpoint_type': 'best' if is_best else 'regular',
+                'temp_directory_enabled': self.temp_checkpoint_dir is not None,
+            }
+            
+            if self.scaler is not None:
+                checkpoint['scaler_state_dict'] = self.scaler.state_dict()
+            
+            # Save locally
+            torch.save(checkpoint, checkpoint_path)
+            self.local_checkpoints.append(checkpoint_path)
+            
+            # Get checkpoint size for logging
+            file_size_mb = checkpoint_path.stat().st_size / (1024 * 1024)
+            logger.info(f"✅ Checkpoint saved: {checkpoint_filename} ({file_size_mb:.1f} MB)")
+            
+            # Save to temp directory if conditions are met
+            should_save_to_temp = (
+                self.temp_checkpoint_dir and (
+                    is_best or 
+                    force_temp or 
+                    (self.global_step % self.save_to_temp_every_n_steps == 0)
+                )
+            )
+            
+            if should_save_to_temp:
+                temp_success = self._save_checkpoint_to_temp(checkpoint_path)
+                if temp_success and is_best:
+                    logger.info(f"🏆 Best checkpoint also saved to temp directory")
+            
+            # Clean up old local checkpoints (but keep best checkpoints)
+            if not is_best:
+                self._cleanup_local_checkpoints()
+            
+            # Log to WandB
+            if self.use_wandb:
+                wandb.log({
+                    "checkpoint/step": self.global_step,
+                    "checkpoint/is_best": is_best,
+                    "checkpoint/size_mb": file_size_mb,
+                    "checkpoint/saved_to_temp": should_save_to_temp,
+                }, step=self.global_step)
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"❌ Checkpoint save failed: {e}")
+            return False
+
     def train(self) -> Dict[str, Any]:
         """Main training loop without normalization"""
         logger.info("🚀 Starting BLIP3-o training (NO NORMALIZATION)...")
         logger.info(f"  Enhanced stability monitoring active")
         logger.info(f"  WandB logging: {'✅ ENABLED' if self.use_wandb else '❌ DISABLED'}")
+        logger.info(f"  Checkpoint strategy: {'Local + Temp' if self.temp_checkpoint_dir else 'Local only'}")
+        
+        if self.temp_checkpoint_dir:
+            logger.info(f"  Temp directory: {self.temp_checkpoint_dir}")
+            logger.info(f"  Save to temp every: {self.save_to_temp_every_n_steps} steps")
+            logger.info(f"  Keep local checkpoints: {self.keep_local_checkpoints}")
         
         # Log initial setup to WandB
         if self.use_wandb:
@@ -686,6 +840,7 @@ class BLIP3oCLIPTrainer:
                 "setup/normalization": "DISABLED",
                 "setup/estimated_steps_per_epoch": self.estimated_steps_per_epoch,
                 "setup/total_estimated_steps": self.estimated_steps_per_epoch * self.num_epochs,
+                "setup/temp_checkpoint_enabled": self.temp_checkpoint_dir is not None,
             }, step=0)
         
         self.model.train()
@@ -744,6 +899,10 @@ class BLIP3oCLIPTrainer:
                         self.grad_norm_history.append(grad_norm)
                         self.lr_history.append(self.optimizer.param_groups[0]['lr'])
                         
+                        # Update best loss
+                        if loss.item() < self.best_loss:
+                            self.best_loss = loss.item()
+                        
                         # Log to WandB
                         if self.use_wandb:
                             wandb.log({
@@ -774,15 +933,19 @@ class BLIP3oCLIPTrainer:
                                                 if isinstance(v, (int, float)) and not math.isnan(v)}
                                     wandb.log(wandb_eval, step=self.global_step)
                                 
-                                if similarity > self.best_eval_similarity:
+                                # Check if this is the best model
+                                is_best = similarity > self.best_eval_similarity
+                                if is_best:
                                     self.best_eval_similarity = similarity
                                     logger.info(f"🎉 NEW BEST similarity: {similarity:.4f}")
+                                    # Save best checkpoint
+                                    self._save_checkpoint(is_best=True)
                             else:
                                 logger.warning("⚠️ Evaluation failed or returned no metrics")
                         
-                        # Save checkpoint
+                        # Regular checkpoint saving
                         if self.global_step % self.save_every_n_steps == 0:
-                            self._save_checkpoint()
+                            self._save_checkpoint(is_best=False)
                 
                 except Exception as e:
                     logger.error(f"❌ Error during epoch {epoch + 1}: {e}")
@@ -798,10 +961,17 @@ class BLIP3oCLIPTrainer:
                 logger.info(f"  Failure rate: {failure_rate*100:.1f}%")
                 logger.info(f"  Best similarity: {self.best_eval_similarity:.4f}")
                 logger.info(f"  Epoch time: {epoch_time:.1f}s")
+                
+                # Save end-of-epoch checkpoint
+                if (epoch + 1) % 5 == 0:  # Every 5 epochs
+                    self._save_checkpoint(force_temp=True)
             
             # Final evaluation
             logger.info("Running final evaluation...")
             final_eval = self._safe_evaluate(num_samples=self.eval_num_samples * 2)
+            
+            # Save final checkpoint
+            self._save_checkpoint(force_temp=True)
             
             total_time = time.time() - start_time
             
@@ -816,6 +986,8 @@ class BLIP3oCLIPTrainer:
                 'stability_alerts': self.stability_alerts,
                 'final_eval': final_eval,
                 'normalization_disabled': True,
+                'checkpoint_strategy_used': 'temp_directory' if self.temp_checkpoint_dir else 'local_only',
+                'checkpoints_saved_to_temp': self.temp_checkpoint_dir is not None,
             }
             
             if self.use_wandb:
@@ -824,6 +996,7 @@ class BLIP3oCLIPTrainer:
                     "final/total_time_seconds": total_time,
                     "final/best_eval_similarity": self.best_eval_similarity,
                     "final/normalization": "DISABLED",
+                    "final/temp_checkpoints_used": self.temp_checkpoint_dir is not None,
                 }, step=self.global_step)
                 wandb.finish()
             
@@ -831,6 +1004,8 @@ class BLIP3oCLIPTrainer:
             logger.info(f"  Total time: {total_time:.1f} seconds")
             logger.info(f"  Best similarity: {self.best_eval_similarity:.4f}")
             logger.info(f"  Training stability maintained")
+            if self.temp_checkpoint_dir:
+                logger.info(f"  Checkpoints available in: {self.temp_checkpoint_dir}")
             
             return summary
             
@@ -839,37 +1014,6 @@ class BLIP3oCLIPTrainer:
             if self.use_wandb:
                 wandb.finish()
             raise
-
-    def _save_checkpoint(self) -> bool:
-        """Save checkpoint"""
-        try:
-            checkpoint_path = self.output_dir / f"checkpoint_step_{self.global_step}.pt"
-            
-            checkpoint = {
-                'global_step': self.global_step,
-                'best_eval_similarity': self.best_eval_similarity,
-                'model_state_dict': self.model.state_dict(),
-                'optimizer_state_dict': self.optimizer.state_dict(),
-                'scheduler_state_dict': self.scheduler.state_dict(),
-                'training_state': {
-                    'emergency_lr_reductions': self.emergency_lr_reductions,
-                    'stability_alerts': self.stability_alerts,
-                    'consecutive_failures': self.consecutive_failures,
-                    'last_stable_step': self.last_stable_step,
-                },
-                'normalization': 'DISABLED',
-            }
-            
-            if self.scaler is not None:
-                checkpoint['scaler_state_dict'] = self.scaler.state_dict()
-            
-            torch.save(checkpoint, checkpoint_path)
-            logger.info(f"✅ Checkpoint saved: {checkpoint_path}")
-            return True
-            
-        except Exception as e:
-            logger.error(f"❌ Checkpoint save failed: {e}")
-            return False
 
 
 def create_clip_trainer(
@@ -880,11 +1024,12 @@ def create_clip_trainer(
     learning_rate: float = 1e-4,
     num_epochs: int = 10,
     output_dir: str = "./checkpoints",
+    temp_checkpoint_dir: Optional[str] = None,  # NEW parameter
     use_wandb: bool = False,
     wandb_project: str = "blip3o-clip-no-norm",
     **kwargs
 ) -> BLIP3oCLIPTrainer:
-    """Factory function to create CLIP trainer without normalization"""
+    """Factory function to create CLIP trainer without normalization - Updated with temp directory support"""
     
     return BLIP3oCLIPTrainer(
         model=model,
@@ -894,6 +1039,7 @@ def create_clip_trainer(
         learning_rate=learning_rate,
         num_epochs=num_epochs,
         output_dir=output_dir,
+        temp_checkpoint_dir=temp_checkpoint_dir,  # NEW parameter
         use_wandb=use_wandb,
         wandb_project=wandb_project,
         **kwargs
