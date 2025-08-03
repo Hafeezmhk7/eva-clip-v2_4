@@ -191,24 +191,23 @@ Where `c` is the EVA conditioning.
 ### Inference Process
 
 ```mermaid
-graph LR
-    subgraph "Inference"
-        A[Random Noise<br/>ε ~ N(0,I)] --> B[t=1.0]
-        B --> C[Velocity<br/>Prediction]
-        C --> D[Heun Step<br/>O(h²) accuracy]
-        D --> E[t=0.9]
-        E --> F[Velocity<br/>Prediction]
-        F --> G[Heun Step]
-        G --> H[...]
-        H --> I[t=0.0]
-        I --> J[Final CLIP<br/>Embedding]
-        
-        K[EVA Conditioning<br/>B×N×4096] --> C
-        K --> F
-        
-        style A fill:#ffebee
-        style J fill:#e8f5e8
-        style K fill:#e1f5fe
+graph TB
+    A[Random Noise<br/>ε ~ N(0,I)] --> B[t=1.0]
+    B --> C[Velocity<br/>Prediction]
+    C --> D[Heun Step<br/>O(h²) accuracy]
+    D --> E[t=0.9]
+    E --> F[Velocity<br/>Prediction]
+    F --> G[Heun Step]
+    G --> H[...]
+    H --> I[t=0.0]
+    I --> J[Final CLIP<br/>Embedding]
+    
+    K[EVA Conditioning<br/>B×N×4096] --> C
+    K --> F
+    
+    style A fill:#ffebee
+    style J fill:#e8f5e8
+    style K fill:#e1f5fe
 ```
 
 ## Loss Function: Multi-Component Design
