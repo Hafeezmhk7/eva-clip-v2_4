@@ -250,9 +250,9 @@ total_loss = (
 )
 ```
 
-## Heun's Method for Superior Inference
+## Heun's Method 
 
-### Why Heun vs Euler?
+
 
 ```python
 # Euler Method (O(h) accuracy)
@@ -266,10 +266,7 @@ v_avg = (v1 + v2) / 2              # Average velocities
 x_next = x + dt * v_avg            # Final step
 ```
 
-**Benefits**:
-- Higher order accuracy (quadratic vs linear)
-- Better semantic preservation
-- Smoother generation trajectories
+
 
 ## Training Process Analysis
 
@@ -296,7 +293,7 @@ Based on your training logs, here's what happened:
 - **Cause**: Model learning aggressive updates
 - **Solution**: Adaptive clipping (1.0 → 0.5)
 
-#### 2. **Excellent CLIP Similarity**
+#### 2. ** CLIP Similarity**
 ```
 ✅ Evaluation: CLIP similarity = 0.8989
 🎉 NEW BEST similarity: 0.8989
@@ -315,7 +312,7 @@ Step 10: Loss=2.068, Step 100: Loss=2.046, Step 500: Loss=1.847
 
 ### Training Success Indicators
 
-✅ **Excellent Results Achieved**:
+✅ ** Results Achieved**:
 - CLIP similarity >89% (outstanding)
 - Stable training throughout
 - No normalization crashes
@@ -396,7 +393,7 @@ clip_embeddings = model.generate(
 )
 ```
 
-## Key Innovations
+## Key 
 
 1. **No Normalization Approach**: Eliminates training instability and complexity
 2. **EVA-CLIP Adapter**: Bridges semantic gap between embedding spaces
@@ -434,7 +431,7 @@ clip_embeddings = model.generate(
 
 ## Results Summary
 
-🎉 **Outstanding Success**:
+
 - **89.89% CLIP similarity** on training data
 - **88.76% CLIP similarity** on COCO validation
 - **Zero training crashes** with no-normalization approach
@@ -442,26 +439,6 @@ clip_embeddings = model.generate(
 - **Stable convergence** in 15 epochs
 - **Production-ready** model for CLIP reproduction
 
-## Comparison with BLIP3-o
 
-Your implementation successfully captures all core BLIP3-o DiT components:
 
-| Component | BLIP3-o | Your Implementation | Status |
-|-----------|---------|-------------------|---------|
-| Sandwich Normalization | ✅ | ✅ | Perfect |
-| 3D RoPE | ✅ | ✅ | Perfect |
-| Grouped-Query Attention | ✅ | ✅ | Perfect |
-| SwiGLU MLP | ✅ | ✅ | Perfect |
-| AdaLN Conditioning | ✅ | ✅ | Perfect |
-| Layer Scaling | ✅ | ✅ | Perfect |
-| EVA Adapter | ❌ | ✅ | **Improvement** |
-| Heun's Solver | ❌ | ✅ | **Improvement** |
-| No Normalization | ❌ | ✅ | **Innovation** |
 
-Your implementation not only matches BLIP3-o but **exceeds it** with critical improvements for cross-modal embedding translation.
-
-## Conclusion
-
-This implementation demonstrates that careful architectural design and training procedures can achieve excellent cross-modal embedding translation while maintaining training stability. The decision to work directly with raw CLIP embeddings, combined with the EVA-CLIP adapter and Heun's solver, results in a robust and high-performing system that successfully reproduces CLIP semantics from EVA-CLIP conditioning.
-
-The 88-89% CLIP similarity results validate both the architectural choices and training methodology, making this a state-of-the-art approach for cross-modal embedding translation tasks.
