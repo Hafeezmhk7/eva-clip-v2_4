@@ -129,12 +129,12 @@ def parse_arguments():
     # Loss component weights
     parser.add_argument("--velocity_weight", type=float, default=1.0,
                        help="Weight for velocity prediction loss")
-    parser.add_argument("--semantic_weight", type=float, default=0.5,
-                       help="Weight for semantic consistency loss")
-    parser.add_argument("--cosine_weight", type=float, default=0.2,
-                       help="Weight for cosine similarity loss")
-    parser.add_argument("--consistency_weight", type=float, default=0.3,
-                       help="Weight for direct CLIP consistency loss")
+    # parser.add_argument("--semantic_weight", type=float, default=0.5,
+    #                    help="Weight for semantic consistency loss")
+    # parser.add_argument("--cosine_weight", type=float, default=0.2,
+    #                    help="Weight for cosine similarity loss")
+    # parser.add_argument("--consistency_weight", type=float, default=0.3,
+    #                    help="Weight for direct CLIP consistency loss")
     
     # Data-independent scaling (optional)
     parser.add_argument("--simple_scale_factor", type=float, default=1.0,
@@ -203,19 +203,19 @@ def validate_arguments(args, logger):
         errors.append(f"Batch size must be positive: {args.batch_size}")
     
     # Validate weights
-    if args.velocity_weight < 0 or args.semantic_weight < 0 or args.cosine_weight < 0:
-        errors.append("All loss weights must be non-negative")
+    # if args.velocity_weight < 0 
+        errors.append("All velocity weights must be non-negative")
     
     # Validate scaling factor
     if args.simple_scale_factor <= 0:
         errors.append(f"Scale factor must be positive: {args.simple_scale_factor}")
     
     # Warnings for potentially suboptimal settings
-    if args.semantic_weight < 0.3:
-        warnings.append(f"Semantic weight ({args.semantic_weight}) seems low - recommend 0.5+")
+    # if args.semantic_weight < 0.3:
+    #     warnings.append(f"Semantic weight ({args.semantic_weight}) seems low - recommend 0.5+")
     
-    if args.cosine_weight < 0.15:
-        warnings.append(f"Cosine weight ({args.cosine_weight}) seems low - recommend 0.2+")
+    # if args.cosine_weight < 0.15:
+    #     warnings.append(f"Cosine weight ({args.cosine_weight}) seems low - recommend 0.2+")
     
     if args.batch_size > 16:
         warnings.append(f"Large batch size ({args.batch_size}) may cause memory issues")
@@ -374,19 +374,19 @@ def create_loss_function(args, logger):
             prediction_type="velocity",
             flow_type="rectified",
             velocity_weight=args.velocity_weight,
-            semantic_weight=args.semantic_weight,
-            cosine_weight=args.cosine_weight,
-            consistency_weight=args.consistency_weight,
+            # semantic_weight=args.semantic_weight,
+            # cosine_weight=args.cosine_weight,
+            # consistency_weight=args.consistency_weight,
             use_timestep_weighting=args.use_timestep_weighting,
         )
         
         logger.info("✅ Loss function created (NO NORMALIZATION):")
         logger.info(f"  Prediction type: velocity")
         logger.info(f"  Flow type: rectified")
-        logger.info(f"  Weights - Velocity: {args.velocity_weight}, Semantic: {args.semantic_weight}, Cosine: {args.cosine_weight}")
-        logger.info(f"  Consistency weight: {args.consistency_weight}")
-        logger.info(f"  Timestep weighting: {'✅ ENABLED' if args.use_timestep_weighting else '❌ DISABLED'}")
-        logger.info(f"  Normalization: DISABLED")
+        # logger.info(f"  Weights - Velocity: {args.velocity_weight}")
+        # logger.info(f"  Consistency weight: {args.consistency_weight}")
+        # logger.info(f"  Timestep weighting: {'✅ ENABLED' if args.use_timestep_weighting else '❌ DISABLED'}")
+        # logger.info(f"  Normalization: DISABLED")
         
         return loss_fn
         
@@ -494,9 +494,9 @@ def create_trainer(model, loss_fn, train_dataloader, eval_dataloader, args, devi
             
             # Loss weights
             "velocity_weight": args.velocity_weight,
-            "semantic_weight": args.semantic_weight,
-            "cosine_weight": args.cosine_weight, 
-            "consistency_weight": args.consistency_weight,
+            # "semantic_weight": args.semantic_weight,
+            # "cosine_weight": args.cosine_weight, 
+            # "consistency_weight": args.consistency_weight,
             
             # Architecture
             "clip_normalization": "DISABLED",
@@ -673,12 +673,12 @@ def main():
         logger.info(f"  Simple scale factor: {args.simple_scale_factor}")
         logger.info(f"  Loss weights:")
         logger.info(f"    Velocity: {args.velocity_weight}")
-        logger.info(f"    Semantic: {args.semantic_weight}")
-        logger.info(f"    Cosine: {args.cosine_weight}")
-        logger.info(f"    Consistency: {args.consistency_weight}")
+        # logger.info(f"    Semantic: {args.semantic_weight}")
+        # logger.info(f"    Cosine: {args.cosine_weight}")
+        # logger.info(f"    Consistency: {args.consistency_weight}")
         logger.info(f"  EVA adapter: {'✅ ENABLED' if args.use_eva_adapter else '❌ DISABLED'}")
         logger.info(f"  Heun inference: {'✅ ENABLED' if args.use_heun_inference else '❌ DISABLED'}")
-        logger.info(f"  Normalization: DISABLED")
+        # logger.info(f"  Normalization: DISABLED")
         
         # Check environment
         if not check_environment(logger):

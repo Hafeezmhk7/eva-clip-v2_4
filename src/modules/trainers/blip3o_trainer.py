@@ -1043,4 +1043,4 @@ def create_clip_trainer(
         use_wandb=use_wandb,
         wandb_project=wandb_project,
         **kwargs
-    )r
+    )

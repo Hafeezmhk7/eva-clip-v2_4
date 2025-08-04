@@ -50,29 +50,29 @@ TRAINING_MODE="patch_only"
 MODEL_SIZE="base"
 
 # Training hyperparameters
-NUM_EPOCHS=10
+NUM_EPOCHS=8
 BATCH_SIZE=128
 LEARNING_RATE=4e-5
 WEIGHT_DECAY=0.04
-WARMUP_STEPS=300
+WARMUP_STEPS=100
 MAX_GRAD_NORM=1.0
 
 # Loss weights (same as before)
 VELOCITY_WEIGHT=1.0
-SEMANTIC_WEIGHT=0.5
-COSINE_WEIGHT=0.2
-CONSISTENCY_WEIGHT=0.3
+# SEMANTIC_WEIGHT=0.5
+# COSINE_WEIGHT=0.2
+# CONSISTENCY_WEIGHT=0.3
 
 # Simple scaling factor (data-independent)
 SIMPLE_SCALE_FACTOR=1.0  # Can be adjusted if needed
 
 # Evaluation parameters
-EVAL_EVERY_N_STEPS=500
+EVAL_EVERY_N_STEPS=50
 EVAL_NUM_SAMPLES=100
 EVAL_INFERENCE_STEPS=50
 
 # Data configuration
-MAX_SHARDS=35
+MAX_SHARDS=3
 
 # Create output directory
 mkdir -p "${OUTPUT_DIR}"
@@ -103,9 +103,9 @@ echo "  Max grad norm: $MAX_GRAD_NORM"
 echo ""
 echo "🎯 Loss Weights:"
 echo "  Velocity: $VELOCITY_WEIGHT"
-echo "  Semantic: $SEMANTIC_WEIGHT"
-echo "  Cosine: $COSINE_WEIGHT"
-echo "  Consistency: $CONSISTENCY_WEIGHT"
+# echo "  Semantic: $SEMANTIC_WEIGHT"
+# echo "  Cosine: $COSINE_WEIGHT"
+# echo "  Consistency: $CONSISTENCY_WEIGHT"
 echo ""
 echo "🔍 Evaluation Configuration:"
 echo "  Eval every: $EVAL_EVERY_N_STEPS steps"
@@ -188,9 +188,6 @@ python train_dit.py \
     --weight_decay $WEIGHT_DECAY \
     --max_grad_norm $MAX_GRAD_NORM \
     --velocity_weight $VELOCITY_WEIGHT \
-    --semantic_weight $SEMANTIC_WEIGHT \
-    --cosine_weight $COSINE_WEIGHT \
-    --consistency_weight $CONSISTENCY_WEIGHT \
     --simple_scale_factor $SIMPLE_SCALE_FACTOR \
     --eval_every_n_steps $EVAL_EVERY_N_STEPS \
     --eval_num_samples $EVAL_NUM_SAMPLES \
@@ -285,26 +282,6 @@ except Exception as e:
         ls -la "$OUTPUT_DIR" 2>/dev/null || echo "Output directory not found"
     fi
     
-    echo ""
-    echo "🎯 Next Steps:"
-    echo "============"
-    echo "1. Review training logs above for success indicators"
-    echo "2. If results are good, run with more data:"
-    echo "   • Increase MAX_SHARDS to use more training data" 
-    echo "   • Increase NUM_EPOCHS for longer training"
-    echo "   • Adjust BATCH_SIZE based on memory usage"
-    echo "3. Run comprehensive evaluation on test set"
-    echo "4. Try different simple_scale_factor values if needed"
-    echo ""
-    echo "🔍 SUCCESS INDICATORS:"
-    echo "  ✅ Non-zero gradients throughout training"
-    echo "  ✅ Decreasing loss trend"
-    echo "  ✅ Increasing similarity metrics"
-    echo "  ✅ Final CLIP similarity >0.2 (fair), >0.4 (good), >0.6 (excellent)"
-    echo "  ✅ No normalization-related crashes"
-    
-    echo ""
-    echo "✅ SUCCESS: BLIP3-o training completed (NO NORMALIZATION)!"
     
 else
     echo "❌ FAILED: Training exit code $TRAINING_EXIT_CODE"
@@ -346,108 +323,3 @@ echo "=========================================="
 
 exit $TRAINING_EXIT_CODE
 
-# =============================================================================
-# EVALUATION JOB SCRIPT (NO NORMALIZATION)
-# =============================================================================
-
-# Separate evaluation job script
-cat > evaluate_blip3o_no_norm.job << 'EOF'
-#!/bin/bash
-#SBATCH --job-name=blip3o_eval_no_norm
-#SBATCH --partition=gpu_h100
-#SBATCH --nodes=1
-#SBATCH --gpus=1
-#SBATCH --ntasks=1
-#SBATCH --cpus-per-task=8
-#SBATCH --time=2:00:00
-#SBATCH --mem=32G
-#SBATCH --output=./slurm_out/blip3o_eval_no_norm_%j.out
-#SBATCH --error=./slurm_out/blip3o_eval_no_norm_%j.err
-
-echo "🔬 BLIP3-o MS-COCO Evaluation (NO NORMALIZATION)"
-echo "Job ID: ${SLURM_JOB_ID} | Node: $(hostname) | Time: $(date)"
-
-cd $SLURM_SUBMIT_DIR
-
-# Setup environment
-module purge
-module load 2024
-module load Miniconda3/24.7.1-0
-module load CUDA/12.6.0
-source activate eva_clip_env
-
-# Configuration
-STANDARD_EMBEDDINGS_BASE="/scratch-shared/azadaianchuk1/blip3o_workspace/embeddings"
-COCO_EMBEDDINGS_FILE="${STANDARD_EMBEDDINGS_BASE}/coco_embeddings/coco_embeddings_consolidated.pkl"
-MODEL_PATH="/home/azadaianchuk1/eva-clip-v6_2/checkpoints/blip3o_no_norm_latest"
-OUTPUT_DIR="./coco_eval_no_norm_$(date +%Y%m%d_%H%M%S)"
-
-# Parameters
-MAX_SAMPLES=1000
-BATCH_SIZE=8
-NUM_INFERENCE_STEPS=50
-
-# Parse arguments
-[ -n "$1" ] && MODEL_PATH="$1"
-[ -n "$2" ] && MAX_SAMPLES="$2"
-[ -n "$3" ] && BATCH_SIZE="$3"
-
-echo "Model: $MODEL_PATH"
-echo "COCO Embeddings: $COCO_EMBEDDINGS_FILE"
-echo "Max Samples: $MAX_SAMPLES | Batch Size: $BATCH_SIZE"
-echo "🔑 Evaluation WITHOUT normalization"
-
-# Verify files exist
-if [ ! -d "$MODEL_PATH" ]; then
-    echo "❌ Model not found: $MODEL_PATH"
-    exit 1
-fi
-
-if [ ! -f "$COCO_EMBEDDINGS_FILE" ]; then
-    echo "❌ COCO embeddings not found: $COCO_EMBEDDINGS_FILE"
-    exit 1
-fi
-
-# Check evaluation script
-EVAL_SCRIPT="eval_blip3o_coco.py"
-if [ ! -f "$EVAL_SCRIPT" ]; then
-    echo "❌ Evaluation script not found: $EVAL_SCRIPT"
-    echo "Please ensure the modified evaluation script is available"
-    exit 1
-fi
-
-mkdir -p "${OUTPUT_DIR}" ./slurm_out
-
-echo "🚀 Starting evaluation (NO NORMALIZATION)..."
-
-# Run evaluation using the modified script (NO NORMALIZATION)
-python $EVAL_SCRIPT \
-    --model_path "$MODEL_PATH" \
-    --coco_embeddings_file "$COCO_EMBEDDINGS_FILE" \
-    --batch_size $BATCH_SIZE \
-    --num_inference_steps $NUM_INFERENCE_STEPS \
-    --max_samples $MAX_SAMPLES \
-    --use_heun \
-    --training_mode patch_only
-
-EVAL_EXIT_CODE=$?
-
-echo ""
-echo "📊 Evaluation Results (NO NORMALIZATION)"
-echo "===================="
-
-if [ $EVAL_EXIT_CODE -eq 0 ]; then
-    echo "✅ Evaluation completed successfully!"
-    echo "🔑 Evaluated in raw CLIP embedding space"
-    echo "📊 No normalization/denormalization applied"
-    
-else
-    echo "❌ Evaluation failed (exit code: $EVAL_EXIT_CODE)"
-    echo "Check logs in ./slurm_out/ for details"
-fi
-
-echo "🏁 Job completed at $(date)"
-exit $EVAL_EXIT_CODE
-EOF
-
-echo "📝 Created evaluation job script: evaluate_blip3o_no_norm.job"

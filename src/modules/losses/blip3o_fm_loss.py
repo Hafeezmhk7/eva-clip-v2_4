@@ -31,11 +31,11 @@ class SemanticPreservingFlowMatchingLoss(nn.Module):
         prediction_type: str = "velocity",
         flow_type: str = "rectified",
         
-        # Loss weights
+        # # Loss weights
         velocity_weight: float = 1.0,
-        semantic_weight: float = 0.5,
-        cosine_weight: float = 0.2,
-        consistency_weight: float = 0.3,
+        # semantic_weight: float = 0.5,
+        # cosine_weight: float = 0.2,
+        # consistency_weight: float = 0.3,
         
         # Timestep configuration
         use_timestep_weighting: bool = True,
@@ -56,11 +56,11 @@ class SemanticPreservingFlowMatchingLoss(nn.Module):
         self.prediction_type = prediction_type
         self.flow_type = flow_type
         
-        # Loss weights
+        # # Loss weights
         self.velocity_weight = velocity_weight
-        self.semantic_weight = semantic_weight
-        self.cosine_weight = cosine_weight
-        self.consistency_weight = consistency_weight
+        # self.semantic_weight = semantic_weight
+        # self.cosine_weight = cosine_weight
+        # self.consistency_weight = consistency_weight
         
         # Timestep weighting
         self.use_timestep_weighting = use_timestep_weighting
@@ -88,9 +88,9 @@ class SemanticPreservingFlowMatchingLoss(nn.Module):
         logger.info(f"✅ Flow Matching Loss initialized (NO NORMALIZATION):")
         logger.info(f"  Prediction type: {prediction_type}")
         logger.info(f"  Flow type: {flow_type}")
-        logger.info(f"  Weights - Velocity: {velocity_weight}, Semantic: {semantic_weight}, Cosine: {cosine_weight}")
-        logger.info(f"  Consistency weight: {consistency_weight}")
-        logger.info(f"  Normalization: DISABLED")
+        logger.info(f"  Weights - Velocity: {velocity_weight}")
+        # logger.info(f"  Consistency weight: {consistency_weight}")
+        # logger.info(f"  Normalization: DISABLED")
 
     def _clamp_timesteps(self, timesteps: torch.Tensor) -> torch.Tensor:
         """Clamp timesteps to avoid numerical issues"""
@@ -152,40 +152,40 @@ class SemanticPreservingFlowMatchingLoss(nn.Module):
             device = timesteps.device
             return {
                 'velocity_weights': torch.ones(batch_size, device=device),
-                'semantic_weights': torch.ones(batch_size, device=device),
-                'cosine_weights': torch.ones(batch_size, device=device),
-                'consistency_weights': torch.ones(batch_size, device=device),
+                # 'semantic_weights': torch.ones(batch_size, device=device),
+                # 'cosine_weights': torch.ones(batch_size, device=device),
+                # 'consistency_weights': torch.ones(batch_size, device=device),
             }
         
         # Velocity loss: constant throughout
         velocity_weights = torch.ones_like(timesteps)
         
         # Semantic loss: starts at late_timestep_threshold
-        semantic_weights = torch.where(
-            timesteps > self.late_timestep_threshold,
-            torch.ones_like(timesteps),
-            torch.zeros_like(timesteps)
-        )
+        # semantic_weights = torch.where(
+        #     timesteps > self.late_timestep_threshold,
+        #     torch.ones_like(timesteps),
+        #     torch.zeros_like(timesteps)
+        # )
         
-        # Cosine loss: emphasize middle to late timesteps
-        cosine_weights = torch.where(
-            timesteps > self.early_timestep_threshold,
-            torch.ones_like(timesteps),
-            torch.ones_like(timesteps) * 0.3
-        )
+        # # Cosine loss: emphasize middle to late timesteps
+        # cosine_weights = torch.where(
+        #     timesteps > self.early_timestep_threshold,
+        #     torch.ones_like(timesteps),
+        #     torch.ones_like(timesteps) * 0.3
+        # )
         
-        # Consistency loss: focus on later timesteps
-        consistency_weights = torch.where(
-            timesteps > self.late_timestep_threshold,
-            torch.ones_like(timesteps),
-            torch.zeros_like(timesteps)
-        )
+        # # Consistency loss: focus on later timesteps
+        # consistency_weights = torch.where(
+        #     timesteps > self.late_timestep_threshold,
+        #     torch.ones_like(timesteps),
+        #     torch.zeros_like(timesteps)
+        # )
         
         return {
-            'velocity_weights': velocity_weights,
-            'semantic_weights': semantic_weights,
-            'cosine_weights': cosine_weights,
-            'consistency_weights': consistency_weights,
+            'velocity_weights': velocity_weights
+            # 'semantic_weights': semantic_weights,
+            # 'cosine_weights': cosine_weights,
+            # 'consistency_weights': consistency_weights,
         }
 
     def _compute_predicted_clean(
@@ -300,52 +300,51 @@ class SemanticPreservingFlowMatchingLoss(nn.Module):
         # Clamp velocity loss
         velocity_loss = torch.clamp(velocity_loss, max=self.max_loss_value)
         
-        # COMPONENT 2: SEMANTIC CONSISTENCY LOSS
+        # # COMPONENT 2: SEMANTIC CONSISTENCY LOSS
         predicted_clean = self._compute_predicted_clean(
             model_output, noisy_input, timesteps, noise
         )
         
-        semantic_mask = weights['semantic_weights'] > 0
-        if semantic_mask.any():
-            semantic_loss = F.mse_loss(
-                predicted_clean[semantic_mask], 
-                target_samples[semantic_mask]
-            )
-            semantic_loss = torch.clamp(semantic_loss, max=self.max_loss_value)
-        else:
-            semantic_loss = torch.tensor(0.0, device=device, dtype=dtype)
+        # semantic_mask = weights['semantic_weights'] > 0
+        # if semantic_mask.any():
+        #     semantic_loss = F.mse_loss(
+        #         predicted_clean[semantic_mask], 
+        #         target_samples[semantic_mask]
+        #     )
+        #     semantic_loss = torch.clamp(semantic_loss, max=self.max_loss_value)
+        # else:
+        #     semantic_loss = torch.tensor(0.0, device=device, dtype=dtype)
         
-        # COMPONENT 3: COSINE SIMILARITY PRESERVATION
-        cosine_mask = weights['cosine_weights'] > 0
-        if cosine_mask.any():
-            pred_subset = predicted_clean[cosine_mask]
-            target_subset = target_samples[cosine_mask]
+        # # COMPONENT 3: COSINE SIMILARITY PRESERVATION
+        # cosine_mask = weights['cosine_weights'] > 0
+        # if cosine_mask.any():
+        #     pred_subset = predicted_clean[cosine_mask]
+        #     target_subset = target_samples[cosine_mask]
             
-            cosine_sim = self._robust_cosine_similarity(pred_subset, target_subset, dim=-1)
-            cosine_loss = 1.0 - cosine_sim.mean()
-            cosine_loss = torch.clamp(cosine_loss, min=0.0, max=2.0)
-        else:
-            cosine_loss = torch.tensor(0.0, device=device, dtype=dtype)
+        #     cosine_sim = self._robust_cosine_similarity(pred_subset, target_subset, dim=-1)
+        #     cosine_loss = 1.0 - cosine_sim.mean()
+        #     cosine_loss = torch.clamp(cosine_loss, min=0.0, max=2.0)
+        # else:
+        #     cosine_loss = torch.tensor(0.0, device=device, dtype=dtype)
         
-        # COMPONENT 4: DIRECT CLIP CONSISTENCY LOSS
-        consistency_mask = weights['consistency_weights'] > 0
-        if consistency_mask.any():
-            # Per-image CLIP similarity
-            pred_per_image = predicted_clean[consistency_mask].mean(dim=1)
-            target_per_image = target_samples[consistency_mask].mean(dim=1)
+        # # COMPONENT 4: DIRECT CLIP CONSISTENCY LOSS
+        # consistency_mask = weights['consistency_weights'] > 0
+        # if consistency_mask.any():
+        #     # Per-image CLIP similarity
+        #     pred_per_image = predicted_clean[consistency_mask].mean(dim=1)
+        #     target_per_image = target_samples[consistency_mask].mean(dim=1)
             
-            clip_consistency = self._robust_cosine_similarity(pred_per_image, target_per_image, dim=-1)
-            consistency_loss = 1.0 - clip_consistency.mean()
-            consistency_loss = torch.clamp(consistency_loss, min=0.0, max=2.0)
-        else:
-            consistency_loss = torch.tensor(0.0, device=device, dtype=dtype)
+        #     clip_consistency = self._robust_cosine_similarity(pred_per_image, target_per_image, dim=-1)
+        #     consistency_loss = 1.0 - clip_consistency.mean()
+        #     consistency_loss = torch.clamp(consistency_loss, min=0.0, max=2.0)
+        # else:
+            # consistency_loss = torch.tensor(0.0, device=device, dtype=dtype)
         
         # Apply adaptive scaling
         scale_factor = self.loss_scale_factor if self.adaptive_scaling else 1.0
         
         # TOTAL LOSS COMBINATION
-        total_loss = scale_factor * (
-            self.velocity_weight * velocity_loss 
+        total_loss = scale_factor * (self.velocity_weight*velocity_loss 
             # self.semantic_weight * semantic_loss +
             # self.cosine_weight * cosine_loss +
             # self.consistency_weight * consistency_loss
@@ -393,17 +392,17 @@ class SemanticPreservingFlowMatchingLoss(nn.Module):
                     velocity_error = model_output - velocity_target
                     velocity_error_norm = torch.norm(velocity_error, dim=-1).mean().item()
                     
-                    # Timestep analysis
-                    active_semantic_ratio = semantic_mask.float().mean().item()
-                    active_cosine_ratio = cosine_mask.float().mean().item()
-                    active_consistency_ratio = consistency_mask.float().mean().item()
+                    # # Timestep analysis
+                    # active_semantic_ratio = semantic_mask.float().mean().item()
+                    # active_cosine_ratio = cosine_mask.float().mean().item()
+                    # active_consistency_ratio = consistency_mask.float().mean().item()
                     
                     metrics = {
                         # Loss components
                         'velocity_loss': velocity_loss.item(),
-                        'semantic_loss': semantic_loss.item() if isinstance(semantic_loss, torch.Tensor) else 0.0,
-                        'cosine_loss': cosine_loss.item() if isinstance(cosine_loss, torch.Tensor) else 0.0,
-                        'consistency_loss': consistency_loss.item() if isinstance(consistency_loss, torch.Tensor) else 0.0,
+                        # 'semantic_loss': semantic_loss.item() if isinstance(semantic_loss, torch.Tensor) else 0.0,
+                        # 'cosine_loss': cosine_loss.item() if isinstance(cosine_loss, torch.Tensor) else 0.0,
+                        # 'consistency_loss': consistency_loss.item() if isinstance(consistency_loss, torch.Tensor) else 0.0,
                         'total_loss': total_loss.item(),
                         
                         # Similarity metrics
@@ -424,9 +423,9 @@ class SemanticPreservingFlowMatchingLoss(nn.Module):
                         # Timestep analysis
                         'timestep_mean': timesteps.mean().item(),
                         'timestep_std': timesteps.std().item(),
-                        'active_semantic_ratio': active_semantic_ratio,
-                        'active_cosine_ratio': active_cosine_ratio,
-                        'active_consistency_ratio': active_consistency_ratio,
+                        # 'active_semantic_ratio': active_semantic_ratio,
+                        # 'active_cosine_ratio': active_cosine_ratio,
+                        # 'active_consistency_ratio': active_consistency_ratio,
                         
                         # Stability metrics
                         'loss_scale_factor': self.loss_scale_factor,
@@ -546,9 +545,9 @@ def create_clip_reproduction_loss(
     prediction_type: str = "velocity",
     flow_type: str = "rectified", 
     velocity_weight: float = 1.0,
-    semantic_weight: float = 0.5,
-    cosine_weight: float = 0.2,
-    consistency_weight: float = 0.3,
+    # semantic_weight: float = 0.5,
+    # cosine_weight: float = 0.2,
+    # consistency_weight: float = 0.3,
     use_timestep_weighting: bool = True,
     max_loss_value: float = 100.0,
     adaptive_scaling: bool = True,
@@ -561,9 +560,9 @@ def create_clip_reproduction_loss(
         prediction_type=prediction_type,
         flow_type=flow_type,
         velocity_weight=velocity_weight,
-        semantic_weight=semantic_weight,
-        cosine_weight=cosine_weight,
-        consistency_weight=consistency_weight,
+        # semantic_weight=semantic_weight,
+        # cosine_weight=cosine_weight,
+        # consistency_weight=consistency_weight,
         use_timestep_weighting=use_timestep_weighting,
         max_loss_value=max_loss_value,
         adaptive_scaling=adaptive_scaling,
