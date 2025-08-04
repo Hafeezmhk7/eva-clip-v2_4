@@ -3,9 +3,7 @@
 BLIP3-o Dataset WITHOUT CLIP Normalization
 src/modules/datasets/blip3o_dataset.py
 
-CHANGES:
-1. Removed UltraConservativeCLIPNormalizer class
-2. Removed normalization from collate functions
+
 3. Simplified dataset to work directly with raw CLIP embeddings
 4. Kept optional simple scaling factor (data-independent)
 """

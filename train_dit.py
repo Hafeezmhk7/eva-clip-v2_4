@@ -1,14 +1,9 @@
 #!/usr/bin/env python3
 """
-BLIP3-o Training Script WITHOUT CLIP Normalization - Updated with Temp Directory Support
+BLIP3-o Training Script 
 train_dit.py
 
-CHANGES:
-1. Removed all references to CLIP normalization
-2. Works directly with raw CLIP embeddings
-3. Simplified training pipeline without normalization concerns
-4. Optional simple scaling factor (data-independent)
-5. UPDATED: Automatic temp directory detection and checkpoint management
+
 
 Usage:
     python train_dit.py --chunked_embeddings_dir /path/to/embeddings --output_dir ./checkpoints_no_norm

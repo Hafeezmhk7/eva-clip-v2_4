@@ -3,11 +3,10 @@
 Flow Matching Loss WITHOUT CLIP Normalization
 src/modules/losses/blip3o_fm_loss.py
 
-CHANGES:
+
 1. Removed denormalization from compute_eval_loss
 2. Simplified evaluation metrics to work with raw CLIP embeddings
-3. Removed references to denormalize_fn
-4. All computation now in raw CLIP space
+3. All computation now in raw CLIP space
 """
 
 import torch

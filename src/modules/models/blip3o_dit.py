@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 """
-UPDATED BLIP3-o DiT Model with EVA Adapter and Heun Solver
 src/modules/models/blip3o_dit.py
 
 Key improvements:

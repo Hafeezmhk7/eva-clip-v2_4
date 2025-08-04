@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 """
-BLIP3-o Trainer WITHOUT CLIP Normalization - Updated with Temp Directory Checkpoints
+BLIP3-o Trainer 
 src/modules/trainers/blip3o_trainer.py
 
-CHANGES:
 1. Removed all references to clip_normalizer
 2. Removed denormalization from evaluation
 3. Simplified evaluation to work with raw CLIP embeddings
