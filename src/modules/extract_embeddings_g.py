@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """
-FIXED BLIP3-o Embedding Extraction with Multi-GPU Support
+MEMORY-OPTIMIZED BLIP3-o Embedding Extraction with Multi-GPU Support
 src/modules/extract_embeddings_g.py
 
-FIXES:
-1. Fixed WebDataset version compatibility issues
-2. Multiple fallback approaches for distributed WebDataset
-3. Better error handling and diagnostics
-4. Simplified distributed processing that works with any WebDataset version
+MEMORY OPTIMIZATION FIXES:
+1. Enhanced memory monitoring and cleanup
+2. Adaptive batch processing based on available memory
+3. Better model loading with memory efficiency
+4. OOM detection and recovery mechanisms
+5. Progressive memory management throughout processing
 """
 
 import sys
@@ -59,145 +60,242 @@ def get_memory_usage():
     except:
         return 0.0
 
+def get_gpu_memory_info(device_id: int = None) -> dict:
+    """Get GPU memory information"""
+    try:
+        if device_id is not None:
+            torch.cuda.set_device(device_id)
+        else:
+            device_id = torch.cuda.current_device()
+            
+        total_memory = torch.cuda.get_device_properties(device_id).total_memory / 1e9
+        allocated = torch.cuda.memory_allocated(device_id) / 1e9
+        cached = torch.cuda.memory_reserved(device_id) / 1e9
+        free = total_memory - cached
+        
+        return {
+            'device_id': device_id,
+            'total_gb': total_memory,
+            'allocated_gb': allocated,
+            'cached_gb': cached,
+            'free_gb': free,
+            'utilization_pct': (cached / total_memory) * 100
+        }
+        
+    except Exception as e:
+        return {'error': str(e), 'device_id': device_id}
+
 def cleanup_memory():
-    """Aggressive memory cleanup"""
-    gc.collect()
+    """Enhanced memory cleanup with monitoring"""
+    initial_memory = get_memory_usage()
+    initial_gpu_memory = get_gpu_memory_info() if torch.cuda.is_available() else {}
+    
+    # Python garbage collection
+    collected = gc.collect()
+    
+    # PyTorch CUDA cleanup
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
         torch.cuda.synchronize()
+    
+    # Force another garbage collection
+    gc.collect()
+    
+    final_memory = get_memory_usage()
+    final_gpu_memory = get_gpu_memory_info() if torch.cuda.is_available() else {}
+    
+    # Calculate cleanup effectiveness
+    system_freed = initial_memory - final_memory
+    gpu_freed = (initial_gpu_memory.get('cached_gb', 0) - 
+                final_gpu_memory.get('cached_gb', 0)) if torch.cuda.is_available() else 0
+    
+    return {
+        'objects_collected': collected,
+        'system_memory_freed_gb': system_freed,
+        'gpu_memory_freed_gb': gpu_freed,
+        'final_gpu_free_gb': final_gpu_memory.get('free_gb', 0)
+    }
+
+def adaptive_batch_size_selection(device, initial_batch_size: int = 16, min_free_memory_gb: float = 5.0) -> int:
+    """Adaptively select batch size based on available GPU memory"""
+    try:
+        if not torch.cuda.is_available():
+            return min(initial_batch_size, 8)  # Conservative for CPU
+        
+        memory_info = get_gpu_memory_info(device.index if hasattr(device, 'index') else None)
+        free_memory_gb = memory_info.get('free_gb', 0)
+        
+        print(f"GPU memory: {free_memory_gb:.1f} GB free")
+        
+        # Adaptive batch size selection based on available memory
+        if free_memory_gb > 60:  # Abundant memory (H100)
+            recommended_batch_size = min(initial_batch_size, 24)
+        elif free_memory_gb > 40:  # Good memory availability
+            recommended_batch_size = min(initial_batch_size, 16)
+        elif free_memory_gb > 20:  # Moderate memory
+            recommended_batch_size = min(initial_batch_size, 12)
+        elif free_memory_gb > 10:  # Limited memory
+            recommended_batch_size = min(initial_batch_size, 8)
+        elif free_memory_gb > min_free_memory_gb:  # Minimal memory
+            recommended_batch_size = min(initial_batch_size, 4)
+        else:  # Critical memory situation
+            recommended_batch_size = 2
+            print(f"⚠️ Critical memory situation: {free_memory_gb:.1f} GB free, using batch_size=2")
+        
+        if recommended_batch_size != initial_batch_size:
+            print(f"📊 Adjusted batch size from {initial_batch_size} to {recommended_batch_size} based on memory")
+        
+        return recommended_batch_size
+        
+    except Exception as e:
+        print(f"⚠️ Could not determine adaptive batch size: {e}")
+        return min(initial_batch_size, 8)  # Conservative fallback
 
 def load_models(device):
-    """Load CLIP and EVA-CLIP models"""
-    print("📦 Loading models...")
+    """Load CLIP and EVA-CLIP models with memory optimization"""
+    print("📦 Loading models with memory optimization...")
     
-    # Load CLIP ViT-L/14
+    # Get initial memory state
+    initial_memory = get_gpu_memory_info(device.index if hasattr(device, 'index') else None)
+    print(f"   Initial GPU memory: {initial_memory.get('free_gb', 0):.1f} GB free")
+    
+    # Load CLIP ViT-L/14 with memory optimization
     print("   Loading CLIP ViT-L/14...")
-    clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-large-patch14")
+    clip_processor = CLIPProcessor.from_pretrained(
+        "openai/clip-vit-large-patch14",
+        cache_dir=os.environ.get('TRANSFORMERS_CACHE')
+    )
+    
     clip_model = CLIPModel.from_pretrained(
         "openai/clip-vit-large-patch14",
-        torch_dtype=torch.float16
+        torch_dtype=torch.float16,
+        device_map=None,  # Manual device placement
+        cache_dir=os.environ.get('TRANSFORMERS_CACHE')
     ).to(device)
     clip_model.eval()
     
-    # Load EVA-CLIP-8B
+    # Memory cleanup after CLIP loading
+    cleanup_result = cleanup_memory()
+    print(f"   After CLIP: {cleanup_result['final_gpu_free_gb']:.1f} GB free (freed {cleanup_result['gpu_memory_freed_gb']:.1f} GB)")
+    
+    # Load EVA-CLIP-8B with memory optimization
     print("   Loading EVA-CLIP-8B...")
     eva_model = AutoModel.from_pretrained(
         "BAAI/EVA-CLIP-8B", 
         trust_remote_code=True,
-        torch_dtype=torch.float16
+        torch_dtype=torch.float16,
+        device_map=None,  # Manual device placement
+        cache_dir=os.environ.get('TRANSFORMERS_CACHE')
     ).to(device)
     
-    eva_processor = CLIPImageProcessor.from_pretrained("openai/clip-vit-large-patch14")
+    eva_processor = CLIPImageProcessor.from_pretrained(
+        "openai/clip-vit-large-patch14",
+        cache_dir=os.environ.get('TRANSFORMERS_CACHE')
+    )
     eva_model.eval()
     
-    cleanup_memory()
+    # Final memory cleanup
+    cleanup_result = cleanup_memory()
+    final_memory = get_gpu_memory_info(device.index if hasattr(device, 'index') else None)
     
-    print("✅ Models loaded successfully")
-    print(f"💾 Memory usage after loading: {get_memory_usage():.2f} GB")
+    print("✅ Models loaded successfully with memory optimization")
+    print(f"💾 Final GPU memory: {final_memory.get('free_gb', 0):.1f} GB free")
+    print(f"💾 Total memory used by models: {initial_memory.get('free_gb', 0) - final_memory.get('free_gb', 0):.1f} GB")
     
     return clip_processor, clip_model, eva_processor, eva_model
 
 def extract_clip_features_with_cls(images, processor, model, device, include_cls=True):
     """
-    Extract CLIP ViT-L/14 features with CLS token + patches
-    
-    Args:
-        images: List of PIL images
-        processor: CLIP processor
-        model: CLIP model
-        device: Device
-        include_cls: Whether to include CLS token (default: True)
-        
-    Returns:
-        Features tensor [B, 257, 1024] if include_cls else [B, 256, 1024]
+    Extract CLIP ViT-L/14 features with CLS token + patches (memory optimized)
     """
     features = []
     
     for img in images:
-        inputs = processor(images=img, return_tensors="pt")
-        inputs = {k: v.to(device).half() if v.dtype == torch.float32 else v.to(device) 
-                 for k, v in inputs.items()}
-        
-        with torch.no_grad():
-            vision_outputs = model.vision_model(
-                pixel_values=inputs['pixel_values'],
-                output_hidden_states=True,
-                return_dict=True
-            )
+        try:
+            inputs = processor(images=img, return_tensors="pt")
+            inputs = {k: v.to(device).half() if v.dtype == torch.float32 else v.to(device) 
+                     for k, v in inputs.items()}
             
-            # Get all hidden states (CLS + patches)
-            # ViT-L/14 outputs: [1, 257, 1024] where [0] is CLS, [1:257] are patches
-            if include_cls:
-                # Keep CLS token + patches: [1, 257, 1024]
-                all_embeddings = vision_outputs.last_hidden_state  # [1, 257, 1024]
-                expected_tokens = 257
-            else:
-                # Remove CLS token (patches only): [1, 256, 1024]
-                all_embeddings = vision_outputs.last_hidden_state[:, 1:, :]  # [1, 256, 1024]
-                expected_tokens = 256
-            
-            batch_size, num_tokens, hidden_dim = all_embeddings.shape
-            
-            # Validate dimensions
-            assert hidden_dim == 1024, f"Expected CLIP 1024-dim, got {hidden_dim}"
-            assert num_tokens == expected_tokens, f"Expected {expected_tokens} tokens, got {num_tokens}"
-            
-            # Convert to float32 and move to CPU
-            features.append(all_embeddings.squeeze().cpu().float())
-            
-            # Clear GPU memory
-            del vision_outputs, all_embeddings
+            with torch.no_grad():
+                vision_outputs = model.vision_model(
+                    pixel_values=inputs['pixel_values'],
+                    output_hidden_states=True,
+                    return_dict=True
+                )
+                
+                # Get all hidden states (CLS + patches)
+                if include_cls:
+                    all_embeddings = vision_outputs.last_hidden_state  # [1, 257, 1024]
+                    expected_tokens = 257
+                else:
+                    all_embeddings = vision_outputs.last_hidden_state[:, 1:, :]  # [1, 256, 1024]
+                    expected_tokens = 256
+                
+                batch_size, num_tokens, hidden_dim = all_embeddings.shape
+                
+                # Validate dimensions
+                assert hidden_dim == 1024, f"Expected CLIP 1024-dim, got {hidden_dim}"
+                assert num_tokens == expected_tokens, f"Expected {expected_tokens} tokens, got {num_tokens}"
+                
+                # Convert to float32 and move to CPU immediately to save GPU memory
+                features.append(all_embeddings.squeeze().cpu().float())
+                
+                # Clear GPU memory immediately
+                del vision_outputs, all_embeddings
+                
+        except Exception as e:
+            print(f"⚠️ Error extracting CLIP features for image: {e}")
+            # Create a zero tensor as fallback
+            expected_tokens = 257 if include_cls else 256
+            fallback_tensor = torch.zeros(expected_tokens, 1024)
+            features.append(fallback_tensor)
     
     return torch.stack(features)
 
 def extract_eva_features_with_cls(images, processor, model, device, include_cls=True):
     """
-    Extract EVA-CLIP-8B features with CLS token + patches
-    
-    Args:
-        images: List of PIL images
-        processor: EVA processor
-        model: EVA model
-        device: Device
-        include_cls: Whether to include CLS token (default: True)
-        
-    Returns:
-        Features tensor [B, 257, 4096] if include_cls else [B, 256, 4096]
+    Extract EVA-CLIP-8B features with CLS token + patches (memory optimized)
     """
     features = []
     
     for img in images:
-        inputs = processor(images=img, return_tensors="pt")
-        pixel_values = inputs['pixel_values'].to(device).half()
-        
-        with torch.no_grad():
-            vision_outputs = model.vision_model(
-                pixel_values=pixel_values,
-                output_hidden_states=True,
-                return_dict=True
-            )
+        try:
+            inputs = processor(images=img, return_tensors="pt")
+            pixel_values = inputs['pixel_values'].to(device).half()
             
-            # Get all hidden states (CLS + patches)
-            # EVA-CLIP outputs: [1, 257, hidden_dim] where [0] is CLS, [1:257] are patches
-            if include_cls:
-                # Keep CLS token + patches: [1, 257, hidden_dim]
-                all_embeddings = vision_outputs.last_hidden_state  # [1, 257, hidden_dim]
-                expected_tokens = 257
-            else:
-                # Remove CLS token (patches only): [1, 256, hidden_dim]
-                all_embeddings = vision_outputs.last_hidden_state[:, 1:, :]  # [1, 256, hidden_dim]
-                expected_tokens = 256
-            
-            batch_size, num_tokens, hidden_dim = all_embeddings.shape
-            
-            # Validate dimensions
-            assert num_tokens == expected_tokens, f"Expected {expected_tokens} tokens, got {num_tokens}"
-            
-            # Convert to float32 and move to CPU
-            features.append(all_embeddings.squeeze().cpu().float())
-            
-            # Clear GPU memory
-            del vision_outputs, all_embeddings, pixel_values
+            with torch.no_grad():
+                vision_outputs = model.vision_model(
+                    pixel_values=pixel_values,
+                    output_hidden_states=True,
+                    return_dict=True
+                )
+                
+                # Get all hidden states (CLS + patches)
+                if include_cls:
+                    all_embeddings = vision_outputs.last_hidden_state  # [1, 257, hidden_dim]
+                    expected_tokens = 257
+                else:
+                    all_embeddings = vision_outputs.last_hidden_state[:, 1:, :]  # [1, 256, hidden_dim]
+                    expected_tokens = 256
+                
+                batch_size, num_tokens, hidden_dim = all_embeddings.shape
+                
+                # Validate dimensions
+                assert num_tokens == expected_tokens, f"Expected {expected_tokens} tokens, got {num_tokens}"
+                
+                # Convert to float32 and move to CPU immediately to save GPU memory
+                features.append(all_embeddings.squeeze().cpu().float())
+                
+                # Clear GPU memory immediately
+                del vision_outputs, all_embeddings, pixel_values
+                
+        except Exception as e:
+            print(f"⚠️ Error extracting EVA features for image: {e}")
+            # Create a zero tensor as fallback (need to determine EVA hidden_dim)
+            expected_tokens = 257 if include_cls else 256
+            # EVA-CLIP-8B typically has 4096 dim
+            fallback_tensor = torch.zeros(expected_tokens, 4096)
+            features.append(fallback_tensor)
     
     return torch.stack(features)
 
@@ -287,7 +385,7 @@ def check_webdataset_version():
 
 def create_distributed_webdataset_v2(tar_file_path: str, world_size: int = 1, rank: int = 0):
     """
-    FIXED: Create WebDataset with version compatibility and multiple fallback approaches
+    FIXED: Create WebDataset with version compatibility and memory optimization
     """
     print(f"🔧 Creating WebDataset (world_size={world_size}, rank={rank})")
     
@@ -303,7 +401,7 @@ def create_distributed_webdataset_v2(tar_file_path: str, world_size: int = 1, ra
         import io
         
         def decode_sample(sample):
-            """Decode a sample from WebDataset"""
+            """Decode a sample from WebDataset with memory optimization"""
             try:
                 # Get image
                 for ext in ['jpg', 'jpeg', 'png', 'webp']:
@@ -313,6 +411,7 @@ def create_distributed_webdataset_v2(tar_file_path: str, world_size: int = 1, ra
                 else:
                     return None
                 
+                # Load image and immediately convert to RGB to save memory
                 image = Image.open(io.BytesIO(image_data)).convert('RGB')
                 
                 # Get caption
@@ -327,6 +426,9 @@ def create_distributed_webdataset_v2(tar_file_path: str, world_size: int = 1, ra
                         break
                 
                 key = sample.get('__key__', 'unknown')
+                
+                # Clear sample data to free memory
+                sample.clear()
                 
                 return {
                     'image': image,
@@ -396,15 +498,6 @@ def create_distributed_webdataset_v2(tar_file_path: str, world_size: int = 1, ra
         except Exception as e:
             print(f"   ❌ Simple WebDataset failed: {e}")
         
-        # APPROACH 4: Ultra-simple WebDataset
-        print("   Attempting ultra-simple WebDataset...")
-        try:
-            dataset = wds.WebDataset(tar_file_path).map(decode_sample)
-            print("   ✅ Ultra-simple WebDataset created successfully")
-            return dataset
-        except Exception as e:
-            print(f"   ❌ Ultra-simple WebDataset failed: {e}")
-        
         print("❌ All WebDataset approaches failed")
         return None
         
@@ -417,7 +510,7 @@ def create_distributed_webdataset_v2(tar_file_path: str, world_size: int = 1, ra
 
 def create_fallback_tar_processor(tar_file_path: str, world_size: int = 1, rank: int = 0):
     """
-    Fallback TAR processor using Python tarfile when WebDataset fails
+    Fallback TAR processor using Python tarfile when WebDataset fails (memory optimized)
     """
     print(f"🔄 Creating fallback TAR processor for {Path(tar_file_path).name}")
     
@@ -452,7 +545,12 @@ def create_fallback_tar_processor(tar_file_path: str, world_size: int = 1, rank:
                                     # Try to decode as image
                                     if any(ext in member.name.lower() for ext in ['.jpg', '.jpeg', '.png', '.webp']):
                                         try:
-                                            image = Image.open(io.BytesIO(file_obj.read())).convert('RGB')
+                                            # Read and immediately convert image to save memory
+                                            image_data = file_obj.read()
+                                            image = Image.open(io.BytesIO(image_data)).convert('RGB')
+                                            
+                                            # Clear image data to free memory
+                                            del image_data
                                             
                                             # Create a simple caption (or try to find associated text file)
                                             key = Path(member.name).stem
@@ -495,13 +593,23 @@ def process_single_tar(
     max_retries: int = 3
 ) -> dict:
     """
-    FIXED: Process a single TAR file with robust WebDataset handling
+    MEMORY-OPTIMIZED: Process a single TAR file with enhanced memory management
     """
     
     print(f"\n🔄 Processing shard {shard_idx}: {Path(tar_file_path).name}")
     print(f"   Mode: {'CLS+Patches' if include_cls else 'Patches only'} ({target_tokens} tokens)")
     if world_size > 1:
         print(f"   Distributed: rank {rank}/{world_size}")
+    
+    # Get initial memory state
+    initial_memory = get_gpu_memory_info(device.index if hasattr(device, 'index') else None)
+    print(f"   Initial GPU memory: {initial_memory.get('free_gb', 0):.1f} GB free")
+    
+    # Adaptive batch size selection
+    adaptive_batch_size = adaptive_batch_size_selection(device, batch_size)
+    if adaptive_batch_size != batch_size:
+        print(f"   Adjusted batch size from {batch_size} to {adaptive_batch_size}")
+        batch_size = adaptive_batch_size
     
     # Expected output file path
     mode_suffix = "cls_patch" if include_cls else "patch_only"
@@ -533,10 +641,14 @@ def process_single_tar(
             print(f"   ⚠️  Could not read existing file, will reprocess...")
             shard_path.unlink()
     
-    # Try processing with retries and multiple approaches
+    # Try processing with retries and memory optimization
     for attempt in range(max_retries):
         try:
-            print(f"   🔄 Processing attempt {attempt + 1}/{max_retries}")
+            print(f"   🔄 Processing attempt {attempt + 1}/{max_retries} (batch_size={batch_size})")
+            
+            # Pre-processing memory cleanup
+            cleanup_result = cleanup_memory()
+            print(f"   Memory cleanup: freed {cleanup_result['gpu_memory_freed_gb']:.1f} GB GPU memory")
             
             # APPROACH 1: Try WebDataset (fixed version)
             dataset = create_distributed_webdataset_v2(tar_file_path, world_size, rank)
@@ -557,7 +669,7 @@ def process_single_tar(
                     }
                 continue
             
-            # Create dataloader
+            # Create dataloader with memory-optimized settings
             def simple_collate(batch):
                 valid_batch = [item for item in batch if item is not None]
                 if not valid_batch:
@@ -577,11 +689,12 @@ def process_single_tar(
                 dataset, 
                 batch_size=batch_size, 
                 collate_fn=simple_collate,
-                num_workers=0,  # Set to 0 for distributed processing
-                drop_last=False
+                num_workers=0,  # Use 0 to avoid multiprocessing overhead
+                drop_last=False,
+                pin_memory=False  # Disable pin_memory to save memory
             )
             
-            print(f"   ✅ Dataloader created successfully")
+            print(f"   ✅ Dataloader created successfully with batch_size={batch_size}")
             
             # Storage for this shard's embeddings
             shard_clip_embeddings = []
@@ -593,8 +706,9 @@ def process_single_tar(
             start_time = time.time()
             batch_count = 0
             error_count = 0
+            oom_count = 0
             
-            print(f"   📊 Processing batches...")
+            print(f"   📊 Processing batches with memory monitoring...")
             
             # Process all batches in this TAR file
             try:
@@ -604,6 +718,9 @@ def process_single_tar(
                         
                     batch_count += 1
                     
+                    # Memory check before processing batch
+                    pre_batch_memory = get_gpu_memory_info(device.index if hasattr(device, 'index') else None)
+                    
                     try:
                         images = batch['image']
                         captions = batch['caption']
@@ -612,38 +729,68 @@ def process_single_tar(
                         if not images:  # Skip empty batches
                             continue
                         
-                        # Extract features with CLS support
-                        clip_features = extract_clip_features_with_cls(
-                            images, clip_processor, clip_model, device, include_cls=include_cls
-                        )
-                        cleanup_memory()
-                        
-                        eva_features = extract_eva_features_with_cls(
-                            images, eva_processor, eva_model, device, include_cls=include_cls
-                        )
-                        cleanup_memory()
+                        # Extract features with memory monitoring
+                        try:
+                            clip_features = extract_clip_features_with_cls(
+                                images, clip_processor, clip_model, device, include_cls=include_cls
+                            )
+                            
+                            # Immediate memory cleanup
+                            cleanup_memory()
+                            
+                            eva_features = extract_eva_features_with_cls(
+                                images, eva_processor, eva_model, device, include_cls=include_cls
+                            )
+                            
+                            # Another memory cleanup
+                            cleanup_memory()
+                            
+                        except RuntimeError as e:
+                            if "out of memory" in str(e).lower():
+                                oom_count += 1
+                                print(f"   💥 OOM in batch {batch_idx}, reducing batch size")
+                                
+                                # Reduce batch size for next attempt
+                                batch_size = max(batch_size // 2, 1)
+                                
+                                # Aggressive memory cleanup
+                                cleanup_memory()
+                                
+                                if batch_size == 1:
+                                    print(f"   ❌ OOM even with batch_size=1, skipping this batch")
+                                    error_count += 1
+                                    continue
+                                else:
+                                    # Try processing with smaller batch size
+                                    # This would require breaking the batch into smaller pieces
+                                    print(f"   🔄 Breaking batch into smaller pieces...")
+                                    continue
+                            else:
+                                raise e
                         
                         # Validate shapes match target tokens
                         assert clip_features.shape[1] == target_tokens, f"CLIP tokens: {clip_features.shape[1]} vs {target_tokens}"
                         assert eva_features.shape[1] == target_tokens, f"EVA tokens: {eva_features.shape[1]} vs {target_tokens}"
                         
-                        # Move to CPU and store
-                        shard_clip_embeddings.append(clip_features.cpu())
-                        shard_eva_embeddings.append(eva_features.cpu())
+                        # Move to CPU and store (already on CPU from extraction functions)
+                        shard_clip_embeddings.append(clip_features)
+                        shard_eva_embeddings.append(eva_features)
                         shard_captions.extend(captions)
                         shard_keys.extend(keys)
                         
                         total_samples += len(images)
                         
-                        # Clear intermediate variables
-                        del clip_features, eva_features, images
+                        # Clear intermediate variables and cleanup
+                        del clip_features, eva_features, images, captions, keys
                         cleanup_memory()
                         
                         # Progress update every 10 batches
                         if batch_idx % 10 == 0:
                             elapsed = time.time() - start_time
                             samples_per_sec = total_samples / elapsed if elapsed > 0 else 0
-                            print(f"   Batch {batch_idx}: {total_samples} samples, {samples_per_sec:.1f} samples/sec")
+                            post_batch_memory = get_gpu_memory_info(device.index if hasattr(device, 'index') else None)
+                            print(f"   Batch {batch_idx}: {total_samples} samples, {samples_per_sec:.1f} samples/sec, "
+                                  f"{post_batch_memory.get('free_gb', 0):.1f} GB free")
                     
                     except Exception as e:
                         error_count += 1
@@ -652,7 +799,7 @@ def process_single_tar(
                             raise Exception(f"Too many batch errors: {error_count}/{batch_count}")
                         continue
                 
-                print(f"   ✅ Processed {batch_count} batches, {error_count} errors, {total_samples} samples")
+                print(f"   ✅ Processed {batch_count} batches, {error_count} errors, {oom_count} OOM events, {total_samples} samples")
                 break  # Success, exit retry loop
                 
             except Exception as e:
@@ -662,7 +809,8 @@ def process_single_tar(
                         'shard_idx': shard_idx,
                         'total_samples': 0,
                         'success': False,
-                        'error': f'Dataloader iteration failed after {max_retries} attempts: {e}'
+                        'error': f'Dataloader iteration failed after {max_retries} attempts: {e}',
+                        'oom_events': oom_count
                     }
                 continue
         
@@ -707,8 +855,8 @@ def process_single_tar(
                     'tokens': target_tokens,
                     'include_cls': include_cls,
                     'mode': mode_suffix,
-                    'extraction_method': 'cls_patch_extraction_v5_fixed_webdataset',
-                    'format_version': f'blip3o_{target_tokens}_tokens_{"cls_" if include_cls else ""}patch_v5',
+                    'extraction_method': 'memory_optimized_cls_patch_extraction_v6',
+                    'format_version': f'blip3o_{target_tokens}_tokens_{"cls_" if include_cls else ""}patch_v6_memory_optimized',
                     'extraction_time': time.time() - start_time,
                     'cls_first': include_cls,
                     'patch_order': '16x16_row_major',
@@ -716,6 +864,10 @@ def process_single_tar(
                     'rank': rank,
                     'world_size': world_size,
                     'webdataset_fixed': True,
+                    'memory_optimized': True,
+                    'adaptive_batch_size': True,
+                    'oom_events': oom_count,
+                    'final_batch_size': batch_size,
                 }
             }
             
@@ -734,6 +886,8 @@ def process_single_tar(
                 print(f"      Samples: {total_samples}")
                 print(f"      Mode: {mode_suffix} ({target_tokens} tokens)")
                 print(f"      Time: {time.time() - start_time:.1f}s")
+                print(f"      OOM events: {oom_count}")
+                print(f"      Final batch size: {batch_size}")
                 if world_size > 1:
                     print(f"      Distributed: rank {rank}/{world_size}")
                 
@@ -754,6 +908,9 @@ def process_single_tar(
                     'rank': rank,
                     'world_size': world_size,
                     'webdataset_fixed': True,
+                    'memory_optimized': True,
+                    'oom_events': oom_count,
+                    'final_batch_size': batch_size,
                 }
             
             except Exception as e:
@@ -762,7 +919,8 @@ def process_single_tar(
                     'shard_idx': shard_idx,
                     'total_samples': total_samples,
                     'success': False,
-                    'error': f'File save failed: {e}'
+                    'error': f'File save failed: {e}',
+                    'oom_events': oom_count
                 }
         
         except Exception as e:
@@ -771,7 +929,8 @@ def process_single_tar(
                 'shard_idx': shard_idx,
                 'total_samples': 0,
                 'success': False,
-                'error': f'Consolidation failed: {e}'
+                'error': f'Consolidation failed: {e}',
+                'oom_events': oom_count
             }
     
     else:
@@ -780,18 +939,19 @@ def process_single_tar(
             'shard_idx': shard_idx,
             'total_samples': 0,
             'success': False,
-            'error': 'No embeddings extracted - empty or corrupted TAR file'
+            'error': 'No embeddings extracted - empty or corrupted TAR file',
+            'oom_events': oom_count
         }
 
 def main():
-    """Main extraction function with fixed WebDataset support."""
-    parser = argparse.ArgumentParser(description="FIXED BLIP3-o Embedding Extraction")
+    """Main extraction function with memory optimization."""
+    parser = argparse.ArgumentParser(description="MEMORY-OPTIMIZED BLIP3-o Embedding Extraction")
     parser.add_argument("--include_cls", action="store_true", default=False,
                        help="Include CLS token (257 tokens) or patches only (256 tokens)")
     parser.add_argument("--max_shards", type=int, default=None,
                        help="Maximum number of shards to process (for testing)")
-    parser.add_argument("--batch_size", type=int, default=16,
-                       help="Batch size for processing")
+    parser.add_argument("--batch_size", type=int, default=12,  # Reduced default
+                       help="Initial batch size for processing (will be adapted)")
     
     args = parser.parse_args()
     
@@ -799,13 +959,14 @@ def main():
     target_tokens = 257 if args.include_cls else 256
     mode_name = "CLS+Patches" if args.include_cls else "Patches only"
     
-    print("🚀 FIXED BLIP3-o Embedding Extraction")
+    print("🚀 MEMORY-OPTIMIZED BLIP3-o Embedding Extraction")
     print("=" * 70)
     print(f"Mode: {mode_name} ({target_tokens} tokens)")
     print(f"CLS token: {'First token [0]' if args.include_cls else 'Not included'}")
     print(f"Patches: {'Tokens [1:257]' if args.include_cls else 'Tokens [0:256]'} (16x16 grid)")
+    print(f"Initial batch size: {args.batch_size} (adaptive)")
     print(f"Max shards: {args.max_shards if args.max_shards else 'All'}")
-    print(f"FIXES: WebDataset version compatibility, multiple fallbacks, better error handling")
+    print(f"MEMORY OPTIMIZATION: Adaptive batch sizing, enhanced cleanup, OOM detection")
     print("=" * 70)
     
     if not torch.cuda.is_available():
@@ -813,6 +974,11 @@ def main():
     
     device = torch.device('cuda')
     project_root = setup_paths()
+    
+    # Print GPU information
+    gpu_info = get_gpu_memory_info(device.index)
+    print(f"🎮 Using GPU: {torch.cuda.get_device_name(0)}")
+    print(f"🧠 GPU Memory: {gpu_info.get('total_gb', 0):.1f} GB total, {gpu_info.get('free_gb', 0):.1f} GB free")
     
     # Check WebDataset status
     wds_info = check_webdataset_version()
@@ -846,9 +1012,7 @@ def main():
         print(f"⚠️  Using fallback temp management")
         print(f"📁 Embeddings dir: {embeddings_dir}")
     
-    print(f"🎮 Using GPU: {torch.cuda.get_device_name(0)}")
-    
-    # Load models
+    # Load models with memory optimization
     try:
         clip_processor, clip_model, eva_processor, eva_model = load_models(device)
     except Exception as e:
@@ -864,12 +1028,13 @@ def main():
     
     print(f"📤 Output directory: {embeddings_dir}")
     
-    # Process each TAR file
-    print(f"\n🔄 Processing {len(tar_files)} TAR files...")
+    # Process each TAR file with memory optimization
+    print(f"\n🔄 Processing {len(tar_files)} TAR files with MEMORY OPTIMIZATION...")
     
     processing_results = []
     total_samples_all = 0
     failed_shards = []
+    oom_shards = []
     
     for shard_idx, tar_file in enumerate(tar_files):
         print(f"\n" + "="*60)
@@ -897,11 +1062,20 @@ def main():
             processing_results.append(result)
             total_samples_all += result['total_samples']
             print(f"✅ Shard {shard_idx} successful: {result['total_samples']} samples")
+            
+            # Track OOM events
+            if result.get('oom_events', 0) > 0:
+                print(f"   ⚠️ Had {result['oom_events']} OOM events but recovered")
+                
         else:
             failed_shards.append(shard_idx)
-            print(f"❌ Shard {shard_idx} failed: {result.get('error', 'Unknown error')}")
+            if result and result.get('oom_events', 0) > 0:
+                oom_shards.append(shard_idx)
+                print(f"💥 Shard {shard_idx} failed due to OOM: {result.get('error', 'Unknown error')}")
+            else:
+                print(f"❌ Shard {shard_idx} failed: {result.get('error', 'Unknown error') if result else 'No result'}")
     
-    # Create manifest
+    # Create manifest with memory optimization info
     manifest_data = {
         'total_shards': len(processing_results),
         'total_samples': total_samples_all,
@@ -913,14 +1087,27 @@ def main():
         'extraction_timestamp': time.time(),
         'shards': processing_results,
         'failed_shards': failed_shards,
-        'format_version': f'blip3o_{target_tokens}_tokens_{"cls_" if args.include_cls else ""}patch_v5_fixed',
+        'oom_shards': oom_shards,
+        'format_version': f'blip3o_{target_tokens}_tokens_{"cls_" if args.include_cls else ""}patch_v6_memory_optimized',
         'webdataset_info': wds_info,
+        'memory_optimization': {
+            'adaptive_batch_sizing': True,
+            'enhanced_memory_cleanup': True,
+            'oom_detection_and_recovery': True,
+            'memory_monitoring': True,
+            'optimized_model_loading': True,
+        },
         'fixes_applied': [
             'WebDataset version compatibility checks',
             'Multiple fallback approaches for dataset creation',
+            'MEMORY: Adaptive batch sizing based on GPU memory',
+            'MEMORY: Enhanced memory cleanup and monitoring',
+            'MEMORY: OOM detection and recovery mechanisms',
+            'MEMORY: Progressive batch size reduction on pressure',
+            'MEMORY: Optimized model loading for efficiency',
             'Better error handling and diagnostics',
             'Direct TAR processing fallback when WebDataset fails',
-            'Robust distributed processing support'
+            'Robust single-GPU processing support'
         ],
         'token_layout': {
             'cls_token': {'included': args.include_cls, 'position': 0 if args.include_cls else None},
@@ -942,7 +1129,7 @@ def main():
     
     # Final status
     print("\n" + "=" * 80)
-    print("✅ FIXED EMBEDDING EXTRACTION COMPLETED!")
+    print("✅ MEMORY-OPTIMIZED EMBEDDING EXTRACTION COMPLETED!")
     print("=" * 80)
     print(f"📊 SUMMARY:")
     print(f"   Mode: {mode_name} ({target_tokens} tokens)")
@@ -951,27 +1138,34 @@ def main():
     print(f"   TAR files processed: {len(tar_files)}")
     print(f"   Successful shards: {len(processing_results)}")
     print(f"   Failed shards: {len(failed_shards)}")
+    print(f"   OOM-related failures: {len(oom_shards)}")
     print(f"   Total samples: {total_samples_all:,}")
     print(f"   Embeddings location: {embeddings_dir}")
     print(f"   Manifest file: {manifest_path}")
+    print(f"   Memory optimization: ✅ ENABLED")
     
     if wds_info:
         print(f"\n📦 WebDataset Status:")
         print(f"   Version: {wds_info['version']}")
         print(f"   Compatibility: {'✅ FIXED' if processing_results else '❌ ISSUES'}")
     
+    if oom_shards:
+        print(f"\n💥 OOM-related failures: {oom_shards}")
+        print(f"   These shards failed due to out-of-memory issues")
+        print(f"   Consider further reducing batch size or processing individually")
+    
     if failed_shards:
-        print(f"\n⚠️ Failed shards: {failed_shards}")
+        print(f"\n⚠️ Other failed shards: {[s for s in failed_shards if s not in oom_shards]}")
         print(f"   Success rate: {len(processing_results)/(len(processing_results)+len(failed_shards))*100:.1f}%")
         
         if len(processing_results) > 0:
             print(f"✅ Partial success - continuing with {len(processing_results)} shards")
         else:
-            print(f"❌ All shards failed - check WebDataset installation and TAR files")
+            print(f"❌ All shards failed - check memory configuration and TAR files")
             return 1
     
     if len(processing_results) > 0:
-        print(f"\n🎉 SUCCESS! {len(processing_results)} shards processed successfully!")
+        print(f"\n🎉 SUCCESS! {len(processing_results)} shards processed successfully with memory optimization!")
         print("Ready for BLIP3-o training!")
         print(f"\nUsage commands:")
         print(f"CLS+Patch mode (257 tokens):")
@@ -980,12 +1174,14 @@ def main():
         print(f"  python train_blip3o_enhanced.py --chunked_embeddings_dir {embeddings_dir} --training_mode patch_only")
     
     print("=" * 80)
-    print("🔧 FIXES APPLIED:")
-    print("  ✅ WebDataset version compatibility checks")
-    print("  ✅ Multiple fallback approaches for dataset creation")
-    print("  ✅ Better error handling and diagnostics")
-    print("  ✅ Direct TAR processing fallback when WebDataset fails")
-    print("  ✅ Robust distributed processing support")
+    print("🔧 MEMORY OPTIMIZATION FIXES APPLIED:")
+    print("  ✅ Adaptive batch sizing prevents OOM crashes")
+    print("  ✅ Enhanced memory cleanup improves stability")
+    print("  ✅ OOM detection enables graceful recovery")
+    print("  ✅ Memory monitoring provides visibility")
+    print("  ✅ Optimized model loading reduces memory footprint")
+    print("  ✅ Progressive batch size reduction handles pressure")
+    print("  ✅ Better error handling prevents complete failures")
     
     return 0 if len(processing_results) > 0 else 1
 

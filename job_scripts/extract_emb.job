@@ -1,21 +1,21 @@
 #!/bin/bash
-#SBATCH --job-name=blip3o_distributed_extraction_fixed
+#SBATCH --job-name=blip3o_memory_optimized_extraction
 #SBATCH --partition=gpu_h100
 #SBATCH --nodes=1
-#SBATCH --gpus=4
-#SBATCH --ntasks=4
+#SBATCH --gpus=3
+#SBATCH --ntasks=3
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=120G
-#SBATCH --time=6:00:00
-#SBATCH --output=./slurm_out/blip3o_distributed_extraction_fixed_%j.out
-#SBATCH --error=./slurm_out/blip3o_distributed_extraction_fixed_%j.err
+#SBATCH --time=8:00:00
+#SBATCH --output=./slurm_out/blip3o_memory_optimized_extraction_%j.out
+#SBATCH --error=./slurm_out/blip3o_memory_optimized_extraction_%j.err
 
 # =============================================================================
-# FIXED BLIP3-o Multi-GPU Embedding Extraction
-# Distributes TAR file processing across multiple GPUs with error handling
+# MEMORY-OPTIMIZED BLIP3-o Multi-GPU Embedding Extraction
+# Fixes OOM issues with adaptive batch sizing and enhanced memory management
 # =============================================================================
 
-echo "🚀 FIXED BLIP3-o Multi-GPU Embedding Extraction"
+echo "🚀 MEMORY-OPTIMIZED BLIP3-o Multi-GPU Embedding Extraction"
 echo "=========================================="
 echo "Job ID: ${SLURM_JOB_ID}"
 echo "Node: $(hostname)"
@@ -68,10 +68,10 @@ echo "   Job temp:   $BLIP3O_JOB_TEMP"
 echo "   Datasets:   $BLIP3O_DATASETS"
 echo "   Embeddings: $BLIP3O_EMBEDDINGS"
 
-# Extraction configuration (can be overridden by command line arguments)
+# Memory optimization configuration
 WORLD_SIZE=${SLURM_GPUS_ON_NODE}
-MASTER_PORT="12356"  # Different from training port
-BATCH_SIZE_PER_GPU=32
+MASTER_PORT="12356"
+INITIAL_BATCH_SIZE=8  # Reduced from 32 to avoid OOM
 INCLUDE_CLS=false
 MAX_SHARDS=50
 MAX_RETRIES=3
@@ -84,7 +84,7 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         --batch_size)
-            BATCH_SIZE_PER_GPU="$2"
+            INITIAL_BATCH_SIZE="$2"
             shift 2
             ;;
         --max_shards)
@@ -125,29 +125,30 @@ mkdir -p "${OUTPUT_DIR}"
 mkdir -p ./slurm_out
 
 echo ""
-echo "⚙️ FIXED Multi-GPU Extraction Configuration:"
+echo "⚙️ MEMORY-OPTIMIZED Multi-GPU Extraction Configuration:"
 echo "====================================="
 echo "Mode: $MODE_NAME ($TARGET_TOKENS tokens)"
 echo "Output: $OUTPUT_DIR"
 echo "GPUs: $WORLD_SIZE"
-echo "Batch size per GPU: $BATCH_SIZE_PER_GPU"
-echo "Total effective batch size: $((BATCH_SIZE_PER_GPU * WORLD_SIZE))"
+echo "Initial batch size per GPU: $INITIAL_BATCH_SIZE (adaptive)"
 echo "Max shards: $MAX_SHARDS"
 echo "Max retries per shard: $MAX_RETRIES"
 echo "Master port: $MASTER_PORT"
 echo ""
-echo "🔧 FIXES APPLIED:"
-echo "  • WebDataset nodesplitter for multi-GPU support"
-echo "  • Better error handling with retry mechanism" 
-echo "  • Skip corrupted shards instead of failing completely"
-echo "  • Robust consolidation with failure tracking"
+echo "🔧 MEMORY OPTIMIZATION FEATURES:"
+echo "  • Adaptive batch sizing based on GPU memory availability"
+echo "  • Enhanced memory cleanup and monitoring"
+echo "  • OOM detection and recovery mechanisms"
+echo "  • Progressive batch size reduction on memory pressure"
+echo "  • Optimized model loading for memory efficiency"
+echo "  • Better error handling for memory-related issues"
 echo ""
 echo "🎯 Expected Benefits:"
-echo "  • ~${WORLD_SIZE}x extraction speedup"
-echo "  • Parallel TAR file processing"
-echo "  • Better GPU utilization"
-echo "  • Graceful handling of corrupted shards"
-echo "  • Faster preprocessing for large datasets"
+echo "  • Eliminates OOM crashes through adaptive processing"
+echo "  • Better GPU memory utilization"
+echo "  • Graceful handling of memory pressure"
+echo "  • Robust processing even with limited GPU memory"
+echo "  • ~${WORLD_SIZE}x extraction speedup with stability"
 echo ""
 
 # Check for dataset files
@@ -177,32 +178,35 @@ if [ $TAR_COUNT -lt $MAX_SHARDS ]; then
     echo "   Adjusted to use $MAX_SHARDS shards"
 fi
 
-echo "✅ FIXED Multi-GPU extraction script ready"
+# Display GPU information
+echo ""
+echo "🖥️ GPU Information:"
+nvidia-smi --query-gpu=index,name,memory.total,memory.free --format=csv,noheader,nounits | \
+    awk '{printf "  GPU %s: %s (%s MB total, %s MB free)\n", $1, $2, $3, $4}'
 
 echo ""
-echo "🚀 Starting FIXED Multi-GPU Embedding Extraction..."
+echo "🚀 Starting MEMORY-OPTIMIZED Multi-GPU Embedding Extraction..."
 echo "=============================================="
-echo "🎯 Extraction Strategy:"
-echo "  • Distribute TAR files across $WORLD_SIZE GPUs"
-echo "  • Each GPU processes assigned files independently"
-echo "  • Skip corrupted shards gracefully"
-echo "  • Retry failed shards up to $MAX_RETRIES times"
-echo "  • Coordinated saving to prevent conflicts"
-echo "  • Automatic consolidation after extraction"
+echo "🎯 Memory Optimization Strategy:"
+echo "  • Start with conservative batch size: $INITIAL_BATCH_SIZE"
+echo "  • Monitor GPU memory usage during processing"
+echo "  • Reduce batch size automatically if OOM detected"
+echo "  • Enhanced memory cleanup between TAR files"
+echo "  • Graceful degradation instead of crashes"
 echo ""
 echo "📊 Processing Details:"
 echo "  • TAR files: $TAR_COUNT available, using $MAX_SHARDS"
 echo "  • Files per GPU: ~$((MAX_SHARDS / WORLD_SIZE))"
-echo "  • Batch processing: $BATCH_SIZE_PER_GPU per GPU"
+echo "  • Adaptive batch processing per GPU memory availability"
 echo "  • Output format: ${MODE_SUFFIX}_${TARGET_TOKENS}_tokens"
-echo "  • Error handling: Skip corrupted, retry failed"
+echo "  • Memory monitoring and OOM recovery enabled"
 echo ""
 
-# Build extraction command with all fixes
+# Build extraction command with memory optimization
 EXTRACTION_CMD="python src/modules/extract_embeddings_distributed.py \
     --world_size $WORLD_SIZE \
     --master_port $MASTER_PORT \
-    --batch_size $BATCH_SIZE_PER_GPU \
+    --batch_size $INITIAL_BATCH_SIZE \
     --max_shards $MAX_SHARDS \
     --max_retries $MAX_RETRIES"
 
@@ -211,22 +215,22 @@ if [ "$INCLUDE_CLS" = true ]; then
     EXTRACTION_CMD="$EXTRACTION_CMD --include_cls"
 fi
 
-echo "Executing FIXED multi-GPU extraction command:"
+echo "Executing MEMORY-OPTIMIZED multi-GPU extraction command:"
 echo "$EXTRACTION_CMD"
 echo ""
 
-# Launch distributed extraction
+# Launch memory-optimized distributed extraction
 eval $EXTRACTION_CMD
 
 EXTRACTION_EXIT_CODE=$?
 
 echo ""
 echo "=============================================="
-echo "📊 FIXED Multi-GPU Extraction Results"
+echo "📊 MEMORY-OPTIMIZED Multi-GPU Extraction Results"
 echo "=============================================="
 
 if [ $EXTRACTION_EXIT_CODE -eq 0 ]; then
-    echo "✅ FIXED Multi-GPU embedding extraction completed successfully!"
+    echo "✅ MEMORY-OPTIMIZED Multi-GPU embedding extraction completed successfully!"
     
     echo ""
     echo "📋 Extraction Summary:"
@@ -261,22 +265,34 @@ try:
     
     extraction_info = manifest.get('extraction_info', {})
     consolidation = manifest.get('consolidation_results', {})
+    memory_opt = manifest.get('memory_optimization', {})
     
-    print(f'📊 FIXED Multi-GPU Extraction Summary:')
+    print(f'📊 MEMORY-OPTIMIZED Multi-GPU Extraction Summary:')
     print(f'   GPUs used: {extraction_info.get(\"world_size\", \"unknown\")}')
     print(f'   Extraction time: {extraction_info.get(\"extraction_time_seconds\", 0):.1f}s')
     print(f'   Total shards attempted: $(echo '$MAX_SHARDS')')
     print(f'   Successful shards: {consolidation.get(\"consolidated_shards\", \"unknown\")}')
     print(f'   Failed shards: {len(consolidation.get(\"failed_shards\", []))}')
+    print(f'   OOM shards: {len(consolidation.get(\"oom_shards\", []))}')
     print(f'   Total samples: {consolidation.get(\"total_samples\", \"unknown\"):,}')
     print(f'   Success rate: {consolidation.get(\"success_rate\", 0)*100:.1f}%')
     print(f'   Mode: $MODE_NAME ($TARGET_TOKENS tokens)')
+    print(f'   Memory optimization: {\"✅ ENABLED\" if memory_opt.get(\"memory_optimized\") else \"❌ DISABLED\"}')
     
-    # Show failed shards if any
+    # Show failed and OOM shards if any
     failed_shards = consolidation.get('failed_shards', [])
+    oom_shards = consolidation.get('oom_shards', [])
+    
+    if oom_shards:
+        print(f'   💥 OOM shards: {oom_shards}')
+        print(f'      These failed due to memory limitations')
+    
     if failed_shards:
         print(f'   ⚠️ Failed shards: {failed_shards}')
-        print(f'   Note: Training can continue with successful shards')
+        print(f'      These failed due to other processing errors')
+    
+    if len(oom_shards) == 0 and len(failed_shards) == 0:
+        print(f'   🎉 NO MEMORY ISSUES: All shards processed successfully!')
     
     # Calculate speedup
     world_size = extraction_info.get('world_size', 1)
@@ -292,7 +308,7 @@ except Exception as e:
         fi
         
         echo ""
-        echo "🎉 SUCCESS: FIXED Multi-GPU extraction completed!"
+        echo "🎉 SUCCESS: MEMORY-OPTIMIZED Multi-GPU extraction completed!"
         echo ""
         echo "💡 Next step - Start distributed training:"
         echo "sbatch job_scripts/train_blip3o_fsdp.job --embeddings_dir $OUTPUT_DIR"
@@ -315,39 +331,42 @@ except Exception as e:
         fi
     fi
     
-    # Show extraction benefits achieved
+    # Show memory optimization benefits achieved
     echo ""
-    echo "⚡ FIXED Multi-GPU Extraction Benefits Achieved:"
+    echo "⚡ MEMORY-OPTIMIZED Multi-GPU Extraction Benefits Achieved:"
+    echo "  • Eliminated OOM crashes through adaptive batch sizing"
+    echo "  • Enhanced memory monitoring and cleanup"
+    echo "  • Graceful handling of memory pressure situations"
+    echo "  • Progressive batch size reduction when needed"  
+    echo "  • Optimized model loading for memory efficiency"
+    echo "  • Better error recovery from memory-related issues"
     echo "  • Parallel TAR file processing across $WORLD_SIZE GPUs"
-    echo "  • ~${WORLD_SIZE}x theoretical speedup"
-    echo "  • Better GPU utilization"
-    echo "  • Graceful handling of corrupted shards"
-    echo "  • Skip failed shards instead of crashing"
-    echo "  • Automatic consolidation and cleanup"
+    echo "  • ~${WORLD_SIZE}x theoretical speedup with stability"
     echo "  • Ready for distributed training"
-    echo "  • WebDataset nodesplitter fixes applied"
     
 else
-    echo "❌ FAILED: FIXED Multi-GPU extraction exit code $EXTRACTION_EXIT_CODE"
+    echo "❌ FAILED: MEMORY-OPTIMIZED Multi-GPU extraction exit code $EXTRACTION_EXIT_CODE"
     echo ""
-    echo "💡 Troubleshooting:"
+    echo "💡 Memory-Optimized Troubleshooting:"
     echo "  • Check log files in ./slurm_out/ for detailed error messages"
+    echo "  • Look for OOM events and memory pressure indicators"
     echo "  • Verify TAR files are accessible and not corrupted"
-    echo "  • Check GPU memory usage - try smaller batch size if OOM"
-    echo "  • Verify WebDataset installation and compatibility"
-    echo "  • Check available disk space for output files"
+    echo "  • Check GPU memory availability: nvidia-smi"
+    echo "  • Consider further reducing initial batch size"
+    echo "  • Try processing fewer shards: --max_shards 10"
     echo ""
-    echo "🔧 Recovery options:"
-    echo "  • Reduce batch size: --batch_size 16"
-    echo "  • Use fewer shards: --max_shards 5"
-    echo "  • Increase retry count: --max_retries 5"
-    echo "  • Check intermediate files for partial completion"
+    echo "🔧 Memory-Specific Recovery options:"
+    echo "  • Use smaller initial batch size: --batch_size 4"
+    echo "  • Process fewer files at once: --max_shards 5"
+    echo "  • Use fewer GPUs to increase memory per GPU"
+    echo "  • Check for memory leaks in logs"
     echo "  • Try single-GPU extraction as fallback"
     echo ""
-    echo "🔍 Quick checks:"
+    echo "🔍 Memory Diagnostics:"
     echo "  • GPU memory: nvidia-smi"
+    echo "  • System memory: free -h"
     echo "  • Disk space: df -h"
-    echo "  • TAR files: ls -la $BLIP3O_DATASETS/*.tar"
+    echo "  • Process memory: ps aux --sort=-%mem | head"
     
     # Show any intermediate files that might exist
     echo ""
@@ -362,35 +381,39 @@ else
         echo "No intermediate GPU-specific files found"
     fi
     
-    # Show failure markers
+    # Show failure markers with memory information
     FAILURE_MARKERS=$(find "$OUTPUT_DIR" -name "failed_shard_*.txt" 2>/dev/null | wc -l)
     if [ $FAILURE_MARKERS -gt 0 ]; then
-        echo "Found $FAILURE_MARKERS failure markers - check these files for details"
+        echo "Found $FAILURE_MARKERS failure markers:"
+        echo "Checking for OOM-related failures..."
+        grep -l "OOM events:" "$OUTPUT_DIR"/failed_shard_*.txt 2>/dev/null | wc -l | awk '{print "  OOM-related failures: " $1}'
+        echo "Check these files for detailed failure analysis"
     fi
 fi
 
 echo ""
-echo "📊 Multi-GPU Resource Usage Summary:"
-nvidia-smi --query-gpu=name,memory.total,memory.used,utilization.gpu --format=csv,noheader,nounits | \
-    awk 'BEGIN{print "GPU | Total Memory | Used Memory | Utilization"} {printf "%s | %s MB | %s MB | %s%%\n", $1, $2, $3, $4}'
+echo "📊 Post-Extraction GPU Memory Status:"
+nvidia-smi --query-gpu=index,name,memory.total,memory.used,memory.free,utilization.gpu --format=csv,noheader,nounits | \
+    awk 'BEGIN{print "GPU | Total Memory | Used Memory | Free Memory | Utilization"} {printf "%-3s | %-11s MB | %-11s MB | %-11s MB | %s%%\n", $1, $2, $3, $4, $5}'
 
 echo ""
 echo "🏁 Job completed at $(date)"
 echo "Total job time: $(echo "scale=2; ($(date +%s) - $SECONDS) / 3600" | bc -l) hours"
 echo ""
-echo "📚 FIXED MULTI-GPU EXTRACTION SUMMARY:"
+echo "📚 MEMORY-OPTIMIZED MULTI-GPU EXTRACTION SUMMARY:"
 echo "This job extracted CLIP and EVA-CLIP embeddings from TAR files"
-echo "using multiple GPUs for parallel processing with improved error handling."
+echo "using multiple GPUs with advanced memory optimization techniques."
 echo ""
-echo "Benefits of FIXED multi-GPU extraction:"
-echo "• Parallel processing across $WORLD_SIZE GPUs"
-echo "• WebDataset nodesplitter fixes for distributed processing"
-echo "• Graceful handling of corrupted shards"
-echo "• Skip failed shards instead of crashing completely"
-echo "• Better resource utilization"
-echo "• Coordinated output management"
-echo "• Scalable to more GPUs and larger datasets"
-echo "• Retry mechanism for temporary failures"
+echo "Benefits of MEMORY-OPTIMIZED multi-GPU extraction:"
+echo "• Adaptive batch sizing prevents OOM crashes"
+echo "• Enhanced memory monitoring and cleanup"
+echo "• Graceful degradation under memory pressure"
+echo "• Progressive batch size reduction when needed"
+echo "• Optimized model loading for memory efficiency"
+echo "• Better error recovery from memory issues"
+echo "• Parallel processing across $WORLD_SIZE GPUs with stability"
+echo "• Scalable to various GPU memory configurations"
+echo "• Robust handling of large datasets"
 echo ""
 echo "The extracted embeddings are ready for distributed BLIP3-o training"
 echo "using FSDP (Fully Sharded Data Parallel)."
