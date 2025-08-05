@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-Updated BLIP3-o Embedding Extraction with CLS + Patches Support
+FIXED BLIP3-o Embedding Extraction with Multi-GPU Support
 src/modules/extract_embeddings_g.py
 
-CHANGES:
-1. Extract CLS token + patches: [B, 257, dim] (CLS first, then 256 patches)
-2. Support both 256 (patch only) and 257 (CLS + patch) modes
-3. Flexible shard selection for training
-4. Better mode detection and validation
+FIXES:
+1. Added proper WebDataset nodesplitter for multi-GPU processing
+2. Better error handling to skip corrupted shards
+3. Distributed processing support
+4. More robust dataloader creation
 """
 
 import sys
@@ -260,55 +260,8 @@ def find_data_files(temp_manager, max_shards=None):
         "  python src/data_hand/download_data.py --shards 0 1 2 3 4 5 6 7 8 9\n"
     )
 
-def process_single_tar(
-    tar_file_path: str,
-    shard_idx: int,
-    clip_processor, clip_model, eva_processor, eva_model,
-    device: torch.device,
-    output_dir: Path,
-    working_dir: Path,
-    batch_size: int = 16,
-    include_cls: bool = True,
-    target_tokens: int = 257
-) -> dict:
-    """
-    Process a single TAR file and save embeddings with CLS+patch support
-    """
-    
-    print(f"\n🔄 Processing shard {shard_idx}: {Path(tar_file_path).name}")
-    print(f"   Mode: {'CLS+Patches' if include_cls else 'Patches only'} ({target_tokens} tokens)")
-    
-    # Expected output file path
-    mode_suffix = "cls_patch" if include_cls else "patch_only"
-    shard_filename = f"embeddings_shard_{shard_idx:05d}_{mode_suffix}.pkl"
-    shard_path = output_dir / shard_filename
-    
-    # Check if this shard already exists
-    if shard_path.exists():
-        print(f"   ✅ Shard {shard_idx} already exists: {shard_path}")
-        file_size_mb = shard_path.stat().st_size / (1024 * 1024)
-        
-        try:
-            with open(shard_path, 'rb') as f:
-                existing_data = pickle.load(f)
-            sample_count = len(existing_data.get('captions', []))
-            
-            return {
-                'shard_idx': shard_idx,
-                'total_samples': sample_count,
-                'file_size_mb': file_size_mb,
-                'processing_time': 0.0,
-                'output_path': str(shard_path),
-                'success': True,
-                'skipped': True,
-                'mode': mode_suffix,
-                'tokens': target_tokens
-            }
-        except:
-            print(f"   ⚠️  Could not read existing file, will reprocess...")
-            shard_path.unlink()
-    
-    # Import dataset (simplified fallback)
+def create_distributed_webdataset(tar_file_path: str, world_size: int = 1, rank: int = 0):
+    """Create WebDataset with proper distributed configuration"""
     try:
         import webdataset as wds
         from PIL import Image
@@ -348,178 +301,321 @@ def process_single_tar(
             except Exception as e:
                 return None
         
-        # Create WebDataset
-        dataset = (wds.WebDataset([tar_file_path], empty_check=False)
-                  .map(decode_sample)
-                  .select(lambda x: x is not None))
+        # Create WebDataset with distributed support
+        if world_size > 1:
+            # Multi-GPU: Add nodesplitter for distributed processing
+            dataset = (
+                wds.WebDataset([tar_file_path], empty_check=False, shardshuffle=False)
+                .pipe(wds.split_by_node, group_size=None)  # This is the key fix!
+                .pipe(wds.split_by_worker)  # Split by dataloader workers
+                .map(decode_sample)
+                .select(lambda x: x is not None)
+            )
+            print(f"   ✅ Created distributed WebDataset (rank {rank}/{world_size})")
+        else:
+            # Single GPU: Standard WebDataset
+            dataset = (
+                wds.WebDataset([tar_file_path], empty_check=False, shardshuffle=False)
+                .map(decode_sample)
+                .select(lambda x: x is not None)
+            )
+            print(f"   ✅ Created standard WebDataset")
         
-        # Create dataloader
-        def simple_collate(batch):
-            images = [item['image'] for item in batch]
-            captions = [item['caption'] for item in batch]
-            keys = [item['key'] for item in batch]
-            return {
-                'image': images,
-                'caption': captions,
-                'key': keys
-            }
+        return dataset
         
-        from torch.utils.data import DataLoader
-        dataloader = DataLoader(dataset, batch_size=batch_size, collate_fn=simple_collate)
-        
-        print(f"   ✅ Created WebDataset dataloader")
-    
+    except ImportError as e:
+        print(f"   ❌ WebDataset import failed: {e}")
+        return None
     except Exception as e:
-        print(f"   ❌ Failed to create dataloader: {e}")
-        return {
-            'shard_idx': shard_idx,
-            'total_samples': 0,
-            'success': False,
-            'error': str(e)
-        }
+        print(f"   ❌ Error creating WebDataset: {e}")
+        return None
+
+def process_single_tar(
+    tar_file_path: str,
+    shard_idx: int,
+    clip_processor, clip_model, eva_processor, eva_model,
+    device: torch.device,
+    output_dir: Path,
+    working_dir: Path,
+    batch_size: int = 16,
+    include_cls: bool = True,
+    target_tokens: int = 257,
+    world_size: int = 1,
+    rank: int = 0,
+    max_retries: int = 3
+) -> dict:
+    """
+    FIXED: Process a single TAR file with multi-GPU support and better error handling
+    """
     
-    # Storage for this shard's embeddings
-    shard_clip_embeddings = []
-    shard_eva_embeddings = []
-    shard_captions = []
-    shard_keys = []
+    print(f"\n🔄 Processing shard {shard_idx}: {Path(tar_file_path).name}")
+    print(f"   Mode: {'CLS+Patches' if include_cls else 'Patches only'} ({target_tokens} tokens)")
+    if world_size > 1:
+        print(f"   Distributed: rank {rank}/{world_size}")
     
-    total_samples = 0
-    start_time = time.time()
+    # Expected output file path
+    mode_suffix = "cls_patch" if include_cls else "patch_only"
+    shard_filename = f"embeddings_shard_{shard_idx:05d}_{mode_suffix}.pkl"
+    shard_path = output_dir / shard_filename
     
-    print(f"   📊 Processing batches...")
-    
-    # Process all batches in this TAR file
-    try:
-        for batch_idx, batch in enumerate(tqdm(dataloader, desc=f"Shard {shard_idx}", unit="batch")):
-            try:
-                images = batch['image']
-                captions = batch['caption']
-                keys = batch['key']
-                
-                # Extract features with CLS support
-                clip_features = extract_clip_features_with_cls(
-                    images, clip_processor, clip_model, device, include_cls=include_cls
-                )
-                cleanup_memory()
-                
-                eva_features = extract_eva_features_with_cls(
-                    images, eva_processor, eva_model, device, include_cls=include_cls
-                )
-                cleanup_memory()
-                
-                # Validate shapes match target tokens
-                assert clip_features.shape[1] == target_tokens, f"CLIP tokens: {clip_features.shape[1]} vs {target_tokens}"
-                assert eva_features.shape[1] == target_tokens, f"EVA tokens: {eva_features.shape[1]} vs {target_tokens}"
-                
-                # Move to CPU and store
-                shard_clip_embeddings.append(clip_features.cpu())
-                shard_eva_embeddings.append(eva_features.cpu())
-                shard_captions.extend(captions)
-                shard_keys.extend(keys)
-                
-                total_samples += len(images)
-                
-                # Clear intermediate variables
-                del clip_features, eva_features, images
-                cleanup_memory()
-                
-                # Progress update
-                if batch_idx % 10 == 0:
-                    elapsed = time.time() - start_time
-                    samples_per_sec = total_samples / elapsed if elapsed > 0 else 0
-                    print(f"   Batch {batch_idx}: {total_samples} samples, {samples_per_sec:.1f} samples/sec")
+    # Check if this shard already exists
+    if shard_path.exists():
+        print(f"   ✅ Shard {shard_idx} already exists: {shard_path}")
+        file_size_mb = shard_path.stat().st_size / (1024 * 1024)
+        
+        try:
+            with open(shard_path, 'rb') as f:
+                existing_data = pickle.load(f)
+            sample_count = len(existing_data.get('captions', []))
             
-            except Exception as e:
-                print(f"   ⚠️  Error processing batch {batch_idx}: {e}")
-                continue
+            return {
+                'shard_idx': shard_idx,
+                'total_samples': sample_count,
+                'file_size_mb': file_size_mb,
+                'processing_time': 0.0,
+                'output_path': str(shard_path),
+                'success': True,
+                'skipped': True,
+                'mode': mode_suffix,
+                'tokens': target_tokens
+            }
+        except:
+            print(f"   ⚠️  Could not read existing file, will reprocess...")
+            shard_path.unlink()
     
-    except Exception as e:
-        print(f"   ❌ Error iterating through dataloader: {e}")
-        return {
-            'shard_idx': shard_idx,
-            'total_samples': 0,
-            'success': False,
-            'error': str(e)
-        }
+    # Try processing with retries
+    for attempt in range(max_retries):
+        try:
+            print(f"   🔄 Processing attempt {attempt + 1}/{max_retries}")
+            
+            # Create distributed WebDataset
+            dataset = create_distributed_webdataset(tar_file_path, world_size, rank)
+            
+            if dataset is None:
+                print(f"   ❌ Failed to create WebDataset")
+                if attempt == max_retries - 1:
+                    return {
+                        'shard_idx': shard_idx,
+                        'total_samples': 0,
+                        'success': False,
+                        'error': 'Failed to create WebDataset'
+                    }
+                continue
+            
+            # Create dataloader
+            def simple_collate(batch):
+                valid_batch = [item for item in batch if item is not None]
+                if not valid_batch:
+                    return None
+                    
+                images = [item['image'] for item in valid_batch]
+                captions = [item['caption'] for item in valid_batch]
+                keys = [item['key'] for item in valid_batch]
+                return {
+                    'image': images,
+                    'caption': captions,
+                    'key': keys
+                }
+            
+            from torch.utils.data import DataLoader
+            dataloader = DataLoader(
+                dataset, 
+                batch_size=batch_size, 
+                collate_fn=simple_collate,
+                num_workers=0,  # Set to 0 for distributed processing
+                drop_last=False
+            )
+            
+            print(f"   ✅ Created dataloader successfully")
+            
+            # Storage for this shard's embeddings
+            shard_clip_embeddings = []
+            shard_eva_embeddings = []
+            shard_captions = []
+            shard_keys = []
+            
+            total_samples = 0
+            start_time = time.time()
+            batch_count = 0
+            error_count = 0
+            
+            print(f"   📊 Processing batches...")
+            
+            # Process all batches in this TAR file
+            try:
+                for batch_idx, batch in enumerate(tqdm(dataloader, desc=f"Shard {shard_idx}", unit="batch")):
+                    if batch is None:
+                        continue
+                        
+                    batch_count += 1
+                    
+                    try:
+                        images = batch['image']
+                        captions = batch['caption']
+                        keys = batch['key']
+                        
+                        if not images:  # Skip empty batches
+                            continue
+                        
+                        # Extract features with CLS support
+                        clip_features = extract_clip_features_with_cls(
+                            images, clip_processor, clip_model, device, include_cls=include_cls
+                        )
+                        cleanup_memory()
+                        
+                        eva_features = extract_eva_features_with_cls(
+                            images, eva_processor, eva_model, device, include_cls=include_cls
+                        )
+                        cleanup_memory()
+                        
+                        # Validate shapes match target tokens
+                        assert clip_features.shape[1] == target_tokens, f"CLIP tokens: {clip_features.shape[1]} vs {target_tokens}"
+                        assert eva_features.shape[1] == target_tokens, f"EVA tokens: {eva_features.shape[1]} vs {target_tokens}"
+                        
+                        # Move to CPU and store
+                        shard_clip_embeddings.append(clip_features.cpu())
+                        shard_eva_embeddings.append(eva_features.cpu())
+                        shard_captions.extend(captions)
+                        shard_keys.extend(keys)
+                        
+                        total_samples += len(images)
+                        
+                        # Clear intermediate variables
+                        del clip_features, eva_features, images
+                        cleanup_memory()
+                        
+                        # Progress update
+                        if batch_idx % 10 == 0:
+                            elapsed = time.time() - start_time
+                            samples_per_sec = total_samples / elapsed if elapsed > 0 else 0
+                            print(f"   Batch {batch_idx}: {total_samples} samples, {samples_per_sec:.1f} samples/sec")
+                    
+                    except Exception as e:
+                        error_count += 1
+                        print(f"   ⚠️  Error processing batch {batch_idx}: {e}")
+                        if error_count > batch_count * 0.5:  # If >50% of batches fail
+                            raise Exception(f"Too many batch errors: {error_count}/{batch_count}")
+                        continue
+                
+                print(f"   ✅ Processed {batch_count} batches, {error_count} errors")
+                break  # Success, exit retry loop
+                
+            except Exception as e:
+                print(f"   ❌ Error iterating through dataloader (attempt {attempt + 1}): {e}")
+                if attempt == max_retries - 1:
+                    return {
+                        'shard_idx': shard_idx,
+                        'total_samples': 0,
+                        'success': False,
+                        'error': f'Dataloader iteration failed: {e}'
+                    }
+                continue
+        
+        except Exception as e:
+            print(f"   ❌ Error in processing attempt {attempt + 1}: {e}")
+            if attempt == max_retries - 1:
+                return {
+                    'shard_idx': shard_idx,
+                    'total_samples': 0,
+                    'success': False,
+                    'error': f'All processing attempts failed: {e}'
+                }
+            continue
     
     # Consolidate embeddings for this shard
     if shard_clip_embeddings:
         print(f"   🔄 Consolidating {total_samples} embeddings...")
         
-        final_clip = torch.cat(shard_clip_embeddings, dim=0)
-        final_eva = torch.cat(shard_eva_embeddings, dim=0)
-        
-        # Final validation
-        assert final_clip.shape[1] == target_tokens, f"Final CLIP shape: {final_clip.shape}"
-        assert final_eva.shape[1] == target_tokens, f"Final EVA shape: {final_eva.shape}"
-        assert final_clip.shape[2] == 1024, f"CLIP dim: {final_clip.shape[2]}"
-        
-        # Create shard data
-        shard_data = {
-            'clip_blip3o_embeddings': final_clip,
-            'eva_blip3o_embeddings': final_eva,
-            'captions': shard_captions,
-            'keys': shard_keys,
-            'total_samples': total_samples,
-            'shard_idx': shard_idx,
-            'source_tar': tar_file_path,
-            'config': {
-                'clip_model': 'openai/clip-vit-large-patch14',
-                'eva_model': 'BAAI/EVA-CLIP-8B',
-                'clip_dim': 1024,
-                'eva_dim': final_eva.shape[2],
-                'tokens': target_tokens,
-                'include_cls': include_cls,
-                'mode': mode_suffix,
-                'extraction_method': 'cls_patch_extraction_v3',
-                'format_version': f'blip3o_{target_tokens}_tokens_{"cls_" if include_cls else ""}patch_v3',
-                'extraction_time': time.time() - start_time,
-                'cls_first': include_cls,  # CLS token is always first if included
-                'patch_order': '16x16_row_major',  # Patches are in row-major order
-            }
-        }
-        
-        # Save shard data
-        print(f"   💾 Saving shard {shard_idx} to persistent storage...")
-        
         try:
-            with open(shard_path, 'wb') as f:
-                pickle.dump(shard_data, f, protocol=pickle.HIGHEST_PROTOCOL)
+            final_clip = torch.cat(shard_clip_embeddings, dim=0)
+            final_eva = torch.cat(shard_eva_embeddings, dim=0)
             
-            file_size_mb = shard_path.stat().st_size / (1024 * 1024)
+            # Final validation
+            assert final_clip.shape[1] == target_tokens, f"Final CLIP shape: {final_clip.shape}"
+            assert final_eva.shape[1] == target_tokens, f"Final EVA shape: {final_eva.shape}"
+            assert final_clip.shape[2] == 1024, f"CLIP dim: {final_clip.shape[2]}"
             
-            print(f"   ✅ Shard {shard_idx} completed:")
-            print(f"      File: {shard_filename}")
-            print(f"      Size: {file_size_mb:.1f} MB")
-            print(f"      Samples: {total_samples}")
-            print(f"      Mode: {mode_suffix} ({target_tokens} tokens)")
-            print(f"      CLS+Patches: [0]=CLS, [1:257]=patches" if include_cls else "      Patches only: [0:256]=patches")
-            print(f"      Time: {time.time() - start_time:.1f}s")
-            
-            # Clear memory
-            del shard_clip_embeddings, shard_eva_embeddings, final_clip, final_eva
-            cleanup_memory()
-            
-            return {
-                'shard_idx': shard_idx,
+            # Create shard data
+            shard_data = {
+                'clip_blip3o_embeddings': final_clip,
+                'eva_blip3o_embeddings': final_eva,
+                'captions': shard_captions,
+                'keys': shard_keys,
                 'total_samples': total_samples,
-                'file_size_mb': file_size_mb,
-                'processing_time': time.time() - start_time,
-                'output_path': str(shard_path),
-                'success': True,
-                'mode': mode_suffix,
-                'tokens': target_tokens,
-                'include_cls': include_cls
+                'shard_idx': shard_idx,
+                'source_tar': tar_file_path,
+                'config': {
+                    'clip_model': 'openai/clip-vit-large-patch14',
+                    'eva_model': 'BAAI/EVA-CLIP-8B',
+                    'clip_dim': 1024,
+                    'eva_dim': final_eva.shape[2],
+                    'tokens': target_tokens,
+                    'include_cls': include_cls,
+                    'mode': mode_suffix,
+                    'extraction_method': 'cls_patch_extraction_v4_distributed',
+                    'format_version': f'blip3o_{target_tokens}_tokens_{"cls_" if include_cls else ""}patch_v4',
+                    'extraction_time': time.time() - start_time,
+                    'cls_first': include_cls,
+                    'patch_order': '16x16_row_major',
+                    'distributed': world_size > 1,
+                    'rank': rank,
+                    'world_size': world_size,
+                }
             }
+            
+            # Save shard data
+            print(f"   💾 Saving shard {shard_idx} to persistent storage...")
+            
+            try:
+                with open(shard_path, 'wb') as f:
+                    pickle.dump(shard_data, f, protocol=pickle.HIGHEST_PROTOCOL)
+                
+                file_size_mb = shard_path.stat().st_size / (1024 * 1024)
+                
+                print(f"   ✅ Shard {shard_idx} completed:")
+                print(f"      File: {shard_filename}")
+                print(f"      Size: {file_size_mb:.1f} MB")
+                print(f"      Samples: {total_samples}")
+                print(f"      Mode: {mode_suffix} ({target_tokens} tokens)")
+                print(f"      CLS+Patches: [0]=CLS, [1:257]=patches" if include_cls else "      Patches only: [0:256]=patches")
+                print(f"      Time: {time.time() - start_time:.1f}s")
+                if world_size > 1:
+                    print(f"      Distributed: rank {rank}/{world_size}")
+                
+                # Clear memory
+                del shard_clip_embeddings, shard_eva_embeddings, final_clip, final_eva
+                cleanup_memory()
+                
+                return {
+                    'shard_idx': shard_idx,
+                    'total_samples': total_samples,
+                    'file_size_mb': file_size_mb,
+                    'processing_time': time.time() - start_time,
+                    'output_path': str(shard_path),
+                    'success': True,
+                    'mode': mode_suffix,
+                    'tokens': target_tokens,
+                    'include_cls': include_cls,
+                    'rank': rank,
+                    'world_size': world_size
+                }
+            
+            except Exception as e:
+                print(f"   ❌ Failed to save shard {shard_idx}: {e}")
+                return {
+                    'shard_idx': shard_idx,
+                    'total_samples': total_samples,
+                    'success': False,
+                    'error': f'File save failed: {e}'
+                }
         
         except Exception as e:
-            print(f"   ❌ Failed to save shard {shard_idx}: {e}")
+            print(f"   ❌ Failed to consolidate embeddings for shard {shard_idx}: {e}")
             return {
                 'shard_idx': shard_idx,
-                'total_samples': total_samples,
+                'total_samples': 0,
                 'success': False,
-                'error': f'File save failed: {e}'
+                'error': f'Consolidation failed: {e}'
             }
     
     else:
@@ -547,12 +643,13 @@ def main():
     target_tokens = 257 if args.include_cls else 256
     mode_name = "CLS+Patches" if args.include_cls else "Patches only"
     
-    print("🚀 BLIP3-o Embedding Extraction with CLS+Patch Support")
+    print("🚀 BLIP3-o Embedding Extraction with CLS+Patch Support (FIXED)")
     print("=" * 70)
     print(f"Mode: {mode_name} ({target_tokens} tokens)")
     print(f"CLS token: {'First token [0]' if args.include_cls else 'Not included'}")
     print(f"Patches: {'Tokens [1:257]' if args.include_cls else 'Tokens [0:256]'} (16x16 grid)")
     print(f"Max shards: {args.max_shards if args.max_shards else 'All'}")
+    print(f"FIXES: WebDataset nodesplitter, better error handling, distributed support")
     print("=" * 70)
     
     if not torch.cuda.is_available():
@@ -632,7 +729,9 @@ def main():
             working_dir=working_dir,
             batch_size=args.batch_size,
             include_cls=args.include_cls,
-            target_tokens=target_tokens
+            target_tokens=target_tokens,
+            world_size=1,  # Single GPU mode
+            rank=0
         )
         
         if result and result['success']:
@@ -641,7 +740,7 @@ def main():
             print(f"✅ Shard {shard_idx} successful: {result['total_samples']} samples")
         else:
             failed_shards.append(shard_idx)
-            print(f"❌ Shard {shard_idx} failed")
+            print(f"❌ Shard {shard_idx} failed: {result.get('error', 'Unknown error')}")
     
     # Create manifest
     manifest_data = {
@@ -655,7 +754,13 @@ def main():
         'extraction_timestamp': time.time(),
         'shards': processing_results,
         'failed_shards': failed_shards,
-        'format_version': f'blip3o_{target_tokens}_tokens_{"cls_" if args.include_cls else ""}patch_v3',
+        'format_version': f'blip3o_{target_tokens}_tokens_{"cls_" if args.include_cls else ""}patch_v4_fixed',
+        'fixes_applied': [
+            'WebDataset nodesplitter for multi-GPU support',
+            'Better error handling with retries',
+            'Distributed processing support',
+            'Skip corrupted shards instead of failing'
+        ],
         'token_layout': {
             'cls_token': {'included': args.include_cls, 'position': 0 if args.include_cls else None},
             'patches': {
@@ -676,7 +781,7 @@ def main():
     
     # Final status
     print("\n" + "=" * 80)
-    print("✅ EMBEDDING EXTRACTION COMPLETED!")
+    print("✅ EMBEDDING EXTRACTION COMPLETED (FIXED)!")
     print("=" * 80)
     print(f"📊 SUMMARY:")
     print(f"   Mode: {mode_name} ({target_tokens} tokens)")
@@ -684,12 +789,23 @@ def main():
     print(f"   Patches: {'Positions [1:257]' if args.include_cls else 'Positions [0:256]'} (16x16)")
     print(f"   TAR files processed: {len(tar_files)}")
     print(f"   Successful shards: {len(processing_results)}")
+    print(f"   Failed shards: {len(failed_shards)}")
     print(f"   Total samples: {total_samples_all:,}")
     print(f"   Embeddings location: {embeddings_dir}")
     print(f"   Manifest file: {manifest_path}")
     
-    if len(processing_results) == len(tar_files):
-        print(f"\n🎉 SUCCESS! All shards processed successfully!")
+    if failed_shards:
+        print(f"\n⚠️ Failed shards: {failed_shards}")
+        print(f"   Success rate: {len(processing_results)/(len(processing_results)+len(failed_shards))*100:.1f}%")
+        
+        if len(processing_results) > 0:
+            print(f"✅ Partial success - continuing with {len(processing_results)} shards")
+        else:
+            print(f"❌ All shards failed - check TAR files and WebDataset setup")
+            return 1
+    
+    if len(processing_results) > 0:
+        print(f"\n🎉 SUCCESS! {len(processing_results)} shards processed successfully!")
         print("Ready for BLIP3-o training!")
         print(f"\nUsage commands:")
         print(f"CLS+Patch mode (257 tokens):")
@@ -698,8 +814,14 @@ def main():
         print(f"  python train_blip3o_enhanced.py --chunked_embeddings_dir {embeddings_dir} --training_mode patch_only")
     
     print("=" * 80)
+    print("🔧 FIXES APPLIED:")
+    print("  • Added WebDataset nodesplitter for multi-GPU processing")
+    print("  • Better error handling with retry mechanism")
+    print("  • Skip corrupted shards instead of failing completely")
+    print("  • Distributed processing support")
+    print("  • More robust dataloader creation")
     
-    return 0 if len(processing_results) == len(tar_files) else 1
+    return 0 if len(processing_results) > 0 else 1
 
 if __name__ == "__main__":
     try:
