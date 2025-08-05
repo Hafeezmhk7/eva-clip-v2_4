@@ -118,7 +118,7 @@ def estimate_download_size(num_shards: int) -> float:
     estimated_gb = num_shards * 1.2
     return estimated_gb
 
-def download_blip3o_shards(shard_indices=None, data_dir=None, force_download=False, max_shards=35):
+def download_blip3o_shards(shard_indices=None, data_dir=None, force_download=False, max_shards=2000):
     """
     FIXED: Download multiple shards with better disk space management
     

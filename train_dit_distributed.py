@@ -1,0 +1,826 @@
+#!/usr/bin/env python3
+"""
+BLIP3-o Distributed Training Script with FSDP
+train_dit_distributed.py
+
+Distributed training script for BLIP3-o with FSDP (Fully Sharded Data Parallel) support.
+Maintains all existing functionality while enabling multi-GPU training with memory efficiency.
+
+Usage:
+    # Single-node multi-GPU training
+    torchrun --nproc_per_node=4 train_dit_distributed.py \
+        --chunked_embeddings_dir /path/to/embeddings \
+        --output_dir ./checkpoints \
+        --distributed
+
+    # Manual launch (for debugging)
+    python train_dit_distributed.py \
+        --chunked_embeddings_dir /path/to/embeddings \
+        --output_dir ./checkpoints \
+        --world_size 4 --rank 0
+"""
+
+import os
+import sys
+import argparse
+import torch
+import torch.multiprocessing as mp
+import json
+import logging
+from pathlib import Path
+from datetime import datetime
+import traceback
+import math
+
+# Setup paths
+sys.path.insert(0, str(Path(__file__).parent))
+
+def setup_logging(rank: int = 0):
+    """Setup logging with rank-specific configuration"""
+    log_level = logging.INFO if rank == 0 else logging.WARNING
+    log_format = f'[Rank {rank}] %(asctime)s - %(levelname)s - %(message)s'
+    
+    logging.basicConfig(
+        level=log_level,
+        format=log_format,
+        handlers=[
+            logging.StreamHandler(sys.stdout),
+            logging.FileHandler(f'blip3o_distributed_training_rank_{rank}.log', mode='w') if rank == 0 else logging.NullHandler()
+        ]
+    )
+    return logging.getLogger(__name__)
+
+def detect_temp_checkpoint_directory():
+    """Detect if temp checkpoint directory is available for distributed training"""
+    # Check for the specific path mentioned by the user
+    user_temp_path = Path("/scratch-shared/azadaianchuk1/blip3o_workspace/checkpoints")
+    if user_temp_path.exists():
+        return str(user_temp_path)
+    
+    # Check environment variables for temp directories
+    temp_paths_to_check = [
+        os.environ.get("BLIP3O_CHECKPOINTS"),
+        os.environ.get("BLIP3O_WORKSPACE", "").rstrip("/") + "/checkpoints" if os.environ.get("BLIP3O_WORKSPACE") else "",
+        os.environ.get("SCRATCH_SHARED", "").rstrip("/") + f"/{os.environ.get('USER', 'user')}/blip3o_workspace/checkpoints" if os.environ.get("SCRATCH_SHARED") else "",
+    ]
+    
+    # Try to create temp directory in scratch locations
+    scratch_locations = [
+        "/scratch-shared",
+        "/scratch-local", 
+        "/scratch",
+        os.environ.get("TMPDIR", ""),
+    ]
+    
+    user = os.environ.get("USER", "user")
+    
+    for base_path in scratch_locations:
+        if base_path and Path(base_path).exists():
+            temp_checkpoint_path = Path(base_path) / user / "blip3o_workspace" / "checkpoints"
+            try:
+                temp_checkpoint_path.mkdir(parents=True, exist_ok=True)
+                return str(temp_checkpoint_path)
+            except (PermissionError, OSError):
+                continue
+    
+    # Check existing paths
+    for temp_path in temp_paths_to_check:
+        if temp_path and Path(temp_path).exists():
+            return temp_path
+    
+    return None
+
+def parse_arguments():
+    """Parse command line arguments for distributed training"""
+    parser = argparse.ArgumentParser(
+        description="BLIP3-o Distributed CLIP Reproduction Training with FSDP",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    )
+    
+    # Required arguments
+    parser.add_argument("--chunked_embeddings_dir", type=str, required=True,
+                       help="Path to chunked embeddings directory")
+    parser.add_argument("--output_dir", type=str, required=True,
+                       help="Output directory for checkpoints (local)")
+    
+    # Distributed training arguments
+    parser.add_argument("--distributed", action="store_true",
+                       help="Enable distributed training with FSDP")
+    parser.add_argument("--world_size", type=int, default=4,
+                       help="Number of GPUs to use")
+    parser.add_argument("--rank", type=int, default=-1,
+                       help="Rank of current process (auto-detected if -1)")
+    parser.add_argument("--master_port", type=str, default="12355",
+                       help="Master port for distributed communication")
+    
+    # FSDP configuration
+    parser.add_argument("--fsdp_sharding_strategy", type=str, default="FULL_SHARD",
+                       choices=["FULL_SHARD", "SHARD_GRAD_OP", "NO_SHARD"],
+                       help="FSDP sharding strategy")
+    parser.add_argument("--fsdp_mixed_precision", action="store_true", default=True,
+                       help="Enable mixed precision with FSDP (BF16)")
+    parser.add_argument("--fsdp_cpu_offload", action="store_true", default=False,
+                       help="Enable CPU offload for parameters (for very large models)")
+    
+    # Temp directory support (enhanced for distributed)
+    parser.add_argument("--temp_checkpoint_dir", type=str, default=None,
+                       help="Temp directory for checkpoints (auto-detected if not specified)")
+    parser.add_argument("--auto_detect_temp_dir", action="store_true", default=True,
+                       help="Automatically detect temp checkpoint directory")
+    parser.add_argument("--keep_local_checkpoints", type=int, default=3,
+                       help="Number of checkpoints to keep locally")
+    parser.add_argument("--save_to_temp_every_n_steps", type=int, default=1000,
+                       help="Save to temp directory every N steps")
+    
+    # Model configuration
+    parser.add_argument("--model_size", type=str, default="base",
+                       choices=["tiny", "small", "base", "large"],
+                       help="Model size")
+    parser.add_argument("--training_mode", type=str, default="patch_only",
+                       choices=["patch_only", "cls_patch"],
+                       help="Training mode")
+    
+    # Training hyperparameters (adjusted for distributed)
+    parser.add_argument("--learning_rate", type=float, default=4e-5,
+                       help="Learning rate (scaled for distributed training)")
+    parser.add_argument("--batch_size", type=int, default=32,
+                       help="Batch size per GPU")
+    parser.add_argument("--num_epochs", type=int, default=8,
+                       help="Number of epochs")
+    parser.add_argument("--warmup_steps", type=int, default=100,
+                       help="Warmup steps")
+    parser.add_argument("--weight_decay", type=float, default=0.04,
+                       help="Weight decay")
+    parser.add_argument("--max_grad_norm", type=float, default=1.0,
+                       help="Max gradient norm")
+    
+    # Loss component weights
+    parser.add_argument("--velocity_weight", type=float, default=1.0,
+                       help="Weight for velocity prediction loss")
+    
+    # Data-independent scaling (optional)
+    parser.add_argument("--simple_scale_factor", type=float, default=1.0,
+                       help="Simple data-independent scaling factor for CLIP embeddings")
+    
+    # Evaluation (adjusted for distributed)
+    parser.add_argument("--eval_every_n_steps", type=int, default=50,
+                       help="Evaluate every N steps")
+    parser.add_argument("--eval_num_samples", type=int, default=100,
+                       help="Number of samples for evaluation (total across GPUs)")
+    parser.add_argument("--eval_inference_steps", type=int, default=50,
+                       help="Number of inference steps for evaluation")
+    parser.add_argument("--use_heun_inference", action="store_true", default=True,
+                       help="Use Heun solver for inference")
+    
+    # Data
+    parser.add_argument("--max_shards", type=int, default=None,
+                       help="Maximum number of shards to use")
+    
+    # System
+    parser.add_argument("--fp16", action="store_true", default=True,
+                       help="Use mixed precision")
+    parser.add_argument("--num_workers", type=int, default=0,
+                       help="Number of dataloader workers")
+    
+    # Architecture improvements
+    parser.add_argument("--use_eva_adapter", action="store_true", default=True,
+                       help="Use EVA-CLIP adapter layers")
+    parser.add_argument("--eva_adapter_layers", type=int, default=6,
+                       help="Number of EVA adapter layers")
+    parser.add_argument("--use_timestep_weighting", action="store_true", default=True,
+                       help="Use timestep-dependent loss weighting")
+    
+    # WandB configuration (only rank 0 logs)
+    parser.add_argument("--use_wandb", action="store_true", default=False,
+                       help="Enable WandB logging (rank 0 only)")
+    parser.add_argument("--wandb_project", type=str, default="blip3o-clip-fsdp",
+                       help="WandB project name")
+    parser.add_argument("--wandb_run_name", type=str, default=None,
+                       help="WandB run name")
+    
+    return parser.parse_args()
+
+def setup_distributed_environment(rank: int, world_size: int, master_port: str):
+    """Setup distributed environment for current process"""
+    from src.modules.distributed.fsdp_utils import setup_distributed_environment
+    
+    device = setup_distributed_environment(rank, world_size, master_port)
+    return device
+
+def validate_distributed_arguments(args, rank: int, logger):
+    """Validate arguments for distributed training"""
+    errors = []
+    warnings = []
+    
+    # Validate distributed-specific arguments
+    if args.distributed:
+        if args.world_size <= 1:
+            errors.append("World size must be > 1 for distributed training")
+        
+        if not torch.cuda.is_available():
+            errors.append("CUDA required for distributed training")
+        
+        if torch.cuda.device_count() < args.world_size:
+            errors.append(f"Requested {args.world_size} GPUs, but only {torch.cuda.device_count()} available")
+    
+    # Check batch size scaling
+    total_batch_size = args.batch_size * args.world_size
+    if total_batch_size > 512:
+        warnings.append(f"Large total batch size: {total_batch_size} (may affect convergence)")
+    
+    # Check learning rate scaling
+    if args.distributed and args.learning_rate == 1e-4:
+        warnings.append("Consider scaling learning rate for distributed training")
+    
+    # Validate paths
+    embeddings_dir = Path(args.chunked_embeddings_dir)
+    if not embeddings_dir.exists():
+        errors.append(f"Embeddings directory does not exist: {embeddings_dir}")
+    else:
+        # Check for embedding files
+        pkl_files = list(embeddings_dir.glob("*.pkl"))
+        if not pkl_files:
+            errors.append(f"No .pkl files found in embeddings directory: {embeddings_dir}")
+        else:
+            if rank == 0:
+                logger.info(f"Found {len(pkl_files)} embedding files")
+    
+    # Log warnings (only rank 0)
+    if rank == 0:
+        for warning in warnings:
+            logger.warning(f"⚠️ {warning}")
+    
+    if errors:
+        if rank == 0:
+            logger.error("❌ Validation errors:")
+            for error in errors:
+                logger.error(f"   • {error}")
+        return False
+    
+    return True
+
+def check_distributed_environment(rank: int, logger):
+    """Check distributed environment and requirements"""
+    issues = []
+    
+    # Check CUDA
+    if not torch.cuda.is_available():
+        issues.append("CUDA not available")
+        return False
+    
+    # Check GPU count
+    gpu_count = torch.cuda.device_count()
+    if rank == 0:
+        logger.info(f"Available GPUs: {gpu_count}")
+        for i in range(gpu_count):
+            gpu_name = torch.cuda.get_device_name(i)
+            total_memory = torch.cuda.get_device_properties(i).total_memory / 1e9
+            logger.info(f"  GPU {i}: {gpu_name} ({total_memory:.1f} GB)")
+    
+    # Check PyTorch version
+    if rank == 0:
+        logger.info(f"PyTorch version: {torch.__version__}")
+    
+    # Check for required distributed imports
+    missing_modules = []
+    
+    try:
+        from src.modules.datasets.blip3o_distributed_dataset import create_distributed_clip_reproduction_dataloaders
+        if rank == 0:
+            logger.info("✅ Distributed dataset module loaded")
+    except ImportError as e:
+        missing_modules.append(f"Distributed dataset: {e}")
+    
+    try:
+        from src.modules.models.blip3o_dit import create_improved_clip_reproduction_model
+        if rank == 0:
+            logger.info("✅ Model module loaded")
+    except ImportError as e:
+        missing_modules.append(f"Model: {e}")
+    
+    try:
+        from src.modules.losses.blip3o_fm_loss import create_clip_reproduction_loss
+        if rank == 0:
+            logger.info("✅ Loss module loaded")
+    except ImportError as e:
+        missing_modules.append(f"Loss: {e}")
+    
+    try:
+        from src.modules.trainers.blip3o_distributed_trainer import create_distributed_clip_trainer
+        if rank == 0:
+            logger.info("✅ Distributed trainer module loaded")
+    except ImportError as e:
+        missing_modules.append(f"Distributed trainer: {e}")
+    
+    try:
+        from src.modules.distributed.fsdp_utils import setup_distributed_environment
+        if rank == 0:
+            logger.info("✅ FSDP utilities loaded")
+    except ImportError as e:
+        missing_modules.append(f"FSDP utilities: {e}")
+    
+    if missing_modules:
+        if rank == 0:
+            logger.error("❌ Missing required modules:")
+            for module in missing_modules:
+                logger.error(f"   • {module}")
+        return False
+    
+    if rank == 0:
+        logger.info("✅ All distributed modules loaded successfully")
+    
+    return True
+
+def create_distributed_model(args, rank: int, logger):
+    """Create model for distributed training"""
+    try:
+        from src.modules.models.blip3o_dit import create_improved_clip_reproduction_model
+        
+        # Create model (will be wrapped with FSDP in trainer)
+        model = create_improved_clip_reproduction_model(
+            model_size=args.model_size,
+            training_mode=args.training_mode,
+            use_3d_rope=True,
+            use_sandwich_norm=True,
+            use_eva_adapter=args.use_eva_adapter,
+            eva_adapter_layers=args.eva_adapter_layers,
+        )
+        
+        if rank == 0:
+            logger.info(f"✅ Model created with {model.get_num_parameters():,} parameters")
+            logger.info(f"  Model size: {args.model_size}")
+            logger.info(f"  Training mode: {args.training_mode}")
+            logger.info(f"  EVA Adapter: {'✅ ENABLED' if args.use_eva_adapter else '❌ DISABLED'}")
+            logger.info(f"  Will be wrapped with FSDP: {'✅' if args.distributed else '❌'}")
+        
+        return model
+        
+    except Exception as e:
+        logger.error(f"❌ Error creating model: {e}")
+        raise
+
+def create_distributed_dataloaders(args, rank: int, world_size: int, logger):
+    """Create distributed dataloaders"""
+    try:
+        from src.modules.datasets.blip3o_distributed_dataset import create_distributed_clip_reproduction_dataloaders
+        
+        # Validate embeddings directory
+        embeddings_dir = Path(args.chunked_embeddings_dir)
+        if rank == 0:
+            logger.info(f"Loading embeddings from: {embeddings_dir}")
+        
+        # Look for embedding files
+        pkl_files = list(embeddings_dir.glob("*.pkl"))
+        if not pkl_files:
+            raise FileNotFoundError(f"No .pkl files found in {embeddings_dir}")
+        
+        if rank == 0:
+            logger.info(f"Found {len(pkl_files)} .pkl files in embeddings directory")
+        
+        # Create distributed dataloaders
+        train_dataloader, eval_dataloader = create_distributed_clip_reproduction_dataloaders(
+            chunked_embeddings_dir=args.chunked_embeddings_dir,
+            world_size=world_size,
+            rank=rank,
+            batch_size=args.batch_size,
+            training_mode=args.training_mode,
+            max_shards=args.max_shards,
+            num_workers=args.num_workers,
+            pin_memory=torch.cuda.is_available(),
+            simple_scale_factor=args.simple_scale_factor,
+            skip_corrupted_samples=True,
+            validate_tensor_shapes=True,
+        )
+        
+        if rank == 0:
+            logger.info("✅ Distributed dataloaders created:")
+            logger.info(f"  Training mode: {args.training_mode}")
+            logger.info(f"  Batch size per GPU: {args.batch_size}")
+            logger.info(f"  Total effective batch size: {args.batch_size * world_size}")
+            logger.info(f"  Max shards: {args.max_shards}")
+            logger.info(f"  Simple scale factor: {args.simple_scale_factor}")
+            logger.info(f"  CLIP normalization: DISABLED")
+        
+        return train_dataloader, eval_dataloader
+        
+    except Exception as e:
+        logger.error(f"❌ Error creating distributed dataloaders: {e}")
+        raise
+
+def create_distributed_trainer(model, loss_fn, train_dataloader, eval_dataloader, args, rank, world_size, output_dir, temp_checkpoint_dir, logger):
+    """Create distributed trainer with FSDP"""
+    try:
+        from src.modules.trainers.blip3o_distributed_trainer import create_distributed_clip_trainer
+        
+        # Create run name if not provided
+        wandb_run_name = args.wandb_run_name
+        if wandb_run_name is None and args.use_wandb:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            improvements = ["fsdp", "no_norm"]
+            if args.use_eva_adapter:
+                improvements.append("eva_adapter")
+            if args.use_heun_inference:
+                improvements.append("heun")
+            if args.simple_scale_factor != 1.0:
+                improvements.append(f"scale_{args.simple_scale_factor}")
+            if temp_checkpoint_dir:
+                improvements.append("temp_checkpoints")
+            improvements_str = "_".join(improvements)
+            wandb_run_name = f"blip3o_{args.model_size}_{args.training_mode}_{improvements_str}_{world_size}gpu_{timestamp}"
+        
+        # WandB config
+        wandb_config = {
+            "model_size": args.model_size,
+            "training_mode": args.training_mode,
+            "batch_size_per_gpu": args.batch_size,
+            "total_batch_size": args.batch_size * world_size,
+            "world_size": world_size,
+            "max_shards": args.max_shards,
+            "experiment_version": "FSDP_NO_NORMALIZATION_v1",
+            "learning_rate": args.learning_rate,
+            "weight_decay": args.weight_decay,
+            "num_epochs": args.num_epochs,
+            "warmup_steps": args.warmup_steps,
+            "max_grad_norm": args.max_grad_norm,
+            "fp16": args.fp16,
+            
+            # FSDP configuration
+            "fsdp_enabled": args.distributed,
+            "fsdp_sharding_strategy": args.fsdp_sharding_strategy,
+            "fsdp_mixed_precision": args.fsdp_mixed_precision,
+            "fsdp_cpu_offload": args.fsdp_cpu_offload,
+            
+            # Loss weights
+            "velocity_weight": args.velocity_weight,
+            
+            # Architecture
+            "clip_normalization": "DISABLED",
+            "simple_scale_factor": args.simple_scale_factor,
+            "eva_adapter": args.use_eva_adapter,
+            "eva_adapter_layers": args.eva_adapter_layers,
+            "heun_inference": args.use_heun_inference,
+            "timestep_weighting": args.use_timestep_weighting,
+            
+            # Checkpoint management
+            "temp_checkpoint_dir": temp_checkpoint_dir,
+            "keep_local_checkpoints": args.keep_local_checkpoints,
+            "save_to_temp_every_n_steps": args.save_to_temp_every_n_steps,
+            
+            # Approach
+            "normalization_approach": "DISABLED",
+            "working_space": "raw_clip_embeddings",
+            "data_dependent_stats": False,
+        }
+        
+        trainer = create_distributed_clip_trainer(
+            model=model,
+            loss_fn=loss_fn,
+            train_dataloader=train_dataloader,
+            eval_dataloader=eval_dataloader,
+            world_size=world_size,
+            rank=rank,
+            use_fsdp=args.distributed,
+            sharding_strategy=args.fsdp_sharding_strategy,
+            cpu_offload=args.fsdp_cpu_offload,
+            mixed_precision_fsdp=args.fsdp_mixed_precision,
+            learning_rate=args.learning_rate,
+            weight_decay=args.weight_decay,
+            num_epochs=args.num_epochs,
+            warmup_steps=args.warmup_steps,
+            max_grad_norm=args.max_grad_norm,
+            fp16=args.fp16,
+            eval_every_n_steps=args.eval_every_n_steps,
+            eval_num_samples=args.eval_num_samples,
+            eval_inference_steps=args.eval_inference_steps,
+            use_heun_inference=args.use_heun_inference,
+            output_dir=output_dir,
+            temp_checkpoint_dir=temp_checkpoint_dir,
+            keep_local_checkpoints=args.keep_local_checkpoints,
+            save_to_temp_every_n_steps=args.save_to_temp_every_n_steps,
+            use_wandb=args.use_wandb and rank == 0,  # Only rank 0 logs to WandB
+            wandb_project=args.wandb_project,
+            wandb_run_name=wandb_run_name,
+            wandb_config=wandb_config,
+        )
+        
+        if rank == 0:
+            logger.info("✅ Distributed trainer created successfully:")
+            logger.info(f"  FSDP enabled: {args.distributed}")
+            logger.info(f"  Sharding strategy: {args.fsdp_sharding_strategy}")
+            logger.info(f"  Mixed precision: {'BF16' if args.fsdp_mixed_precision else 'FP32'}")
+            logger.info(f"  CPU offload: {'Enabled' if args.fsdp_cpu_offload else 'Disabled'}")
+            logger.info(f"  Evaluation: Every {args.eval_every_n_steps} steps")
+            logger.info(f"  WandB enabled: {args.use_wandb and rank == 0}")
+            logger.info(f"  Heun inference: {'✅ ENABLED' if args.use_heun_inference else '❌ DISABLED'}")
+            logger.info(f"  Normalization: DISABLED")
+            logger.info(f"  Local checkpoints: {args.keep_local_checkpoints}")
+            logger.info(f"  Temp checkpoints: {'✅ ENABLED' if temp_checkpoint_dir else '❌ DISABLED'}")
+            if temp_checkpoint_dir:
+                logger.info(f"    Temp directory: {temp_checkpoint_dir}")
+                logger.info(f"    Save to temp every: {args.save_to_temp_every_n_steps} steps")
+        
+        return trainer
+        
+    except Exception as e:
+        logger.error(f"❌ Error creating distributed trainer: {e}")
+        raise
+
+def save_distributed_experiment_config(args, model, output_dir, temp_checkpoint_dir, rank, world_size, logger):
+    """Save detailed experiment configuration for distributed training"""
+    
+    if rank != 0:
+        return {}  # Only rank 0 saves config
+    
+    try:
+        config = {
+            'experiment_info': {
+                'name': 'BLIP3-o CLIP Reproduction with FSDP + Temp Checkpoints',
+                'version': 'FSDP_NO_NORMALIZATION_v1',
+                'timestamp': datetime.now().isoformat(),
+                'task': 'Reproduce CLIP embeddings from EVA embeddings',
+                'method': 'BLIP3-o DiT with FSDP without CLIP normalization',
+                'focus': 'Distributed training with FSDP + smart checkpoint management',
+            },
+            'distributed_config': {
+                'world_size': world_size,
+                'fsdp_enabled': args.distributed,
+                'sharding_strategy': args.fsdp_sharding_strategy,
+                'mixed_precision': args.fsdp_mixed_precision,
+                'cpu_offload': args.fsdp_cpu_offload,
+                'total_batch_size': args.batch_size * world_size,
+                'batch_size_per_gpu': args.batch_size,
+            },
+            'args': vars(args),
+            'model_config': model.config.to_dict() if hasattr(model.config, 'to_dict') else {},
+            'model_info': {
+                'parameters': model.get_num_parameters() if hasattr(model, 'get_num_parameters') else 'unknown',
+                'model_class': model.__class__.__name__,
+                'parameters_per_gpu_estimate': (model.get_num_parameters() // world_size) if hasattr(model, 'get_num_parameters') else 'unknown',
+            },
+            'normalization_info': {
+                'clip_normalization': 'DISABLED',
+                'working_space': 'raw_clip_embeddings',
+                'simple_scale_factor': args.simple_scale_factor,
+                'data_dependent_stats': False,
+                'advantages': [
+                    'No dependency on training data statistics',
+                    'Simpler training and evaluation pipeline',
+                    'No risk of normalization-related crashes',
+                    'Direct work with original CLIP space',
+                    'Compatible with distributed training'
+                ],
+            },
+            'checkpoint_management': {
+                'local_output_dir': str(output_dir),
+                'temp_checkpoint_dir': temp_checkpoint_dir,
+                'keep_local_checkpoints': args.keep_local_checkpoints,
+                'save_to_temp_every_n_steps': args.save_to_temp_every_n_steps,
+                'strategy': 'local_plus_temp' if temp_checkpoint_dir else 'local_only',
+                'distributed_checkpointing': True,
+            },
+        }
+        
+        config_path = Path(output_dir) / 'distributed_experiment_config.json'
+        with open(config_path, 'w') as f:
+            json.dump(config, f, indent=2, default=str)
+        
+        logger.info(f"✅ Distributed configuration saved to {config_path}")
+        
+        # Also save to temp directory if available
+        if temp_checkpoint_dir:
+            temp_config_path = Path(temp_checkpoint_dir) / 'distributed_experiment_config.json'
+            try:
+                with open(temp_config_path, 'w') as f:
+                    json.dump(config, f, indent=2, default=str)
+                logger.info(f"✅ Configuration also saved to temp: {temp_config_path}")
+            except Exception as e:
+                logger.warning(f"⚠️ Could not save config to temp directory: {e}")
+        
+        return config
+        
+    except Exception as e:
+        logger.error(f"❌ Error saving distributed experiment config: {e}")
+        return {}
+
+def run_distributed_training(rank: int, world_size: int, args):
+    """Main distributed training function for a single rank"""
+    
+    # Setup logging for this rank
+    logger = setup_logging(rank)
+    
+    try:
+        # Setup distributed environment
+        device = setup_distributed_environment(rank, world_size, args.master_port)
+        
+        if rank == 0:
+            logger.info("🚀 BLIP3-o Distributed CLIP Reproduction Training (FSDP + NO NORMALIZATION)")
+            logger.info("=" * 80)
+            logger.info("📋 Task: Reproduce CLIP embeddings from EVA embeddings")
+            logger.info("🧠 Model: BLIP3-o DiT WITHOUT CLIP normalization")
+            logger.info("⚡ Training: FSDP (Fully Sharded Data Parallel)")
+            logger.info("🌊 Method: Rectified Flow Matching with raw embeddings")
+            logger.info("🎯 Target: CLIP embeddings [B, N, 1024] (RAW)")
+            logger.info("🎮 Conditioning: EVA embeddings [B, N, 4096]")
+            logger.info("🔑 Focus: Distributed training without data-dependent normalization")
+            logger.info("📦 NEW: FSDP + Smart checkpoint management")
+            logger.info("=" * 80)
+        
+        # Validate arguments
+        if not validate_distributed_arguments(args, rank, logger):
+            return 1
+        
+        # Check environment
+        if not check_distributed_environment(rank, logger):
+            if rank == 0:
+                logger.error("❌ Distributed environment check failed!")
+            return 1
+        
+        # Setup checkpoint directories
+        output_dir = Path(args.output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        
+        temp_checkpoint_dir = None
+        if args.temp_checkpoint_dir:
+            temp_checkpoint_dir = args.temp_checkpoint_dir
+        elif args.auto_detect_temp_dir:
+            temp_checkpoint_dir = detect_temp_checkpoint_directory()
+        
+        if temp_checkpoint_dir:
+            temp_path = Path(temp_checkpoint_dir)
+            try:
+                temp_path.mkdir(parents=True, exist_ok=True)
+                if rank == 0:
+                    logger.info(f"✅ Temp checkpoint directory ready: {temp_path}")
+            except (PermissionError, OSError) as e:
+                if rank == 0:
+                    logger.warning(f"⚠️ Cannot use temp directory {temp_path}: {e}")
+                temp_checkpoint_dir = None
+        
+        if rank == 0:
+            logger.info(f"Configuration (FSDP + NO NORMALIZATION):")
+            logger.info(f"  World size: {world_size}")
+            logger.info(f"  Model size: {args.model_size}")
+            logger.info(f"  Training mode: {args.training_mode}")
+            logger.info(f"  Embeddings dir: {args.chunked_embeddings_dir}")
+            logger.info(f"  Output dir: {output_dir}")
+            logger.info(f"  Temp checkpoint dir: {temp_checkpoint_dir or 'None'}")
+            logger.info(f"  Batch size per GPU: {args.batch_size}")
+            logger.info(f"  Total batch size: {args.batch_size * world_size}")
+            logger.info(f"  Learning rate: {args.learning_rate}")
+            logger.info(f"  Epochs: {args.num_epochs}")
+            logger.info(f"  FSDP sharding: {args.fsdp_sharding_strategy}")
+            logger.info(f"  Mixed precision: {'BF16' if args.fsdp_mixed_precision else 'FP32'}")
+            logger.info(f"  CPU offload: {'Enabled' if args.fsdp_cpu_offload else 'Disabled'}")
+        
+        # Create model
+        if rank == 0:
+            logger.info("🏗️ Creating model...")
+        model = create_distributed_model(args, rank, logger)
+        
+        # Create loss function
+        if rank == 0:
+            logger.info("🌊 Creating loss function...")
+        from src.modules.losses.blip3o_fm_loss import create_clip_reproduction_loss
+        loss_fn = create_clip_reproduction_loss(
+            prediction_type="velocity",
+            flow_type="rectified",
+            velocity_weight=args.velocity_weight,
+            use_timestep_weighting=args.use_timestep_weighting,
+        )
+        
+        # Create distributed dataloaders
+        if rank == 0:
+            logger.info("📊 Creating distributed dataloaders...")
+        train_dataloader, eval_dataloader = create_distributed_dataloaders(args, rank, world_size, logger)
+        
+        # Create distributed trainer
+        if rank == 0:
+            logger.info("🏃 Creating distributed trainer...")
+        trainer = create_distributed_trainer(
+            model, loss_fn, train_dataloader, eval_dataloader, 
+            args, rank, world_size, str(output_dir), temp_checkpoint_dir, logger
+        )
+        
+        # Save configuration
+        if rank == 0:
+            logger.info("💾 Saving experiment configuration...")
+        config = save_distributed_experiment_config(args, model, output_dir, temp_checkpoint_dir, rank, world_size, logger)
+        
+        # Start distributed training
+        if rank == 0:
+            logger.info(f"\n🚀 Starting FSDP distributed training...")
+            logger.info("=" * 80)
+            logger.info("🎯 Expected Results:")
+            logger.info("   • Distributed training across multiple GPUs")
+            logger.info("   • Memory efficiency through parameter sharding")
+            logger.info("   • Simplified training without normalization concerns")
+            logger.info("   • Smart checkpoint management for large-scale training")
+            logger.info("   • ~3-4x training speedup with proper scaling")
+            logger.info("=" * 80)
+        
+        start_time = datetime.now()
+        
+        # Run distributed training
+        summary = trainer.train()
+        
+        end_time = datetime.now()
+        duration = (end_time - start_time).total_seconds()
+        
+        # FINAL SUMMARY (only rank 0)
+        if rank == 0:
+            logger.info("\n" + "=" * 80)
+            logger.info("🎉 DISTRIBUTED TRAINING COMPLETED!")
+            logger.info("=" * 80)
+            
+            logger.info(f"📊 RESULTS:")
+            logger.info(f"  Duration: {duration:.1f} seconds ({duration/60:.1f} minutes)")
+            logger.info(f"  Total steps: {summary.get('total_steps', 0)}")
+            logger.info(f"  Best loss: {summary.get('best_loss', float('inf')):.6f}")
+            logger.info(f"  Best CLIP similarity: {summary.get('best_eval_similarity', 0):.4f}")
+            logger.info(f"  World size: {world_size}")
+            logger.info(f"  FSDP enabled: ✅")
+            
+            # Success assessment
+            best_sim = summary.get('best_eval_similarity', 0)
+            if best_sim > 0.6:
+                logger.info(f"  🎉 EXCELLENT: Similarity >0.6 with distributed training!")
+                success_level = "excellent"
+            elif best_sim > 0.4:
+                logger.info(f"  ✅ GOOD: Similarity >0.4 with FSDP scaling!")
+                success_level = "good"
+            elif best_sim > 0.2:
+                logger.info(f"  📈 FAIR: Similarity >0.2, distributed training stable!")
+                success_level = "fair"
+            else:
+                logger.info(f"  ⚠️ Needs investigation: Check distributed training progress")
+                success_level = "needs_investigation"
+            
+            logger.info(f"📁 Outputs:")
+            logger.info(f"  Local checkpoints: {output_dir}")
+            if temp_checkpoint_dir:
+                logger.info(f"  Temp checkpoints: {temp_checkpoint_dir}")
+            
+            logger.info("=" * 80)
+            logger.info("✅ FSDP DISTRIBUTED TRAINING COMPLETED!")
+            logger.info("🔑 Working directly with raw CLIP embeddings!")
+            logger.info("⚡ FSDP parameter sharding enabled!")
+            logger.info("📦 Smart checkpoint management active!")
+            
+            logger.info("💡 Distributed Training Benefits:")
+            logger.info("  • ~3-4x training speedup")
+            logger.info("  • Memory efficiency through parameter sharding")
+            logger.info("  • Scalable to larger models (up to 8B parameters)")
+            logger.info("  • No normalization complexity")
+            logger.info("  • Automatic gradient synchronization")
+            logger.info("=" * 80)
+        
+        return 0 if summary.get('training_completed', False) else 1
+        
+    except Exception as e:
+        logger.error(f"❌ Distributed training failed on rank {rank}: {e}")
+        logger.error("FULL ERROR TRACEBACK:")
+        traceback.print_exc()
+        return 1
+    
+    finally:
+        # Cleanup distributed environment
+        from src.modules.distributed.fsdp_utils import cleanup_distributed
+        cleanup_distributed()
+
+def main():
+    """Main entry point for distributed training"""
+    
+    # Parse arguments
+    args = parse_arguments()
+    
+    # Determine rank and world size
+    if args.distributed and args.rank == -1:
+        # Auto-detect from torchrun environment
+        if 'RANK' in os.environ and 'WORLD_SIZE' in os.environ:
+            args.rank = int(os.environ['RANK'])
+            args.world_size = int(os.environ['WORLD_SIZE'])
+        else:
+            print("❌ Distributed training requested but RANK/WORLD_SIZE not set")
+            print("Use: torchrun --nproc_per_node=4 train_dit_distributed.py ...")
+            return 1
+    
+    # Run single-rank training (either single-GPU or part of distributed)
+    if args.distributed:
+        # Distributed training
+        exit_code = run_distributed_training(args.rank, args.world_size, args)
+    else:
+        # Single-GPU training (fallback to original script behavior)
+        print("⚠️ Single-GPU training not implemented in this script")
+        print("Use: python train_dit.py for single-GPU training")
+        return 1
+    
+    return exit_code
+
+if __name__ == "__main__":
+    try:
+        exit_code = main()
+        sys.exit(exit_code)
+    except Exception as e:
+        print(f"❌ Critical error in main: {e}")
+        traceback.print_exc()
+        sys.exit(1)

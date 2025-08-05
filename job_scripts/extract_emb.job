@@ -1,67 +1,357 @@
 #!/bin/bash
+#SBATCH --job-name=blip3o_distributed_extraction
 #SBATCH --partition=gpu_h100
-#SBATCH --gpus=1
-#SBATCH --job-name=blip3o_extract_chunked
-#SBATCH --time=24:00:00
-#SBATCH --output=./slurm_out/extract_only_patch_50shard.out
-#SBATCH --error=./slurm_out/extract_only_patch_50shard.err
-#SBATCH --mem=64GB
-#SBATCH --cpus-per-task=8
 #SBATCH --nodes=1
-#SBATCH --ntasks-per-node=1
+#SBATCH --gpus=4
+#SBATCH --ntasks=4
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=120G
+#SBATCH --time=6:00:00
+#SBATCH --output=./slurm_out/blip3o_distributed_extraction_%j.out
+#SBATCH --error=./slurm_out/blip3o_distributed_extraction_%j.err
 
-echo "🚀 Starting BLIP3-o Embedding Extraction"
-echo "Job ID: $SLURM_JOB_ID"
-echo "Node: $SLURMD_NODENAME"
-echo "Date: $(date)"
-echo ""
+# =============================================================================
+# BLIP3-o Multi-GPU Embedding Extraction
+# Distributes TAR file processing across multiple GPUs for faster preprocessing
+# =============================================================================
 
-# Environment setup
+echo "🚀 BLIP3-o Multi-GPU Embedding Extraction"
+echo "=========================================="
+echo "Job ID: ${SLURM_JOB_ID}"
+echo "Node: $(hostname)"
+echo "Time: $(date)"
+echo "GPUs: ${SLURM_GPUS_ON_NODE}"
+echo "CPUs per task: ${SLURM_CPUS_PER_TASK}"
+echo "Memory: ${SLURM_MEM_PER_NODE}MB"
+echo "=========================================="
+
+cd $SLURM_SUBMIT_DIR
+
+# Setup environment
 module purge
 module load 2024
 module load Miniconda3/24.7.1-0
 module load CUDA/12.6.0
 source activate eva_clip_env
 
+# Setup BLIP3-o workspace
 export SCRATCH_SHARED="/scratch-shared"
-export SCRATCH_LOCAL="/scratch-local"
-
 export BLIP3O_USER=$(whoami)
 export BLIP3O_JOB_ID=${SLURM_JOB_ID}
+
+# Set up structured directories
 export BLIP3O_WORKSPACE="/scratch-shared/${BLIP3O_USER}/blip3o_workspace"
-export BLIP3O_DATASETS="${BLIP3O_WORKSPACE}/datasets"
 export BLIP3O_EMBEDDINGS="${BLIP3O_WORKSPACE}/embeddings"
 export BLIP3O_CHECKPOINTS="${BLIP3O_WORKSPACE}/checkpoints"
+export BLIP3O_DATASETS="${BLIP3O_WORKSPACE}/datasets"
 export BLIP3O_LOGS="${BLIP3O_WORKSPACE}/logs"
 
+# Job temp directory
 export BLIP3O_JOB_TEMP="/scratch-local/${BLIP3O_USER}.${BLIP3O_JOB_ID}/blip3o_job_${BLIP3O_JOB_ID}"
 export BLIP3O_CACHE="${BLIP3O_JOB_TEMP}/cache"
-export BLIP3O_WORKING="${BLIP3O_JOB_TEMP}/working"
 
+# Create directories
 mkdir -p "${BLIP3O_WORKSPACE}"/{datasets,embeddings,checkpoints,logs,metadata}
 mkdir -p "${BLIP3O_JOB_TEMP}"/{cache,working,temp_checkpoints}
+
+# Model cache (redirected to job temp to avoid home quota)
 export TORCH_HOME="${BLIP3O_CACHE}/torch"
 export HF_HOME="${BLIP3O_CACHE}/huggingface"
 export TRANSFORMERS_CACHE="${BLIP3O_CACHE}/transformers"
-export WANDB_DIR="${BLIP3O_LOGS}/wandb"
-mkdir -p "${TORCH_HOME}" "${HF_HOME}" "${TRANSFORMERS_CACHE}" "${WANDB_DIR}"
 
-export BLIP3O_TEMP_DIR="${BLIP3O_JOB_TEMP}"
+# Create cache subdirectories
+mkdir -p "${TORCH_HOME}" "${HF_HOME}" "${TRANSFORMERS_CACHE}"
 
-# Run extraction directly with chosen arguments. Example values are set below:
-# --include_cls      for cls_patch mode (257 tokens)
-# omit --include_cls for patch_only mode (256 tokens)
-# --max_shards N     to limit number of shards
-# --batch_size N     to set batch size
+echo "🗂️  BLIP3-o workspace ready:"
+echo "   Persistent: $BLIP3O_WORKSPACE"
+echo "   Job temp:   $BLIP3O_JOB_TEMP"
+echo "   Datasets:   $BLIP3O_DATASETS"
+echo "   Embeddings: $BLIP3O_EMBEDDINGS"
 
-python src/modules/extract_embeddings_g.py --max_shards 1 --batch_size 128
+# Extraction configuration (can be overridden by command line arguments)
+WORLD_SIZE=${SLURM_GPUS_ON_NODE}
+MASTER_PORT="12356"  # Different from training port
+BATCH_SIZE_PER_GPU=32
+INCLUDE_CLS=false
+MAX_SHARDS=50
 
-EXTRACTION_EXIT_CODE=$?
-if [ $EXTRACTION_EXIT_CODE -ne 0 ]; then
-    echo "❌ Extraction failed with exit code: $EXTRACTION_EXIT_CODE"
+# Parse command line arguments
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --include_cls)
+            INCLUDE_CLS=true
+            shift
+            ;;
+        --batch_size)
+            BATCH_SIZE_PER_GPU="$2"
+            shift 2
+            ;;
+        --max_shards)
+            MAX_SHARDS="$2"
+            shift 2
+            ;;
+        --world_size)
+            WORLD_SIZE="$2"
+            shift 2
+            ;;
+        *)
+            echo "Unknown option: $1"
+            shift
+            ;;
+    esac
+done
+
+# Determine extraction mode
+if [ "$INCLUDE_CLS" = true ]; then
+    TARGET_TOKENS=257
+    MODE_NAME="CLS+Patches"
+    MODE_SUFFIX="cls_patch"
+else
+    TARGET_TOKENS=256
+    MODE_NAME="Patches only"
+    MODE_SUFFIX="patch_only"
+fi
+
+# Set output directory
+OUTPUT_DIR="${BLIP3O_EMBEDDINGS}/${MODE_SUFFIX}_${TARGET_TOKENS}_tokens"
+
+# Create output directories
+mkdir -p "${OUTPUT_DIR}"
+mkdir -p ./slurm_out
+
+echo ""
+echo "⚙️ Multi-GPU Extraction Configuration:"
+echo "====================================="
+echo "Mode: $MODE_NAME ($TARGET_TOKENS tokens)"
+echo "Output: $OUTPUT_DIR"
+echo "GPUs: $WORLD_SIZE"
+echo "Batch size per GPU: $BATCH_SIZE_PER_GPU"
+echo "Total effective batch size: $((BATCH_SIZE_PER_GPU * WORLD_SIZE))"
+echo "Max shards: $MAX_SHARDS"
+echo "Master port: $MASTER_PORT"
+echo ""
+echo "🎯 Expected Benefits:"
+echo "  • ~${WORLD_SIZE}x extraction speedup"
+echo "  • Parallel TAR file processing"
+echo "  • Better GPU utilization"
+echo "  • Faster preprocessing for large datasets"
+echo ""
+
+# Check for dataset files
+if [ ! -d "$BLIP3O_DATASETS" ]; then
+    echo "❌ Datasets directory not found: $BLIP3O_DATASETS"
+    echo ""
+    echo "💡 To download datasets:"
+    echo "  python src/data_hand/download_data.py --shards 0 1 2 3 4 5 6 7 8 9"
+    echo "  # Make sure to place downloaded TAR files in: $BLIP3O_DATASETS"
     exit 1
 fi
 
-echo "✅ Extraction completed!"
+# Count available TAR files
+TAR_COUNT=$(find "$BLIP3O_DATASETS" -name "*.tar" | wc -l)
+echo "✅ Found $TAR_COUNT TAR files in datasets directory"
 
-# The rest of your job file (validation, cleanup, etc.) goes here as needed...
+if [ $TAR_COUNT -eq 0 ]; then
+    echo "❌ No TAR files found in datasets directory!"
+    echo "Available files:"
+    ls -la "$BLIP3O_DATASETS/" 2>/dev/null || echo "Directory empty"
+    exit 1
+fi
+
+if [ $TAR_COUNT -lt $MAX_SHARDS ]; then
+    echo "⚠️ Only $TAR_COUNT TAR files available (requested $MAX_SHARDS)"
+    MAX_SHARDS=$TAR_COUNT
+    echo "   Adjusted to use $MAX_SHARDS shards"
+fi
+
+echo "✅ Multi-GPU extraction script ready"
+
+echo ""
+echo "🚀 Starting Multi-GPU Embedding Extraction..."
+echo "=============================================="
+echo "🎯 Extraction Strategy:"
+echo "  • Distribute TAR files across $WORLD_SIZE GPUs"
+echo "  • Each GPU processes assigned files independently"
+echo "  • Coordinated saving to prevent conflicts"
+echo "  • Automatic consolidation after extraction"
+echo ""
+echo "📊 Processing Details:"
+echo "  • TAR files: $TAR_COUNT available, using $MAX_SHARDS"
+echo "  • Files per GPU: ~$((MAX_SHARDS / WORLD_SIZE))"
+echo "  • Batch processing: $BATCH_SIZE_PER_GPU per GPU"
+echo "  • Output format: ${MODE_SUFFIX}_${TARGET_TOKENS}_tokens"
+echo ""
+
+# Build extraction command
+EXTRACTION_CMD="python src/modules/extract_embeddings_distributed.py \
+    --world_size $WORLD_SIZE \
+    --master_port $MASTER_PORT \
+    --batch_size $BATCH_SIZE_PER_GPU \
+    --max_shards $MAX_SHARDS"
+
+# Add CLS token option if specified
+if [ "$INCLUDE_CLS" = true ]; then
+    EXTRACTION_CMD="$EXTRACTION_CMD --include_cls"
+fi
+
+echo "Executing multi-GPU extraction command:"
+echo "$EXTRACTION_CMD"
+echo ""
+
+# Launch distributed extraction
+eval $EXTRACTION_CMD
+
+EXTRACTION_EXIT_CODE=$?
+
+echo ""
+echo "=============================================="
+echo "📊 Multi-GPU Extraction Results"
+echo "=============================================="
+
+if [ $EXTRACTION_EXIT_CODE -eq 0 ]; then
+    echo "✅ Multi-GPU embedding extraction completed successfully!"
+    
+    echo ""
+    echo "📋 Extraction Summary:"
+    echo "===================="
+    
+    # Check for output files
+    echo ""
+    echo "📋 Generated Files:"
+    echo "=================="
+    
+    # Check for consolidated files
+    CONSOLIDATED_FILES=$(find "$OUTPUT_DIR" -name "embeddings_shard_*_${MODE_SUFFIX}.pkl" | wc -l)
+    if [ $CONSOLIDATED_FILES -gt 0 ]; then
+        echo "✅ Found $CONSOLIDATED_FILES consolidated embedding files"
+        
+        # Calculate total size
+        TOTAL_SIZE=$(du -sh "$OUTPUT_DIR" 2>/dev/null | cut -f1)
+        echo "✅ Total size: $TOTAL_SIZE"
+        
+        # Check manifest
+        MANIFEST_FILE="${OUTPUT_DIR}/embeddings_manifest.json"
+        if [ -f "$MANIFEST_FILE" ]; then
+            echo "✅ Manifest file: $MANIFEST_FILE"
+            
+            # Extract summary from manifest
+            python -c "
+import json
+import sys
+try:
+    with open('$MANIFEST_FILE', 'r') as f:
+        manifest = json.load(f)
+    
+    extraction_info = manifest.get('extraction_info', {})
+    consolidation = manifest.get('consolidation_results', {})
+    
+    print(f'📊 Multi-GPU Extraction Summary:')
+    print(f'   GPUs used: {extraction_info.get(\"world_size\", \"unknown\")}')
+    print(f'   Extraction time: {extraction_info.get(\"extraction_time_seconds\", 0):.1f}s')
+    print(f'   Total shards: {manifest.get(\"total_shards\", \"unknown\")}')
+    print(f'   Total samples: {manifest.get(\"total_samples\", \"unknown\"):,}')
+    print(f'   Consolidated shards: {consolidation.get(\"consolidated_shards\", \"unknown\")}')
+    print(f'   Consolidation errors: {consolidation.get(\"consolidation_errors\", \"unknown\")}')
+    print(f'   Mode: $MODE_NAME ($TARGET_TOKENS tokens)')
+    
+    # Calculate speedup
+    world_size = extraction_info.get('world_size', 1)
+    extraction_time = extraction_info.get('extraction_time_seconds', 0)
+    if world_size > 1 and extraction_time > 0:
+        theoretical_speedup = world_size
+        print(f'   Theoretical speedup: ~{theoretical_speedup:.1f}x')
+    
+except Exception as e:
+    print(f'Could not parse manifest: {e}')
+    sys.exit(1)
+"
+        fi
+        
+        echo ""
+        echo "🎉 SUCCESS: Multi-GPU extraction completed!"
+        echo ""
+        echo "💡 Next step - Start distributed training:"
+        echo "sbatch job_scripts/train_blip3o_fsdp.job --embeddings_dir $OUTPUT_DIR"
+        echo ""
+        echo "Or manually:"
+        echo "torchrun --nproc_per_node=4 train_dit_distributed.py \\"
+        echo "  --chunked_embeddings_dir $OUTPUT_DIR \\"
+        echo "  --output_dir ./checkpoints \\"
+        echo "  --distributed"
+        
+    else
+        echo "⚠️ No consolidated files found - check for intermediate files"
+        echo "Files in output directory:"
+        ls -la "$OUTPUT_DIR" 2>/dev/null | head -10
+    fi
+    
+    # Show extraction benefits achieved
+    echo ""
+    echo "⚡ Multi-GPU Extraction Benefits Achieved:"
+    echo "  • Parallel TAR file processing across $WORLD_SIZE GPUs"
+    echo "  • ~${WORLD_SIZE}x theoretical speedup"
+    echo "  • Better GPU utilization"
+    echo "  • Coordinated file output management"
+    echo "  • Automatic consolidation and cleanup"
+    echo "  • Ready for distributed training"
+    
+else
+    echo "❌ FAILED: Multi-GPU extraction exit code $EXTRACTION_EXIT_CODE"
+    echo ""
+    echo "💡 Troubleshooting:"
+    echo "  • Check log files in ./slurm_out/ for detailed error messages"
+    echo "  • Verify TAR files are accessible and not corrupted"
+    echo "  • Check GPU memory usage - try smaller batch size if OOM"
+    echo "  • Verify distributed extraction script is available"
+    echo "  • Check available disk space for output files"
+    echo ""
+    echo "🔧 Recovery options:"
+    echo "  • Reduce batch size: --batch_size 16"
+    echo "  • Use fewer shards: --max_shards 5"
+    echo "  • Check intermediate files for partial completion"
+    echo "  • Verify model downloads completed successfully"
+    echo ""
+    echo "🔍 Quick checks:"
+    echo "  • GPU memory: nvidia-smi"
+    echo "  • Disk space: df -h"
+    echo "  • TAR files: ls -la $BLIP3O_DATASETS/*.tar"
+    
+    # Show any intermediate files that might exist
+    echo ""
+    echo "🔍 Checking for intermediate files..."
+    INTERMEDIATE_FILES=$(find "$OUTPUT_DIR" -name "*_gpu*.pkl" 2>/dev/null | wc -l)
+    if [ $INTERMEDIATE_FILES -gt 0 ]; then
+        echo "Found $INTERMEDIATE_FILES intermediate files:"
+        find "$OUTPUT_DIR" -name "*_gpu*.pkl" 2>/dev/null | head -3
+        echo ""
+        echo "💡 You can try to consolidate these files manually or re-run extraction"
+    else
+        echo "No intermediate GPU-specific files found"
+    fi
+fi
+
+echo ""
+echo "📊 Multi-GPU Resource Usage Summary:"
+nvidia-smi --query-gpu=name,memory.total,memory.used,utilization.gpu --format=csv,noheader,nounits | \
+    awk 'BEGIN{print "GPU | Total Memory | Used Memory | Utilization"} {printf "%s | %s MB | %s MB | %s%%\n", $1, $2, $3, $4}'
+
+echo ""
+echo "🏁 Job completed at $(date)"
+echo "Total job time: $(echo "scale=2; ($(date +%s) - $SECONDS) / 3600" | bc -l) hours"
+echo ""
+echo "📚 MULTI-GPU EXTRACTION SUMMARY:"
+echo "This job extracted CLIP and EVA-CLIP embeddings from TAR files"
+echo "using multiple GPUs for parallel processing."
+echo ""
+echo "Benefits of multi-GPU extraction:"
+echo "• Parallel processing across $WORLD_SIZE GPUs"
+echo "• Faster preprocessing for large datasets"
+echo "• Better resource utilization"
+echo "• Coordinated output management"
+echo "• Scalable to more GPUs and larger datasets"
+echo ""
+echo "The extracted embeddings are ready for distributed BLIP3-o training"
+echo "using FSDP (Fully Sharded Data Parallel)."
+echo "=============================================="
+
+exit $EXTRACTION_EXIT_CODE

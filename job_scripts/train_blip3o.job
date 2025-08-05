@@ -1,28 +1,29 @@
 #!/bin/bash
-#SBATCH --job-name=blip3o_no_norm
+#SBATCH --job-name=blip3o_fsdp_training
 #SBATCH --partition=gpu_h100
 #SBATCH --nodes=1
-#SBATCH --gpus=1
-#SBATCH --ntasks=1
-#SBATCH --cpus-per-task=8
+#SBATCH --gpus=4
+#SBATCH --ntasks=4
+#SBATCH --cpus-per-task=16
+#SBATCH --mem=180G
 #SBATCH --time=12:00:00
-#SBATCH --mem=64G
-#SBATCH --output=./slurm_out/blip3o_no_norm_%j.out
-#SBATCH --error=./slurm_out/blip3o_no_norm_%j.err
+#SBATCH --output=./slurm_out/blip3o_fsdp_training_%j.out
+#SBATCH --error=./slurm_out/blip3o_fsdp_training_%j.err
 
 # =============================================================================
-# BLIP3-o CLIP Reproduction Training WITHOUT Normalization
-# Task: Reproduce CLIP embeddings [B, N, 1024] from EVA embeddings [B, N, 4096]
-# Method: Rectified Flow Matching with BLIP3-o DiT (NO NORMALIZATION)
+# BLIP3-o Distributed Training with FSDP
+# Multi-GPU training using Fully Sharded Data Parallel for memory efficiency
 # =============================================================================
 
-echo "🚀 BLIP3-o CLIP Reproduction Training (NO NORMALIZATION)"
-echo "=========================================="
+echo "🚀 BLIP3-o Distributed Training with FSDP"
+echo "==========================================="
 echo "Job ID: ${SLURM_JOB_ID}"
 echo "Node: $(hostname)"
 echo "Time: $(date)"
-echo "GPUs: $(nvidia-smi --query-gpu=name --format=csv,noheader,nounits | tr '\n' ', ')"
-echo "=========================================="
+echo "GPUs: ${SLURM_GPUS_ON_NODE}"
+echo "CPUs per task: ${SLURM_CPUS_PER_TASK}"
+echo "Memory: ${SLURM_MEM_PER_NODE}MB"
+echo "==========================================="
 
 cd $SLURM_SUBMIT_DIR
 
@@ -33,38 +34,58 @@ module load Miniconda3/24.7.1-0
 module load CUDA/12.6.0
 source activate eva_clip_env
 
-# # ✅ Set WandB API key
-# export WANDB_API_KEY="0d9895af249ee18e4fa141e8a2350e0f4adb920f"
-# export WANDB_MODE="online"
-# export WANDB_CACHE_DIR="${TMPDIR}/wandb_cache"
-# mkdir -p "${WANDB_CACHE_DIR}"
+# Setup BLIP3-o workspace (temp directory management)
+export SCRATCH_SHARED="/scratch-shared"
+export BLIP3O_USER=$(whoami)
+export BLIP3O_JOB_ID=${SLURM_JOB_ID}
 
-# # Verify WandB login
-# echo "🔐 Verifying WandB authentication..."
-# python -c "import wandb; wandb.login(key='$WANDB_API_KEY'); print('✅ WandB login successful')"
+# Set up structured directories for large-scale training
+export BLIP3O_WORKSPACE="/scratch-shared/${BLIP3O_USER}/blip3o_workspace"
+export BLIP3O_EMBEDDINGS="${BLIP3O_WORKSPACE}/embeddings"
+export BLIP3O_CHECKPOINTS="${BLIP3O_WORKSPACE}/checkpoints"
+export BLIP3O_DATASETS="${BLIP3O_WORKSPACE}/datasets"
+export BLIP3O_LOGS="${BLIP3O_WORKSPACE}/logs"
 
-# Configuration
-EMBEDDINGS_DIR="/scratch-shared/azadaianchuk1/blip3o_workspace/embeddings/patch_only_256_tokens"
-OUTPUT_DIR="./checkpoints/blip3o_no_norm_$(date +%Y%m%d_%H%M%S)"
-TRAINING_MODE="patch_only"
+# Job temp directory
+export BLIP3O_JOB_TEMP="/scratch-local/${BLIP3O_USER}.${BLIP3O_JOB_ID}/blip3o_job_${BLIP3O_JOB_ID}"
+export BLIP3O_CACHE="${BLIP3O_JOB_TEMP}/cache"
+
+# Create directories
+mkdir -p "${BLIP3O_WORKSPACE}"/{datasets,embeddings,checkpoints,logs,metadata}
+mkdir -p "${BLIP3O_JOB_TEMP}"/{cache,working,temp_checkpoints}
+
+# Model cache (redirected to job temp to avoid home quota)
+export TORCH_HOME="${BLIP3O_CACHE}/torch"
+export HF_HOME="${BLIP3O_CACHE}/huggingface"
+export TRANSFORMERS_CACHE="${BLIP3O_CACHE}/transformers"
+export WANDB_DIR="${BLIP3O_LOGS}/wandb"
+
+# Create cache subdirectories
+mkdir -p "${TORCH_HOME}" "${HF_HOME}" "${TRANSFORMERS_CACHE}" "${WANDB_DIR}"
+
+echo "🗂️  BLIP3-o workspace ready:"
+echo "   Persistent: $BLIP3O_WORKSPACE"
+echo "   Job temp:   $BLIP3O_JOB_TEMP"
+echo "   Checkpoints: $BLIP3O_CHECKPOINTS"
+
+# Training configuration (can be overridden by command line arguments)
+EMBEDDINGS_DIR="${BLIP3O_EMBEDDINGS}/patch_only_256_tokens"
+OUTPUT_DIR="$BLIP3O_CHECKPOINTS/blip3o_fsdp_$(date +%Y%m%d_%H%M%S)"
+TEMP_CHECKPOINT_DIR="$BLIP3O_CHECKPOINTS"
+
+# Model and training parameters
 MODEL_SIZE="base"
-
-# Training hyperparameters
-NUM_EPOCHS=8
-BATCH_SIZE=128
+TRAINING_MODE="patch_only"
+BATCH_SIZE_PER_GPU=32
 LEARNING_RATE=4e-5
+NUM_EPOCHS=8
 WEIGHT_DECAY=0.04
-WARMUP_STEPS=100
 MAX_GRAD_NORM=1.0
 
-# Loss weights (same as before)
-VELOCITY_WEIGHT=1.0
-# SEMANTIC_WEIGHT=0.5
-# COSINE_WEIGHT=0.2
-# CONSISTENCY_WEIGHT=0.3
-
-# Simple scaling factor (data-independent)
-SIMPLE_SCALE_FACTOR=1.0  # Can be adjusted if needed
+# FSDP configuration
+FSDP_SHARDING_STRATEGY="FULL_SHARD"
+FSDP_MIXED_PRECISION=true
+FSDP_CPU_OFFLOAD=false
 
 # Evaluation parameters
 EVAL_EVERY_N_STEPS=50
@@ -73,72 +94,100 @@ EVAL_INFERENCE_STEPS=50
 
 # Data configuration
 MAX_SHARDS=3
+SIMPLE_SCALE_FACTOR=1.0
 
-# Create output directory
+# Distributed configuration
+WORLD_SIZE=${SLURM_GPUS_ON_NODE}
+MASTER_PORT="12355"
+
+# Parse command line arguments (override defaults)
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --embeddings_dir)
+            EMBEDDINGS_DIR="$2"
+            shift 2
+            ;;
+        --model_size)
+            MODEL_SIZE="$2"
+            shift 2
+            ;;
+        --batch_size)
+            BATCH_SIZE_PER_GPU="$2"
+            shift 2
+            ;;
+        --learning_rate)
+            LEARNING_RATE="$2"
+            shift 2
+            ;;
+        --num_epochs)
+            NUM_EPOCHS="$2"
+            shift 2
+            ;;
+        --max_shards)
+            MAX_SHARDS="$2"
+            shift 2
+            ;;
+        --fsdp_cpu_offload)
+            FSDP_CPU_OFFLOAD=true
+            shift
+            ;;
+        *)
+            echo "Unknown option: $1"
+            shift
+            ;;
+    esac
+done
+
+# Create output directories
 mkdir -p "${OUTPUT_DIR}"
 mkdir -p ./slurm_out
 
 echo ""
-echo "⚙️ BLIP3-o Configuration (NO NORMALIZATION):"
-echo "============================="
-echo "Task: Reproduce CLIP embeddings from EVA embeddings"
-echo "Method: BLIP3-o DiT WITHOUT CLIP normalization"
-echo "Target: CLIP embeddings [B, N, 1024] (RAW)"
-echo "Conditioning: EVA embeddings [B, N, 4096]"
-echo ""
+echo "⚙️ Distributed Training Configuration:"
+echo "======================================="
+echo "Model: $MODEL_SIZE"
+echo "Training mode: $TRAINING_MODE"
 echo "Embeddings: $EMBEDDINGS_DIR"
 echo "Output: $OUTPUT_DIR"
-echo "Training mode: $TRAINING_MODE"
-echo "Model size: $MODEL_SIZE"
-echo "Max shards: $MAX_SHARDS"
-echo "Simple scale factor: $SIMPLE_SCALE_FACTOR"
+echo "Temp checkpoints: $TEMP_CHECKPOINT_DIR"
 echo ""
-echo "📊 Training Hyperparameters:"
-echo "  Epochs: $NUM_EPOCHS"
-echo "  Batch size: $BATCH_SIZE"
+echo "📊 Training Parameters:"
+echo "  Batch size per GPU: $BATCH_SIZE_PER_GPU"
+echo "  Total batch size: $((BATCH_SIZE_PER_GPU * WORLD_SIZE))"
 echo "  Learning rate: $LEARNING_RATE"
+echo "  Epochs: $NUM_EPOCHS"
+echo "  Max shards: ${MAX_SHARDS}"
 echo "  Weight decay: $WEIGHT_DECAY"
-echo "  Warmup steps: $WARMUP_STEPS"
 echo "  Max grad norm: $MAX_GRAD_NORM"
 echo ""
-echo "🎯 Loss Weights:"
-echo "  Velocity: $VELOCITY_WEIGHT"
-# echo "  Semantic: $SEMANTIC_WEIGHT"
-# echo "  Cosine: $COSINE_WEIGHT"
-# echo "  Consistency: $CONSISTENCY_WEIGHT"
+echo "⚡ FSDP Configuration:"
+echo "  World size: $WORLD_SIZE"
+echo "  Sharding strategy: $FSDP_SHARDING_STRATEGY"
+echo "  Mixed precision: $FSDP_MIXED_PRECISION"
+echo "  CPU offload: $FSDP_CPU_OFFLOAD"
+echo "  Master port: $MASTER_PORT"
 echo ""
-echo "🔍 Evaluation Configuration:"
+echo "🔍 Evaluation Settings:"
 echo "  Eval every: $EVAL_EVERY_N_STEPS steps"
 echo "  Eval samples: $EVAL_NUM_SAMPLES"
 echo "  Inference steps: $EVAL_INFERENCE_STEPS"
-echo ""
-echo "🏗️ Architecture Features:"
-echo "  • 3D Rotary Position Embedding"
-echo "  • Sandwich Normalization (RMSNorm)"
-echo "  • Grouped-Query Attention"
-echo "  • Rectified Flow Matching"
-echo "  • Simple Linear Timestep Schedule"
-echo "  • Heun's Integration Method"
-echo "  • EVA-CLIP Adapter Layers"
-echo ""
-echo "🔑 KEY CHANGE: NO CLIP NORMALIZATION"
-echo "  • Works directly with raw CLIP embeddings"
-echo "  • No dependency on training data statistics"
-echo "  • Simplified training and evaluation pipeline"
-echo "  • Optional simple data-independent scaling"
 echo ""
 
 # Verify embeddings exist
 if [ ! -d "$EMBEDDINGS_DIR" ]; then
     echo "❌ Embeddings directory not found: $EMBEDDINGS_DIR"
-    echo "Available embeddings:"
-    ls -la "/scratch-shared/azadaianchuk1/blip3o_workspace/embeddings/" 2>/dev/null || echo "No embeddings found"
+    echo ""
+    echo "Available embeddings directories:"
+    ls -la "$BLIP3O_EMBEDDINGS/" 2>/dev/null || echo "No embeddings found"
+    echo ""
+    echo "💡 To extract embeddings:"
+    echo "sbatch job_scripts/extract_embeddings_distributed.job"
     exit 1
 fi
 
 echo "✅ Embeddings verified: $EMBEDDINGS_DIR"
 
-# Check available shards
+# Check available embedding shards
 SHARD_COUNT=$(find "$EMBEDDINGS_DIR" -name "*.pkl" | wc -l)
 echo "✅ Found $SHARD_COUNT embedding shards"
 
@@ -153,63 +202,82 @@ if [ $SHARD_COUNT -lt $MAX_SHARDS ]; then
     echo "   Adjusted to use $MAX_SHARDS shards"
 fi
 
-echo "✅ Training script ready"
+echo "✅ Distributed training script ready"
 
 echo ""
-echo "🚀 Starting BLIP3-o Training (NO NORMALIZATION)..."
-echo "===================================="
-echo "🎯 Expected Behavior:"
-echo "  ✅ No normalization-related crashes"
-echo "  ✅ Direct work with raw CLIP embeddings"
-echo "  ✅ Simplified training pipeline"
-echo "  ✅ Non-zero gradients from first step"
-echo "  ✅ Decreasing loss within first few epochs"
-echo "  ✅ CLIP similarity during evaluation"
-echo "  ✅ No dependency on training data statistics"
+echo "🚀 Starting BLIP3-o Distributed Training (FSDP)..."
+echo "=============================================="
+echo "🎯 Expected Benefits:"
+echo "  ✅ ~3-4x training speedup with $WORLD_SIZE GPUs"
+echo "  ✅ Memory efficiency through parameter sharding"
+echo "  ✅ Scalable to larger models (up to 8B parameters)"
+echo "  ✅ No CLIP normalization complexity"
+echo "  ✅ Smart checkpoint management"
+echo "  ✅ Automatic gradient synchronization"
 echo ""
 echo "🏗️ Architecture:"
-echo "  • BLIP3-o DiT with 3D RoPE and Sandwich Normalization"
-echo "  • Rectified Flow Matching"
-echo "  • Simple Linear Timestep Schedule"
-echo "  • Heun's Integration Method"
-echo "  • EVA [4096] → CLIP [1024] mapping (NO NORMALIZATION)"
+echo "  • BLIP3-o DiT with FSDP parameter sharding"
+echo "  • Rectified Flow Matching (no normalization)"
+echo "  • EVA [4096] → CLIP [1024] mapping"
+echo "  • Multi-GPU distributed training"
 echo ""
 
-# Launch BLIP3-o training WITHOUT normalization
-python train_dit.py \
-    --chunked_embeddings_dir "$EMBEDDINGS_DIR" \
-    --output_dir "$OUTPUT_DIR" \
-    --model_size "$MODEL_SIZE" \
-    --training_mode "$TRAINING_MODE" \
+# Build training command with all parameters
+TRAINING_CMD="torchrun \
+    --nproc_per_node=$WORLD_SIZE \
+    --master_port=$MASTER_PORT \
+    train_dit_distributed.py \
+    --chunked_embeddings_dir \"$EMBEDDINGS_DIR\" \
+    --output_dir \"$OUTPUT_DIR\" \
+    --temp_checkpoint_dir \"$TEMP_CHECKPOINT_DIR\" \
+    --distributed \
+    --world_size $WORLD_SIZE \
+    --model_size $MODEL_SIZE \
+    --training_mode $TRAINING_MODE \
+    --batch_size $BATCH_SIZE_PER_GPU \
     --learning_rate $LEARNING_RATE \
-    --batch_size $BATCH_SIZE \
     --num_epochs $NUM_EPOCHS \
-    --warmup_steps $WARMUP_STEPS \
     --weight_decay $WEIGHT_DECAY \
     --max_grad_norm $MAX_GRAD_NORM \
-    --velocity_weight $VELOCITY_WEIGHT \
+    --velocity_weight 1.0 \
     --simple_scale_factor $SIMPLE_SCALE_FACTOR \
     --eval_every_n_steps $EVAL_EVERY_N_STEPS \
     --eval_num_samples $EVAL_NUM_SAMPLES \
     --eval_inference_steps $EVAL_INFERENCE_STEPS \
     --max_shards $MAX_SHARDS \
+    --fsdp_sharding_strategy $FSDP_SHARDING_STRATEGY \
     --use_eva_adapter \
     --use_heun_inference \
     --use_timestep_weighting \
     --fp16 \
-    --wandb_project "blip3o-clip-no-norm"
+    --keep_local_checkpoints 3 \
+    --save_to_temp_every_n_steps 1000"
 
-# --use_wandb  \
+# Add FSDP options
+if [ "$FSDP_MIXED_PRECISION" = true ]; then
+    TRAINING_CMD="$TRAINING_CMD --fsdp_mixed_precision"
+fi
+
+if [ "$FSDP_CPU_OFFLOAD" = true ]; then
+    TRAINING_CMD="$TRAINING_CMD --fsdp_cpu_offload"
+fi
+
+echo "Executing distributed training command:"
+echo "$TRAINING_CMD"
+echo ""
+
+# Launch distributed training
+eval $TRAINING_CMD
 
 TRAINING_EXIT_CODE=$?
 
 echo ""
-echo "======================================"
-echo "📊 BLIP3-o Training Results (NO NORMALIZATION)"
-echo "======================================"
+echo "=============================================="
+echo "📊 BLIP3-o Distributed Training Results"
+echo "=============================================="
 
 if [ $TRAINING_EXIT_CODE -eq 0 ]; then
-    echo "✅ BLIP3-o training completed successfully (NO NORMALIZATION)!"
+    echo "✅ BLIP3-o distributed training completed successfully!"
     
     echo ""
     echo "📋 Training Summary:"
@@ -217,7 +285,7 @@ if [ $TRAINING_EXIT_CODE -eq 0 ]; then
     
     # Check for training results
     SUMMARY_FILE="$OUTPUT_DIR/training_summary.json"
-    CONFIG_FILE="$OUTPUT_DIR/experiment_config.json"
+    CONFIG_FILE="$OUTPUT_DIR/distributed_experiment_config.json"
     
     if [ -f "$SUMMARY_FILE" ]; then
         echo ""
@@ -236,12 +304,14 @@ try:
     print(f'🎯 Best CLIP Similarity: {data.get(\"best_eval_similarity\", 0):.4f}')
     print(f'📊 Total Steps: {data.get(\"total_steps\", 0):,}')
     print(f'⏱️ Training Time: {data.get(\"total_time_seconds\", 0):.1f} seconds')
+    print(f'⚡ World Size: {data.get(\"world_size\", 1)} GPUs')
+    print(f'🔧 FSDP Enabled: {data.get(\"fsdp_enabled\", False)}')
     
     # Final evaluation
     final_eval = data.get('final_eval', {})
     if final_eval:
         print(f'')
-        print(f'🔍 Final Evaluation (RAW CLIP space):')
+        print(f'🔍 Final Distributed Evaluation:')
         clip_sim = final_eval.get('eval_clip_similarity', 0)
         high_qual = final_eval.get('eval_high_quality', 0) * 100
         very_high_qual = final_eval.get('eval_very_high_quality', 0) * 100
@@ -250,18 +320,19 @@ try:
         print(f'   High Quality (>0.7): {high_qual:.1f}%')
         print(f'   Very High Quality (>0.8): {very_high_qual:.1f}%')
         print(f'   Samples Evaluated: {final_eval.get(\"eval_samples\", 0):,}')
+        print(f'   Distributed: {final_eval.get(\"eval_distributed\", False)}')
         
         # Assessment
         if clip_sim > 0.8:
-            print(f'   🎉 EXCELLENT: Outstanding CLIP reproduction without normalization!')
+            print(f'   🎉 EXCELLENT: Outstanding distributed training results!')
         elif clip_sim > 0.6:
-            print(f'   ✅ VERY GOOD: Strong CLIP reproduction with simplified approach!')
+            print(f'   ✅ VERY GOOD: Strong CLIP reproduction with FSDP!')
         elif clip_sim > 0.4:
-            print(f'   ✅ GOOD: Solid CLIP reproduction without data-dependent stats!')
+            print(f'   ✅ GOOD: Solid distributed training performance!')
         elif clip_sim > 0.2:
-            print(f'   📈 FAIR: Decent reproduction, shows learning works!')
+            print(f'   📈 FAIR: Distributed training shows learning!')
         else:
-            print(f'   ⚠️ NEEDS WORK: Try adjusting simple_scale_factor or loss weights')
+            print(f'   ⚠️ NEEDS WORK: Check distributed training configuration')
     
 except Exception as e:
     print(f'Could not parse training summary: {e}')
@@ -275,34 +346,46 @@ except Exception as e:
 "
         
         echo ""
-        echo "📁 Training artifacts saved to: $OUTPUT_DIR"
+        echo "📁 Training artifacts saved to:"
+        echo "   Local: $OUTPUT_DIR"
+        echo "   Temp:  $TEMP_CHECKPOINT_DIR"
     else
         echo "⚠️ No training summary found, checking for any outputs..."
         echo "Directory contents:"
         ls -la "$OUTPUT_DIR" 2>/dev/null || echo "Output directory not found"
     fi
     
+    # Show distributed training benefits achieved
+    echo ""
+    echo "⚡ Distributed Training Benefits Achieved:"
+    echo "  • Multi-GPU parameter sharding with FSDP"
+    echo "  • Memory efficiency for larger model scaling"
+    echo "  • Automatic gradient synchronization"
+    echo "  • Smart checkpoint management"
+    echo "  • No CLIP normalization complexity"
+    echo "  • Scalable training infrastructure"
     
 else
-    echo "❌ FAILED: Training exit code $TRAINING_EXIT_CODE"
+    echo "❌ FAILED: Distributed training exit code $TRAINING_EXIT_CODE"
     echo ""
     echo "💡 Troubleshooting:"
     echo "  • Check log files in ./slurm_out/ for detailed error messages"
-    echo "  • Verify all required Python files are present"
+    echo "  • Verify all required files are present for distributed training"
     echo "  • Check embeddings directory structure and file formats"
-    echo "  • Monitor GPU memory usage with nvidia-smi"
-    echo "  • Try reducing batch_size if out-of-memory errors"
-    echo "  • Try different simple_scale_factor values"
+    echo "  • Monitor GPU memory usage across all ranks"
+    echo "  • Try reducing batch_size per GPU if out-of-memory errors"
+    echo "  • Verify FSDP and distributed training setup"
     echo ""
     echo "🔧 Quick Recovery Options:"
-    echo "  • Use smaller model: --model_size small or tiny"
-    echo "  • Reduce batch size: --batch_size 4"
-    echo "  • Use fewer shards: MAX_SHARDS=2"
-    echo "  • Try scaling factor: --simple_scale_factor 0.1"
+    echo "  • Use smaller model: --model_size small"
+    echo "  • Reduce batch size: --batch_size 16"
+    echo "  • Enable CPU offload: --fsdp_cpu_offload"
+    echo "  • Use fewer shards: --max_shards 2"
+    echo "  • Try different sharding strategy: SHARD_GRAD_OP"
 fi
 
 echo ""
-echo "📊 GPU Resource Usage Summary:"
+echo "📊 Multi-GPU Resource Usage Summary:"
 nvidia-smi --query-gpu=name,memory.total,memory.used,utilization.gpu --format=csv,noheader,nounits | \
     awk 'BEGIN{print "GPU | Total Memory | Used Memory | Utilization"} {printf "%s | %s MB | %s MB | %s%%\n", $1, $2, $3, $4}'
 
@@ -310,16 +393,22 @@ echo ""
 echo "🏁 Job completed at $(date)"
 echo "Total job time: $(echo "scale=2; ($(date +%s) - $SECONDS) / 3600" | bc -l) hours"
 echo ""
-echo "📚 BLIP3-o SUMMARY (NO NORMALIZATION):"
-echo "This job trains BLIP3-o DiT to reproduce CLIP embeddings from EVA embeddings"
-echo "WITHOUT using data-dependent CLIP normalization. This approach:"
-echo "• Works directly with raw CLIP embeddings"
-echo "• Has no dependency on training data statistics"
-echo "• Simplifies training and evaluation pipelines"
-echo "• Eliminates normalization-related crashes"
-echo "• Makes the model easier to deploy and understand"
-echo "Success indicates the architecture works well without complex normalization."
-echo "=========================================="
+echo "📚 FSDP DISTRIBUTED TRAINING SUMMARY:"
+echo "This job trained BLIP3-o DiT using FSDP (Fully Sharded Data Parallel)"
+echo "to reproduce CLIP embeddings from EVA embeddings across multiple GPUs."
+echo ""
+echo "Key achievements:"
+echo "• Multi-GPU parameter sharding for memory efficiency"
+echo "• No dependency on CLIP normalization"
+echo "• Smart checkpoint management with temp directory support"
+echo "• Scalable training infrastructure for larger models"
+echo "• Automatic gradient synchronization across ranks"
+echo ""
+echo "Benefits of FSDP approach:"
+echo "• Memory usage scales with number of GPUs"
+echo "• Enables training of larger models (up to 8B parameters)"
+echo "• Maintains training stability without normalization complexity"
+echo "• Provides ~3-4x speedup with proper scaling"
+echo "=============================================="
 
 exit $TRAINING_EXIT_CODE
-
