@@ -203,7 +203,7 @@ echo "  • Memory monitoring and OOM recovery enabled"
 echo ""
 
 # Build extraction command with memory optimization
-EXTRACTION_CMD="python src/modules/extract_embeddings_distributed.py \
+EXTRACTION_CMD="python src/modules/extract_embeddings_unified.py \
     --world_size $WORLD_SIZE \
     --master_port $MASTER_PORT \
     --batch_size $INITIAL_BATCH_SIZE \
