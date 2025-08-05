@@ -1,13 +1,13 @@
 """
-FIXED Download BLIP3o-Pretrain-Short-Caption dataset with better Snellius support
-Supports multiple shards and structured temp directory storage with quota management
+UPDATED Download BLIP3o datasets with support for multiple dataset types
+Supports both short and long caption datasets with structured organization
 Place this file in: src/data_hand/download_data.py
 
-FIXES:
-- Better disk space checking before download
-- Proper temp manager integration
-- Avoids home directory quota issues
-- Better error handling for disk quota exceeded
+NEW FEATURES:
+- Support for both short_caption and long_caption datasets
+- Organized folder structure for different datasets
+- Better disk space checking and quota management
+- Parallel download support
 """
 
 import os
@@ -18,8 +18,27 @@ from tqdm import tqdm
 import argparse
 import shutil
 import logging
+import concurrent.futures
+import threading
+from typing import List, Dict, Any
 
 logger = logging.getLogger(__name__)
+
+# Dataset configurations
+DATASET_CONFIGS = {
+    'short_caption': {
+        'repo_id': 'BLIP3o/BLIP3o-Pretrain-Short-Caption',
+        'description': 'BLIP3-o Pretrain Short Caption Dataset',
+        'estimated_size_per_shard_gb': 1.2,
+        'max_shards': 2000,
+    },
+    'long_caption': {
+        'repo_id': 'BLIP3o/BLIP3o-Pretrain-Long-Caption',
+        'description': 'BLIP3-o Pretrain Long Caption Dataset',
+        'estimated_size_per_shard_gb': 1.5,
+        'max_shards': 1500,
+    }
+}
 
 def get_project_root():
     """Get the project root directory"""
@@ -42,17 +61,18 @@ def setup_temp_manager():
         print("Using fallback directories")
         return None
 
-def get_temp_directory():
-    """Get the temp directory path for Snellius or other systems"""
+def get_temp_directory(dataset_type: str):
+    """Get the temp directory path for a specific dataset type"""
     # Try to use temp manager first
     temp_manager = setup_temp_manager()
     if temp_manager:
-        return temp_manager.get_datasets_dir()
+        datasets_dir = temp_manager.get_datasets_dir()
+        return datasets_dir / dataset_type
     
     # FIXED: Better fallback to proper Snellius directories
     # First try environment variables set by job script
     if "BLIP3O_DATASETS" in os.environ:
-        temp_dir = Path(os.environ["BLIP3O_DATASETS"])
+        temp_dir = Path(os.environ["BLIP3O_DATASETS"]) / dataset_type
         print(f"📁 Using BLIP3O_DATASETS: {temp_dir}")
         return temp_dir
     
@@ -61,20 +81,20 @@ def get_temp_directory():
     
     # Check for scratch-shared
     if Path("/scratch-shared").exists():
-        temp_dir = Path("/scratch-shared") / user / "blip3o_workspace" / "datasets"
+        temp_dir = Path("/scratch-shared") / user / "blip3o_workspace" / "datasets" / dataset_type
         print(f"📁 Using scratch-shared: {temp_dir}")
         return temp_dir
     
     # Fallback to environment variables
     if "TMPDIR" in os.environ:
-        temp_dir = Path(os.environ["TMPDIR"]) / "blip3o_data"
+        temp_dir = Path(os.environ["TMPDIR"]) / "blip3o_data" / dataset_type
         print(f"📁 Using TMPDIR: {temp_dir}")
     elif "SCRATCH_SHARED" in os.environ:
-        temp_dir = Path(os.environ["SCRATCH_SHARED"]) / user / "blip3o_data"
+        temp_dir = Path(os.environ["SCRATCH_SHARED"]) / user / "blip3o_data" / dataset_type
         print(f"📁 Using SCRATCH_SHARED env var: {temp_dir}")
     else:
         # AVOID home directory to prevent quota issues
-        temp_dir = Path("/tmp") / user / "blip3o_data"
+        temp_dir = Path("/tmp") / user / "blip3o_data" / dataset_type
         print(f"⚠️  Using /tmp fallback: {temp_dir}")
         print("⚠️  Consider setting proper scratch directories")
     
@@ -112,25 +132,95 @@ def check_disk_space(target_dir: Path, required_gb: float) -> bool:
         print(f"⚠️  Could not check disk space: {e}")
         return True  # Continue anyway
 
-def estimate_download_size(num_shards: int) -> float:
-    """Estimate download size in GB based on number of shards."""
-    # Based on empirical data: ~1.2 GB per shard on average
-    estimated_gb = num_shards * 1.2
+def estimate_download_size(dataset_type: str, num_shards: int) -> float:
+    """Estimate download size in GB based on dataset type and number of shards."""
+    config = DATASET_CONFIGS.get(dataset_type, DATASET_CONFIGS['short_caption'])
+    estimated_gb = num_shards * config['estimated_size_per_shard_gb']
     return estimated_gb
 
-def download_blip3o_shards(shard_indices=None, data_dir=None, force_download=False, max_shards=2000):
+def download_single_shard(args_tuple):
+    """Download a single shard (for parallel processing)"""
+    repo_id, shard_filename, data_dir, shard_idx, force_download = args_tuple
+    
+    local_file_path = data_dir / shard_filename
+    
+    # Check if file already exists
+    if local_file_path.exists() and not force_download:
+        file_size_gb = local_file_path.stat().st_size / (1024**3)
+        return {
+            'success': True,
+            'shard_idx': shard_idx,
+            'filename': shard_filename,
+            'size_gb': file_size_gb,
+            'status': 'already_exists'
+        }
+    
+    try:
+        # Download using HuggingFace Hub
+        downloaded_path = hf_hub_download(
+            repo_id=repo_id,
+            filename=shard_filename,
+            repo_type="dataset",
+            local_dir=str(data_dir),
+            local_dir_use_symlinks=False,  # Download actual files, not symlinks
+            resume_download=True,  # Resume partial downloads
+        )
+        
+        # Verify download
+        if os.path.exists(downloaded_path):
+            file_size_gb = os.path.getsize(downloaded_path) / (1024**3)
+            return {
+                'success': True,
+                'shard_idx': shard_idx,
+                'filename': shard_filename,
+                'size_gb': file_size_gb,
+                'status': 'downloaded',
+                'path': downloaded_path
+            }
+        else:
+            return {
+                'success': False,
+                'shard_idx': shard_idx,
+                'filename': shard_filename,
+                'error': 'File not found after download'
+            }
+            
+    except Exception as e:
+        return {
+            'success': False,
+            'shard_idx': shard_idx,
+            'filename': shard_filename,
+            'error': str(e)
+        }
+
+def download_blip3o_shards(
+    dataset_type: str = "short_caption",
+    shard_indices=None, 
+    data_dir=None, 
+    force_download=False, 
+    parallel_downloads=4
+):
     """
-    FIXED: Download multiple shards with better disk space management
+    Download multiple shards with parallel processing and better organization
     
     Args:
-        shard_indices (list): List of shard indices to download (0-11). If None, downloads all.
-        data_dir (str): Directory to save data. If None, uses temp directory
-        force_download (bool): Force re-download even if file exists
-        max_shards (int): Maximum number of shards available
+        dataset_type: Type of dataset ('short_caption' or 'long_caption')
+        shard_indices: List of shard indices to download
+        data_dir: Directory to save data. If None, uses temp directory
+        force_download: Force re-download even if file exists
+        parallel_downloads: Number of parallel downloads
     
     Returns:
-        list: Paths to downloaded files
+        dict: Download results with statistics
     """
+    
+    # Get dataset configuration
+    if dataset_type not in DATASET_CONFIGS:
+        raise ValueError(f"Unknown dataset type: {dataset_type}. Available: {list(DATASET_CONFIGS.keys())}")
+    
+    config = DATASET_CONFIGS[dataset_type]
+    repo_id = config['repo_id']
+    max_shards = config['max_shards']
     
     # Setup temp manager for structured storage
     temp_manager = setup_temp_manager()
@@ -138,13 +228,13 @@ def download_blip3o_shards(shard_indices=None, data_dir=None, force_download=Fal
     # Set up paths - prioritize temp manager
     if data_dir is None:
         if temp_manager:
-            data_dir = temp_manager.get_datasets_dir()
+            data_dir = temp_manager.get_datasets_dir() / dataset_type
             print(f"📁 Using temp manager datasets directory: {data_dir}")
         else:
-            data_dir = get_temp_directory()
+            data_dir = get_temp_directory(dataset_type)
             print(f"📁 Using fallback temp directory: {data_dir}")
     else:
-        data_dir = Path(data_dir)
+        data_dir = Path(data_dir) / dataset_type
         print(f"📁 Using specified directory: {data_dir}")
     
     # Create data directory
@@ -162,7 +252,7 @@ def download_blip3o_shards(shard_indices=None, data_dir=None, force_download=Fal
     
     # Default shard selection
     if shard_indices is None:
-        shard_indices = list(range(min(30, max_shards)))  # Default: first 30 shards for ~100k samples
+        shard_indices = list(range(min(30, max_shards)))  # Default: first 30 shards
     
     # Ensure shard_indices is a list
     if isinstance(shard_indices, int):
@@ -174,8 +264,8 @@ def download_blip3o_shards(shard_indices=None, data_dir=None, force_download=Fal
     if not shard_indices:
         raise ValueError(f"No valid shard indices provided. Must be in range 0-{max_shards-1}")
     
-    # FIXED: Check disk space before starting download
-    estimated_size_gb = estimate_download_size(len(shard_indices))
+    # Check disk space before starting download
+    estimated_size_gb = estimate_download_size(dataset_type, len(shard_indices))
     if not check_disk_space(data_dir, estimated_size_gb):
         # Try to suggest alternatives
         print(f"\n💡 Suggestions to fix disk space issue:")
@@ -186,124 +276,70 @@ def download_blip3o_shards(shard_indices=None, data_dir=None, force_download=Fal
             print(f"   4. Check temp manager status for disk usage")
         raise RuntimeError("Insufficient disk space for download")
     
-    # Dataset info
-    repo_id = "BLIP3o/BLIP3o-Pretrain-Short-Caption"
-    
-    print(f"Downloading BLIP3o Short Caption Dataset")
+    print(f"Downloading {config['description']}")
     print(f"Repository: {repo_id}")
+    print(f"Dataset type: {dataset_type}")
     print(f"Shards to download: {shard_indices}")
     print(f"Destination: {data_dir}")
     print(f"Total shards requested: {len(shard_indices)}")
     print(f"Estimated size: {estimated_size_gb:.1f} GB")
-    
-    if temp_manager:
-        print(f"Storage type: Structured temp management")
-        print(f"Retention: 14 days (scratch-shared)")
-        # Show current disk usage
-        usage = temp_manager.get_disk_usage()
-        datasets_usage = usage.get('datasets', {})
-        if datasets_usage.get('exists', False):
-            print(f"Current datasets size: {datasets_usage.get('total_size_gb', 0):.2f} GB")
-    else:
-        print(f"Storage type: Basic temp directory")
-    
+    print(f"Parallel downloads: {parallel_downloads}")
     print("=" * 70)
     
-    downloaded_files = []
-    total_size_gb = 0
-    failed_downloads = []
-    
+    # Prepare download arguments
+    download_args = []
     for shard_idx in shard_indices:
         shard_filename = f"{shard_idx:05d}.tar"
-        local_file_path = data_dir / shard_filename
+        download_args.append((repo_id, shard_filename, data_dir, shard_idx, force_download))
+    
+    # Execute parallel downloads
+    successful_downloads = []
+    failed_downloads = []
+    total_size_gb = 0
+    
+    print(f"🚀 Starting parallel download with {parallel_downloads} workers...")
+    
+    with concurrent.futures.ThreadPoolExecutor(max_workers=parallel_downloads) as executor:
+        # Submit all download tasks
+        future_to_shard = {executor.submit(download_single_shard, args): args[3] for args in download_args}
         
-        print(f"\n📥 Processing shard {shard_idx}: {shard_filename}")
-        
-        # Check if file already exists
-        if local_file_path.exists() and not force_download:
-            file_size_gb = local_file_path.stat().st_size / (1024**3)
-            print(f"✅ File already exists: {local_file_path}")
-            print(f"   Size: {file_size_gb:.2f} GB")
-            downloaded_files.append(str(local_file_path))
-            total_size_gb += file_size_gb
-            continue
-        
-        # Check disk space before each download
-        remaining_shards = len(shard_indices) - len(downloaded_files) - len(failed_downloads)
-        estimated_remaining_gb = remaining_shards * 1.2
-        
-        if not check_disk_space(data_dir, estimated_remaining_gb):
-            print(f"⚠️  Stopping download due to insufficient disk space")
-            print(f"   Successfully downloaded {len(downloaded_files)} shards")
-            print(f"   Remaining shards would need ~{estimated_remaining_gb:.1f} GB")
-            break
-        
-        try:
-            print(f"🔄 Downloading {shard_filename}...")
-            
-            # Download using HuggingFace Hub
-            downloaded_path = hf_hub_download(
-                repo_id=repo_id,
-                filename=shard_filename,
-                repo_type="dataset",
-                local_dir=str(data_dir),
-                local_dir_use_symlinks=False,  # Download actual files, not symlinks
-                resume_download=True,  # Resume partial downloads
-            )
-            
-            # Verify download
-            if os.path.exists(downloaded_path):
-                file_size_gb = os.path.getsize(downloaded_path) / (1024**3)
-                print(f"✅ Download successful!")
-                print(f"   File path: {downloaded_path}")
-                print(f"   File size: {file_size_gb:.2f} GB")
+        # Progress bar for downloads
+        with tqdm(total=len(download_args), desc="Downloading shards", unit="shard") as pbar:
+            for future in concurrent.futures.as_completed(future_to_shard):
+                result = future.result()
                 
-                downloaded_files.append(downloaded_path)
-                total_size_gb += file_size_gb
+                if result['success']:
+                    successful_downloads.append(result)
+                    total_size_gb += result['size_gb']
+                    
+                    status_icon = "✅" if result['status'] == 'downloaded' else "☑️"
+                    pbar.set_postfix({
+                        'Status': f"{status_icon} {result['filename']} ({result['size_gb']:.2f}GB)"
+                    })
+                else:
+                    failed_downloads.append(result)
+                    pbar.set_postfix({
+                        'Status': f"❌ {result['filename']} - {result.get('error', 'Unknown error')}"
+                    })
                 
-                # Estimate number of samples
-                estimated_samples = int(file_size_gb * 400000 / 1.0)  # Rough estimate
-                print(f"   Estimated samples: ~{estimated_samples:,}")
-            else:
-                print(f"❌ Download failed: File not found at {downloaded_path}")
-                failed_downloads.append(shard_idx)
-                
-        except Exception as e:
-            print(f"❌ Download error for shard {shard_idx}: {e}")
-            
-            # Check if it's a disk quota error
-            if "Disk quota exceeded" in str(e) or "No space left" in str(e):
-                print(f"💾 DISK QUOTA/SPACE ERROR!")
-                print(f"   Downloaded {len(downloaded_files)} shards successfully")
-                print(f"   Total downloaded: {total_size_gb:.2f} GB")
-                print(f"   Consider using fewer shards or cleaning up space")
-                break
-            else:
-                failed_downloads.append(shard_idx)
-                continue
-        
-        # Show disk usage update if using temp manager
-        if temp_manager and shard_idx % 5 == 0:  # Every 5 downloads
-            try:
-                usage = temp_manager.get_disk_usage()
-                datasets_usage = usage.get('datasets', {})
-                if datasets_usage.get('exists', False):
-                    current_size = datasets_usage.get('total_size_gb', 0)
-                    print(f"   💾 Current datasets storage: {current_size:.2f} GB")
-            except Exception as e:
-                # Don't fail the whole download for status check issues
-                pass
+                pbar.update(1)
     
     print("\n" + "=" * 70)
     print(f"📊 DOWNLOAD SUMMARY:")
-    print(f"   Successfully downloaded: {len(downloaded_files)}/{len(shard_indices)} shards")
+    print(f"   Dataset type: {dataset_type}")
+    print(f"   Successfully downloaded: {len(successful_downloads)}/{len(shard_indices)} shards")
     print(f"   Total size: {total_size_gb:.2f} GB")
     print(f"   Storage location: {data_dir}")
     print(f"   Estimated total samples: ~{int(total_size_gb * 400000):,}")
     
     if failed_downloads:
         print(f"   Failed downloads: {len(failed_downloads)} shards")
-        print(f"   Failed shard indices: {failed_downloads}")
+        print(f"   Failed shard indices: {[r['shard_idx'] for r in failed_downloads]}")
+        
+        # Show specific errors
+        print(f"   Error details:")
+        for failure in failed_downloads[:5]:  # Show first 5 errors
+            print(f"     • Shard {failure['shard_idx']}: {failure.get('error', 'Unknown')}")
     
     if temp_manager:
         print(f"\n🗂️  TEMP MANAGER INFO:")
@@ -311,44 +347,66 @@ def download_blip3o_shards(shard_indices=None, data_dir=None, force_download=Fal
         print(f"   Retention policy: 14 days automatic cleanup")
         print(f"   Access across jobs: Yes")
         print(f"   Workspace: {temp_manager.persistent_workspace}")
-        
-        # Show final disk usage
-        try:
-            usage = temp_manager.get_disk_usage()
-            for name, info in usage.items():
-                if info.get('exists', False) and 'datasets' in name:
-                    size_gb = info.get('total_size_gb', 0)
-                    file_count = info.get('file_count', 0)
-                    print(f"   {name}: {size_gb:.2f} GB ({file_count} files)")
-        except Exception as e:
-            # Don't fail for status issues
-            pass
     
-    if downloaded_files:
+    if successful_downloads:
         print(f"\n✅ Ready for embedding extraction!")
-        print(f"   Use these files in extract_embeddings_g.py")
-        print(f"   Files are in structured temp storage with 14-day retention")
+        print(f"   Use these files in extract_embeddings_distributed.py")
+        print(f"   Command: python src/modules/extract_embeddings_distributed.py --dataset_type {dataset_type}")
     else:
         print(f"\n❌ No files downloaded successfully")
         if failed_downloads:
-            print(f"   This is likely due to disk space issues")
-            print(f"   Try downloading fewer shards or cleaning up space")
+            print(f"   This is likely due to network or disk space issues")
     
     # Save file list for embedding extraction
-    if downloaded_files:
+    if successful_downloads:
         try:
             file_list_path = data_dir / "downloaded_shards.txt"
             with open(file_list_path, 'w') as f:
-                for file_path in downloaded_files:
-                    f.write(f"{file_path}\n")
+                for result in successful_downloads:
+                    if 'path' in result:
+                        f.write(f"{result['path']}\n")
+                    else:
+                        f.write(f"{data_dir / result['filename']}\n")
             print(f"\n📝 File list saved to: {file_list_path}")
+            
+            # Also save download manifest
+            manifest = {
+                'dataset_type': dataset_type,
+                'repo_id': repo_id,
+                'download_timestamp': time.time(),
+                'total_shards': len(successful_downloads),
+                'total_size_gb': total_size_gb,
+                'successful_downloads': successful_downloads,
+                'failed_downloads': failed_downloads,
+                'shard_indices': shard_indices,
+            }
+            
+            manifest_path = data_dir / "download_manifest.json"
+            import json
+            with open(manifest_path, 'w') as f:
+                json.dump(manifest, f, indent=2)
+            print(f"📝 Download manifest saved to: {manifest_path}")
+            
         except Exception as e:
             print(f"⚠️  Could not save file list: {e}")
     
-    return downloaded_files
+    return {
+        'dataset_type': dataset_type,
+        'successful_downloads': successful_downloads,
+        'failed_downloads': failed_downloads,
+        'total_size_gb': total_size_gb,
+        'data_dir': str(data_dir)
+    }
 
-def list_available_files(repo_id="BLIP3o/BLIP3o-Pretrain-Short-Caption"):
+def list_available_files(dataset_type: str = "short_caption"):
     """List all available files in the repository"""
+    if dataset_type not in DATASET_CONFIGS:
+        print(f"❌ Unknown dataset type: {dataset_type}")
+        return []
+    
+    config = DATASET_CONFIGS[dataset_type]
+    repo_id = config['repo_id']
+    
     try:
         print(f"🔍 Available files in {repo_id}:")
         files = list_repo_files(repo_id, repo_type="dataset")
@@ -367,77 +425,39 @@ def list_available_files(repo_id="BLIP3o/BLIP3o-Pretrain-Short-Caption"):
         print(f"❌ Error listing files: {e}")
         return []
 
-def verify_downloads(file_paths):
-    """Verify the downloaded files"""
-    print(f"\n🧪 Verifying {len(file_paths)} downloaded files...")
+def show_dataset_info():
+    """Show information about available datasets"""
+    print("📊 Available BLIP3-o Datasets:")
+    print("=" * 50)
     
-    valid_files = []
-    total_size = 0
-    
-    for file_path in file_paths:
-        if not os.path.exists(file_path):
-            print(f"❌ File not found: {file_path}")
-            continue
-        
-        file_size = os.path.getsize(file_path)
-        if file_size < 1024 * 1024:  # Less than 1MB is suspicious
-            print(f"❌ File seems too small: {file_path} ({file_size} bytes)")
-            continue
-        
-        print(f"✅ {Path(file_path).name}: {file_size / (1024**3):.2f} GB")
-        valid_files.append(file_path)
-        total_size += file_size
-    
-    print(f"\n📊 Verification summary:")
-    print(f"   Valid files: {len(valid_files)}/{len(file_paths)}")
-    print(f"   Total size: {total_size / (1024**3):.2f} GB")
-    
-    return valid_files
-
-def show_temp_info():
-    """Show information about temp directory setup"""
-    temp_manager = setup_temp_manager()
-    
-    if temp_manager:
-        print("\n🗂️  TEMP MANAGER STATUS:")
-        temp_manager.print_status()
-        
-        # Show disk quota safety
-        safety = temp_manager.check_disk_quota_safety()
-        print(f"\n🛡️  Disk quota safety: {safety['status']}")
-        if safety['warnings']:
-            for warning in safety['warnings']:
-                print(f"   ⚠️  {warning}")
-        if safety['recommendations']:
-            for rec in safety['recommendations']:
-                print(f"   💡 {rec}")
-    else:
-        print("\n📁 FALLBACK TEMP DIRECTORIES:")
-        temp_dir = get_temp_directory()
-        print(f"   Datasets directory: {temp_dir}")
-        
-        # Check available space if possible
-        try:
-            total, used, free = shutil.disk_usage(temp_dir.parent)
-            print(f"   Available space: {free / (1024**3):.1f} GB")
-            print(f"   Used: {(used/total)*100:.1f}%")
-        except:
-            print("   Cannot determine available space")
+    for dataset_type, config in DATASET_CONFIGS.items():
+        print(f"\n🗂️  Dataset: {dataset_type}")
+        print(f"   Description: {config['description']}")
+        print(f"   Repository: {config['repo_id']}")
+        print(f"   Max shards: {config['max_shards']}")
+        print(f"   Est. size per shard: {config['estimated_size_per_shard_gb']:.1f} GB")
+        print(f"   Total est. size: {config['max_shards'] * config['estimated_size_per_shard_gb']:.1f} GB")
 
 def main():
     """Main function for command line usage"""
     parser = argparse.ArgumentParser(
-        description="Download BLIP3o-Pretrain-Short-Caption dataset with better disk space management",
+        description="Download BLIP3o datasets with support for multiple dataset types",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python src/data_hand/download_data.py                           # Download first 30 shards to temp
-  python src/data_hand/download_data.py --shards 0 1 2 3 4        # Download specific shards
-  python src/data_hand/download_data.py --shards 0 --data_dir /tmp # Download to specific directory
-  python src/data_hand/download_data.py --list                    # List available files
-  python src/data_hand/download_data.py --all                     # Download ALL shards (be careful!)
-  python src/data_hand/download_data.py --info                    # Show temp directory info
+  python src/data_hand/download_data.py --dataset_type short_caption --shards 0 1 2 3 4
+  python src/data_hand/download_data.py --dataset_type long_caption --shards 0 1 2
+  python src/data_hand/download_data.py --list --dataset_type short_caption
+  python src/data_hand/download_data.py --info
         """
+    )
+    
+    parser.add_argument(
+        "--dataset_type",
+        type=str,
+        default="short_caption",
+        choices=list(DATASET_CONFIGS.keys()),
+        help="Type of dataset to download"
     )
     
     parser.add_argument(
@@ -446,12 +466,6 @@ Examples:
         nargs='+',
         default=None,
         help="Shard indices to download (default: first 30 shards)"
-    )
-    
-    parser.add_argument(
-        "--all",
-        action="store_true",
-        help="Download ALL available shards (warning: very large!)"
     )
     
     parser.add_argument(
@@ -468,115 +482,61 @@ Examples:
     )
     
     parser.add_argument(
+        "--parallel_downloads",
+        type=int,
+        default=4,
+        help="Number of parallel downloads"
+    )
+    
+    parser.add_argument(
         "--list",
         action="store_true",
         help="List available files in the repository"
     )
     
     parser.add_argument(
-        "--verify",
-        nargs='+',
-        help="Verify specific downloaded files"
-    )
-    
-    parser.add_argument(
         "--info",
         action="store_true",
-        help="Show temp directory information"
+        help="Show information about available datasets"
     )
     
     args = parser.parse_args()
     
     if args.info:
-        show_temp_info()
+        show_dataset_info()
         return
     
     if args.list:
-        list_available_files()
+        list_available_files(args.dataset_type)
         return
     
-    if args.verify:
-        verify_downloads(args.verify)
-        return
+    print(f"🚀 BLIP3-o Dataset Downloader")
+    print(f"Dataset type: {args.dataset_type}")
+    print(f"Description: {DATASET_CONFIGS[args.dataset_type]['description']}")
+    print("=" * 60)
     
-    # Show temp directory info first
-    show_temp_info()
-    
-    # Determine which shards to download
-    if args.all:
-        # Download all available shards (get list first)
-        print("⚠️  WARNING: Downloading ALL shards will use significant storage!")
-        
-        # Estimate space needed
-        available_files = list_available_files()
-        estimated_gb = len(available_files) * 1.2
-        print(f"   Estimated space needed: {estimated_gb:.1f} GB")
-        
-        response = input("Continue? (y/N): ")
-        if response.lower() != 'y':
-            print("Cancelled.")
-            return
-        
-        shard_indices = list(range(len(available_files)))
-    else:
-        shard_indices = args.shards
-    
-    # Estimate space needed and warn user
-    if shard_indices:
-        estimated_gb = estimate_download_size(len(shard_indices))
-        print(f"\n💾 SPACE ESTIMATE:")
-        print(f"   Shards to download: {len(shard_indices)}")
-        print(f"   Estimated space needed: {estimated_gb:.1f} GB")
-        
-        # Check with temp manager
-        temp_manager = setup_temp_manager()
-        if temp_manager:
-            usage = temp_manager.get_disk_usage()
-            
-            # Check workspace space
-            workspace_info = usage.get('workspace_system', {})
-            if workspace_info and 'free_gb' in workspace_info:
-                available_gb = workspace_info['free_gb']
-                print(f"   Available space: {available_gb:.1f} GB")
-                
-                if estimated_gb > available_gb * 0.8:  # 80% threshold
-                    print(f"   ⚠️  WARNING: May not have enough space!")
-                    print(f"   Consider downloading fewer shards")
-                    response = input("Continue anyway? (y/N): ")
-                    if response.lower() != 'y':
-                        print("Cancelled.")
-                        return
-    
-    # Download the shards
     try:
-        downloaded_files = download_blip3o_shards(
-            shard_indices=shard_indices,
+        # Download the shards
+        results = download_blip3o_shards(
+            dataset_type=args.dataset_type,
+            shard_indices=args.shards,
             data_dir=args.data_dir,
-            force_download=args.force
+            force_download=args.force,
+            parallel_downloads=args.parallel_downloads
         )
         
-        if downloaded_files:
-            print(f"\n🎉 SUCCESS! Downloaded {len(downloaded_files)} shards")
+        if results['successful_downloads']:
+            print(f"\n🎉 SUCCESS! Downloaded {len(results['successful_downloads'])} shards")
+            print(f"   Dataset type: {results['dataset_type']}")
+            print(f"   Total size: {results['total_size_gb']:.1f} GB")
+            print(f"   Location: {results['data_dir']}")
             print(f"\n📋 Next steps:")
-            print(f"1. Extract embeddings: python src/modules/extract_embeddings_g.py")
-            print(f"2. Start training with structured temp management")
-            print(f"3. Files are in structured temp storage with proper retention")
-            
-            temp_manager = setup_temp_manager()
-            if temp_manager:
-                print(f"\n🗂️  TEMP MANAGER BENEFITS:")
-                print(f"   ✅ Structured storage in persistent workspace")
-                print(f"   ✅ 14-day retention (scratch-shared)")
-                print(f"   ✅ Accessible across different jobs")
-                print(f"   ✅ Automatic disk usage monitoring")
-                print(f"   ✅ Proper cache management")
-            
+            print(f"1. Extract embeddings:")
+            print(f"   python src/modules/extract_embeddings_distributed.py --dataset_type {args.dataset_type}")
+            print(f"2. Start training:")
+            print(f"   torchrun --nproc_per_node=4 train_dit_distributed.py --chunked_embeddings_dir <embeddings_dir>")
         else:
             print(f"\n❌ Download failed. Please check the error messages above.")
-            print(f"   Common issues:")
-            print(f"   • Disk quota exceeded (use scratch directories)")
-            print(f"   • Network issues (try again later)")
-            print(f"   • Insufficient disk space (download fewer shards)")
             sys.exit(1)
             
     except Exception as e:
