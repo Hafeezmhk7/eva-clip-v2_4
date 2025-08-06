@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=blip3o_fixed_multi_gpu
+#SBATCH --job-name=blip3o_multi_gpu
 #SBATCH --partition=gpu_h100
 #SBATCH --nodes=1
 #SBATCH --gpus=3
@@ -7,34 +7,18 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=250G
 #SBATCH --time=8:00:00
-#SBATCH --output=./slurm_out/blip3o_fixed_multi_gpu_%j.out
-#SBATCH --error=./slurm_out/blip3o_fixed_multi_gpu_%j.err
+#SBATCH --output=./slurm_out/blip3o_multi_gpu_%j.out
+#SBATCH --error=./slurm_out/blip3o_multi_gpu_%j.err
 
 # =============================================================================
-# FIXED BLIP3-o Multi-GPU Embedding Extraction
-# ✅ Fixes "not subscriptable" error by implementing __getitem__ method
-# ✅ Proper DistributedSampler for multi-GPU data loading
-# ✅ Enhanced distributed training setup
-# ✅ Streamlined for multi-GPU operation
+# BLIP3-o Multi-GPU Embedding Extraction
 # =============================================================================
 
-echo "🚀 FIXED BLIP3-o Multi-GPU Embedding Extraction"
-echo "=========================================="
+echo "🚀 BLIP3-o Multi-GPU Embedding Extraction"
 echo "Job ID: ${SLURM_JOB_ID}"
 echo "Node: $(hostname)"
 echo "Time: $(date)"
 echo "GPUs: ${SLURM_GPUS_ON_NODE}"
-echo "CPUs per task: ${SLURM_CPUS_PER_TASK}"
-echo "Memory: ${SLURM_MEM_PER_NODE}MB"
-echo ""
-echo "🔧 CRITICAL FIXES APPLIED:"
-echo "  ✅ Dataset.__getitem__ method implemented (fixes 'not subscriptable' error)"
-echo "  ✅ DistributedSampler for proper multi-GPU data distribution"
-echo "  ✅ Enhanced distributed training setup and error handling"
-echo "  ✅ Memory optimization for multi-GPU stability"
-echo "  ✅ Code streamlined - removed unnecessary fallbacks"
-echo "  ✅ PyTorch DataLoader compatibility issues resolved"
-echo "=========================================="
 
 cd $SLURM_SUBMIT_DIR
 
@@ -45,19 +29,17 @@ module load Miniconda3/24.7.1-0
 module load CUDA/12.6.0
 source activate eva_clip_env
 
-# Setup BLIP3-o workspace
+# Setup workspace directories
 export SCRATCH_SHARED="/scratch-shared"
 export BLIP3O_USER=$(whoami)
 export BLIP3O_JOB_ID=${SLURM_JOB_ID}
 
-# Set up structured directories
 export BLIP3O_WORKSPACE="/scratch-shared/${BLIP3O_USER}/blip3o_workspace"
 export BLIP3O_EMBEDDINGS="${BLIP3O_WORKSPACE}/embeddings"
 export BLIP3O_CHECKPOINTS="${BLIP3O_WORKSPACE}/checkpoints"
 export BLIP3O_DATASETS="${BLIP3O_WORKSPACE}/datasets"
 export BLIP3O_LOGS="${BLIP3O_WORKSPACE}/logs"
 
-# Job temp directory
 export BLIP3O_JOB_TEMP="/scratch-local/${BLIP3O_USER}.${BLIP3O_JOB_ID}/blip3o_job_${BLIP3O_JOB_ID}"
 export BLIP3O_CACHE="${BLIP3O_JOB_TEMP}/cache"
 
@@ -65,7 +47,7 @@ export BLIP3O_CACHE="${BLIP3O_JOB_TEMP}/cache"
 mkdir -p "${BLIP3O_WORKSPACE}"/{datasets,embeddings,checkpoints,logs,metadata}
 mkdir -p "${BLIP3O_JOB_TEMP}"/{cache,working,temp_checkpoints}
 
-# Model cache (redirected to job temp to avoid home quota)
+# Model cache (redirected to job temp)
 export TORCH_HOME="${BLIP3O_CACHE}/torch"
 export HF_HOME="${BLIP3O_CACHE}/huggingface"
 export TRANSFORMERS_CACHE="${BLIP3O_CACHE}/transformers"
@@ -73,21 +55,17 @@ export WANDB_DIR="${BLIP3O_LOGS}/wandb"
 export HUGGINGFACE_HUB_CACHE="${BLIP3O_CACHE}/huggingface/hub"
 export HF_DATASETS_CACHE="${BLIP3O_CACHE}/datasets"
 
-# Create cache subdirectories
 mkdir -p "${TORCH_HOME}" "${HF_HOME}" "${TRANSFORMERS_CACHE}" "${WANDB_DIR}" "${HUGGINGFACE_HUB_CACHE}" "${HF_DATASETS_CACHE}"
 
-echo "🗂️  BLIP3-o workspace ready:"
-echo "   Persistent: $BLIP3O_WORKSPACE"
-echo "   Job temp:   $BLIP3O_JOB_TEMP"
-echo "   Datasets:   $BLIP3O_DATASETS"
-echo "   Embeddings: $BLIP3O_EMBEDDINGS"
+echo "Workspace: $BLIP3O_WORKSPACE"
+echo "Job temp: $BLIP3O_JOB_TEMP"
 
-# FIXED: Configuration for multi-GPU extraction
+# Configuration
 WORLD_SIZE=${SLURM_GPUS_ON_NODE}
-MASTER_PORT="12361"  # Fixed port
-BATCH_SIZE=4  # Conservative batch size per GPU
-MAX_SHARDS=20  # Adjust as needed
-INCLUDE_CLS=false  # Set to true for CLS+patches mode
+MASTER_PORT="12361"
+BATCH_SIZE=128
+MAX_SHARDS=20
+INCLUDE_CLS=false
 
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
@@ -126,173 +104,81 @@ else
     MODE_SUFFIX="patch_only"
 fi
 
-# Set output directory
 OUTPUT_DIR="${BLIP3O_EMBEDDINGS}/${MODE_SUFFIX}_${TARGET_TOKENS}_tokens"
-
-# Create output directories
 mkdir -p "${OUTPUT_DIR}"
 mkdir -p ./slurm_out
 
-echo ""
-echo "⚙️ FIXED Multi-GPU Extraction Configuration:"
-echo "====================================="
 echo "Mode: $MODE_NAME ($TARGET_TOKENS tokens)"
 echo "Output: $OUTPUT_DIR"
 echo "GPUs: $WORLD_SIZE"
 echo "Batch size per GPU: $BATCH_SIZE"
 echo "Max shards: $MAX_SHARDS"
-echo "Master port: $MASTER_PORT"
-echo ""
-echo "🔧 FIXES ENABLED:"
-echo "  ✅ Dataset.__getitem__ method implemented"
-echo "  ✅ DistributedSampler for proper data distribution"
-echo "  ✅ Enhanced error handling for distributed training"
-echo "  ✅ Memory optimization for stability"
-echo "  ✅ Streamlined multi-GPU operation"
-echo ""
 
-# Validate the extraction script exists
+# Validate extraction script
 EXTRACTION_SCRIPT="src/modules/extract_embeddings_unified.py"
 if [ ! -f "$EXTRACTION_SCRIPT" ]; then
     echo "❌ Extraction script not found: $EXTRACTION_SCRIPT"
-    echo "Please ensure the fixed script is in place."
     exit 1
 fi
-
-# Quick validation that the critical fix is in the script
-if ! grep -q "__getitem__" "$EXTRACTION_SCRIPT" 2>/dev/null; then
-    echo "❌ CRITICAL: __getitem__ method not found in extraction script"
-    echo "   The fixed script with __getitem__ method must be used!"
-    echo "   Please replace the extraction script with the fixed version."
-    exit 1
-fi
-
-if ! grep -q "DistributedSampler" "$EXTRACTION_SCRIPT" 2>/dev/null; then
-    echo "❌ CRITICAL: DistributedSampler not found in extraction script"
-    echo "   The fixed script with proper distributed sampling must be used!"
-    exit 1
-fi
-
-echo "✅ Script validation passed - critical fixes are present"
 
 # Check for dataset files
 if [ ! -d "$BLIP3O_DATASETS" ]; then
     echo "❌ Datasets directory not found: $BLIP3O_DATASETS"
-    echo ""
-    echo "💡 To download datasets:"
+    echo "To download datasets:"
     echo "  python src/data_hand/download_data.py --shards 0 1 2 3 4 5 6 7 8 9"
-    echo "  # Make sure to place downloaded TAR files in: $BLIP3O_DATASETS"
     exit 1
 fi
 
-# Count available TAR files
 TAR_COUNT=$(find "$BLIP3O_DATASETS" -name "*.tar" | wc -l)
-echo "✅ Found $TAR_COUNT TAR files in datasets directory"
+echo "Found $TAR_COUNT TAR files in datasets directory"
 
 if [ $TAR_COUNT -eq 0 ]; then
     echo "❌ No TAR files found in datasets directory!"
-    echo "Available files:"
-    ls -la "$BLIP3O_DATASETS/" 2>/dev/null || echo "Directory empty"
     exit 1
 fi
 
 if [ $TAR_COUNT -lt $MAX_SHARDS ]; then
-    echo "⚠️ Only $TAR_COUNT TAR files available (requested $MAX_SHARDS)"
     MAX_SHARDS=$TAR_COUNT
-    echo "   Adjusted to use $MAX_SHARDS shards"
+    echo "Adjusted to use $MAX_SHARDS shards"
 fi
 
 # Display GPU information
-echo ""
-echo "🖥️ GPU Information:"
-nvidia-smi --query-gpu=index,name,memory.total,memory.free --format=csv,noheader,nounits | \
-    awk 'BEGIN{print "GPU | Name              | Total MB | Free MB"} {printf "%-3s | %-17s | %-8s | %-8s\n", $1, $2, $3, $4}'
+echo "GPU Information:"
+nvidia-smi --query-gpu=index,name,memory.total,memory.free --format=csv,noheader
 
-# Check for sufficient GPU memory
-echo ""
-echo "🧠 Pre-flight Memory Check:"
-FREE_MEMORY=$(nvidia-smi --query-gpu=memory.free --format=csv,noheader,nounits | head -1)
-if [ $FREE_MEMORY -lt 15000 ]; then  # Less than 15GB free
-    echo "⚠️  Warning: Low GPU memory detected (${FREE_MEMORY}MB free)"
-    echo "   Consider using smaller batch size"
-    if [ $BATCH_SIZE -gt 2 ]; then
-        BATCH_SIZE=2
-        echo "   🔧 Automatically reducing batch size to $BATCH_SIZE"
-    fi
-fi
-
-echo ""
-echo "🚀 Starting FIXED Multi-GPU Embedding Extraction..."
-echo "=============================================="
-echo "🎯 Using FIXED Implementation:"
-echo "  • Dataset.__getitem__ method properly implemented"
-echo "  • DistributedSampler for correct multi-GPU data distribution"
-echo "  • Enhanced distributed training coordination"
-echo "  • Memory optimization for multi-GPU stability"
-echo "  • All PyTorch DataLoader compatibility issues resolved"
-echo ""
-echo "📊 Processing Details:"
-echo "  • TAR files: $TAR_COUNT available, using $MAX_SHARDS"
-echo "  • GPUs: $WORLD_SIZE"
-echo "  • Batch size per GPU: $BATCH_SIZE"
-echo "  • Output format: ${MODE_SUFFIX}_${TARGET_TOKENS}_tokens"
-echo "  • Expected speedup: ~${WORLD_SIZE}x"
-echo ""
-
-# Build FIXED extraction command
+# Build extraction command
 EXTRACTION_CMD="python $EXTRACTION_SCRIPT \
     --world_size $WORLD_SIZE \
     --master_port $MASTER_PORT \
     --batch_size $BATCH_SIZE \
     --max_shards $MAX_SHARDS"
 
-# Add CLS token option if specified
 if [ "$INCLUDE_CLS" = true ]; then
     EXTRACTION_CMD="$EXTRACTION_CMD --include_cls"
 fi
 
-echo "Executing FIXED multi-GPU extraction command:"
+echo "Starting extraction:"
 echo "$EXTRACTION_CMD"
-echo ""
-echo "🕐 Started at: $(date)"
-echo "⏱️  Estimated completion: $(date -d '+2 hours')"
-echo ""
+echo "Started at: $(date)"
 
-# Launch FIXED distributed extraction
+# Launch extraction
 eval $EXTRACTION_CMD
 
 EXTRACTION_EXIT_CODE=$?
 
-echo ""
-echo "=============================================="
-echo "📊 FIXED Multi-GPU Extraction Results"
-echo "=============================================="
-echo "🕐 Completed at: $(date)"
+echo "Completed at: $(date)"
 
 if [ $EXTRACTION_EXIT_CODE -eq 0 ]; then
-    echo "✅ FIXED Multi-GPU embedding extraction completed successfully!"
-    echo ""
-    echo "🎉 SUCCESS INDICATORS:"
-    echo "  ✅ No 'not subscriptable' errors - __getitem__ method working"
-    echo "  ✅ Proper multi-GPU data distribution with DistributedSampler"
-    echo "  ✅ Enhanced distributed training coordination successful"
-    echo "  ✅ Memory optimization prevented crashes"
-    echo "  ✅ All PyTorch DataLoader compatibility issues resolved"
-    
-    echo ""
-    echo "📋 Extraction Summary:"
-    echo "===================="
+    echo "✅ Multi-GPU embedding extraction completed successfully!"
     
     # Check for output files
     CONSOLIDATED_FILES=$(find "$OUTPUT_DIR" -name "embeddings_shard_*_${MODE_SUFFIX}.pkl" | wc -l)
     if [ $CONSOLIDATED_FILES -gt 0 ]; then
         echo "✅ Found $CONSOLIDATED_FILES consolidated embedding files"
         
-        # Calculate total size
         TOTAL_SIZE=$(du -sh "$OUTPUT_DIR" 2>/dev/null | cut -f1)
         echo "✅ Total size: $TOTAL_SIZE"
         
-        # Show success rate
         SUCCESS_RATE=$(echo "scale=1; $CONSOLIDATED_FILES * 100 / $MAX_SHARDS" | bc -l 2>/dev/null || echo "N/A")
         echo "✅ Success rate: $SUCCESS_RATE% ($CONSOLIDATED_FILES/$MAX_SHARDS shards)"
         
@@ -300,158 +186,40 @@ if [ $EXTRACTION_EXIT_CODE -eq 0 ]; then
         MANIFEST_FILE="${OUTPUT_DIR}/embeddings_manifest.json"
         if [ -f "$MANIFEST_FILE" ]; then
             echo "✅ Manifest file: $MANIFEST_FILE"
-            
-            # Extract detailed summary from manifest
-            python -c "
-import json
-import sys
-try:
-    with open('$MANIFEST_FILE', 'r') as f:
-        manifest = json.load(f)
-    
-    extraction_info = manifest.get('extraction_info', {})
-    consolidation = manifest.get('consolidation_results', {})
-    
-    print(f'📊 FIXED Multi-GPU Extraction Detailed Summary:')
-    print(f'   Method: {extraction_info.get(\"method\", \"unknown\")}')
-    print(f'   GPUs used: {extraction_info.get(\"world_size\", \"unknown\")}')
-    print(f'   Extraction time: {extraction_info.get(\"extraction_time_seconds\", 0):.1f}s')
-    print(f'   Successful shards: {consolidation.get(\"consolidated_shards\", \"unknown\")}')
-    print(f'   Total samples: {consolidation.get(\"total_samples\", \"unknown\"):,}')
-    print(f'   Mode: $MODE_NAME ($TARGET_TOKENS tokens)')
-    
-    # Check for fixes working
-    fixes_applied = extraction_info.get('fixes_applied', [])
-    if fixes_applied:
-        print(f'   Fixes applied: {len(fixes_applied)} critical fixes')
-        for fix in fixes_applied[:3]:  # Show first 3 fixes
-            print(f'     • {fix}')
-        if len(fixes_applied) > 3:
-            print(f'     • ... and {len(fixes_applied)-3} more fixes')
-    
-    # Show error analysis
-    failed_shards = consolidation.get('failed_shards', [])
-    
-    if not failed_shards:
-        print(f'   🎉 PERFECT RUN: No failures!')
-    else:
-        if failed_shards:
-            print(f'   ⚠️ Failed shards: {len(failed_shards)} ({failed_shards[:3]})')
-    
-except Exception as e:
-    print(f'Could not parse manifest: {e}')
-    sys.exit(1)
-"
         fi
         
-        echo ""
-        echo "🎉 EXTRACTION SUCCESS: All critical fixes worked perfectly!"
-        echo ""
-        echo "💡 Next Steps:"
-        echo "1. Verify embedding quality:"
-        echo "   python scripts/validate_embeddings.py --embeddings_dir $OUTPUT_DIR"
-        echo ""
-        echo "2. Start multi-GPU distributed training:"
-        echo "   torchrun --nproc_per_node=$WORLD_SIZE train_dit_distributed.py \\"
-        echo "     --chunked_embeddings_dir $OUTPUT_DIR \\"
-        echo "     --distributed --world_size $WORLD_SIZE"
-        echo ""
-        echo "3. Or single-GPU training:"
-        echo "   python train_dit.py --chunked_embeddings_dir $OUTPUT_DIR"
+        echo "🎉 EXTRACTION SUCCESS!"
+        echo "Next steps:"
+        echo "torchrun --nproc_per_node=$WORLD_SIZE train_dit_distributed.py \\"
+        echo "  --chunked_embeddings_dir $OUTPUT_DIR \\"
+        echo "  --distributed --world_size $WORLD_SIZE"
         
     else
-        echo "⚠️ No consolidated files found - checking for partial results..."
-        
-        # Check for GPU-specific files that might need manual consolidation
-        GPU_FILES=$(find "$OUTPUT_DIR" -name "*_gpu*.pkl" | wc -l)
-        if [ $GPU_FILES -gt 0 ]; then
-            echo "✅ Found $GPU_FILES GPU-specific files"
-            echo "   Run the consolidation manually if needed"
-        else
-            echo "❌ No output files found at all"
-            echo "Files in output directory:"
-            ls -la "$OUTPUT_DIR" 2>/dev/null | head -10
-        fi
+        echo "⚠️ No consolidated files found"
+        echo "Files in output directory:"
+        ls -la "$OUTPUT_DIR" 2>/dev/null | head -10
     fi
     
-    # Show the benefits achieved
-    echo ""
-    echo "⚡ FIXES SUCCESSFULLY APPLIED - Benefits Achieved:"
-    echo "  ✅ No more 'not subscriptable' errors - __getitem__ method working"
-    echo "  ✅ Proper multi-GPU data distribution with DistributedSampler"
-    echo "  ✅ Enhanced distributed training coordination"
-    echo "  ✅ Memory optimization improved stability"
-    echo "  ✅ All PyTorch DataLoader compatibility issues resolved"
-    echo "  ✅ ~${WORLD_SIZE}x parallel speedup achieved"
-    echo "  ✅ Production-ready multi-GPU embedding extraction"
-    
 else
-    echo "❌ FAILED: FIXED extraction exit code $EXTRACTION_EXIT_CODE"
-    echo ""
-    echo "🔍 FAILURE ANALYSIS:"
+    echo "❌ Extraction failed with exit code $EXTRACTION_EXIT_CODE"
     
-    # Check what type of failure occurred
     if [ -f "${OUTPUT_DIR}/error_log.txt" ]; then
-        echo "Found error log, showing last 20 lines:"
+        echo "Error log (last 20 lines):"
         tail -20 "${OUTPUT_DIR}/error_log.txt"
     fi
     
-    echo ""
-    echo "🔧 TROUBLESHOOTING:"
-    echo "1. Check if the critical fixes are in the script:"
-    echo "   grep -n '__getitem__' $EXTRACTION_SCRIPT"
-    echo "   grep -n 'DistributedSampler' $EXTRACTION_SCRIPT"
-    echo ""
-    echo "2. Verify TAR files are not corrupted:"
-    echo "   for f in \$BLIP3O_DATASETS/*.tar; do tar -tf \"\$f\" >/dev/null && echo \"OK: \$f\" || echo \"BAD: \$f\"; done"
-    echo ""
-    echo "3. Try with smaller configuration:"
-    echo "   sbatch --gpus=2 job_scripts/extract_emb.job --batch_size 2 --max_shards 2"
-    
-    # Show diagnostic information
-    echo ""
-    echo "🔍 System Diagnostics:"
-    echo "GPU Memory:"
-    nvidia-smi --query-gpu=index,memory.used,memory.free --format=csv,noheader,nounits | \
-        awk '{print "  GPU " $1 ": " $2 "MB used, " $3 "MB free"}'
-    
-    echo "Disk Space:"
-    df -h "$OUTPUT_DIR" | tail -1 | awk '{print "  " $4 " available on " $6}'
+    echo "Troubleshooting:"
+    echo "1. Check TAR files integrity"
+    echo "2. Try with smaller batch size: --batch_size 2"
+    echo "3. Try with fewer GPUs: --world_size 2"
 fi
 
-echo ""
-echo "📊 Final GPU Memory Status:"
-nvidia-smi --query-gpu=index,name,memory.total,memory.used,memory.free,utilization.gpu --format=csv,noheader,nounits | \
-    awk 'BEGIN{print "GPU | Name              | Total MB | Used MB | Free MB | GPU%"} {printf "%-3s | %-17s | %-8s | %-7s | %-7s | %s%%\n", $1, $2, $3, $4, $5, $6}'
+echo "Final GPU Memory Status:"
+nvidia-smi --query-gpu=index,name,memory.used,memory.free --format=csv,noheader
 
-echo ""
-echo "🏁 Job completed at $(date)"
+echo "Job completed at $(date)"
 TOTAL_SECONDS=$(($(date +%s) - $SECONDS))
 TOTAL_HOURS=$(echo "scale=2; $TOTAL_SECONDS / 3600" | bc -l)
-echo "⏱️  Total job time: ${TOTAL_HOURS} hours (${TOTAL_SECONDS} seconds)"
-
-echo ""
-echo "📚 FIXED MULTI-GPU EXTRACTION SUMMARY:"
-echo "======================================"
-echo "This job used the FIXED version of BLIP3-o embedding extraction"
-echo "with critical fixes for multi-GPU operation:"
-echo ""
-echo "🔧 Critical Fixes Applied:"
-echo "• Dataset.__getitem__ method implemented (fixes 'not subscriptable' error)"
-echo "• DistributedSampler for proper multi-GPU data distribution"
-echo "• Enhanced distributed training setup and error handling"
-echo "• Memory optimization for multi-GPU stability"
-echo "• PyTorch DataLoader compatibility issues resolved"
-echo "• Code streamlined for multi-GPU operation"
-echo ""
-if [ $EXTRACTION_EXIT_CODE -eq 0 ]; then
-    echo "🎉 RESULT: All fixes worked successfully!"
-    echo "The extraction is now stable, reliable, and production-ready."
-    echo "Multi-GPU operation achieved ~${WORLD_SIZE}x speedup with no errors."
-else
-    echo "⚠️  RESULT: Some issues may remain."
-    echo "Please verify the fixed script is in place and check error logs."
-fi
-echo "======================================"
+echo "Total job time: ${TOTAL_HOURS} hours"
 
 exit $EXTRACTION_EXIT_CODE
