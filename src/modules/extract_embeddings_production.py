@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """
-FIXED Multi-GPU BLIP3-o Embedding Extraction
+FIXED Single-Node Multi-GPU BLIP3-o Embedding Extraction
 src/modules/extract_embeddings_production.py
 
 FIXES:
-✅ Proper process termination and coordination
-✅ Fixed file naming (removes GPU suffixes in final files)
+✅ Single node operation (4 GPUs)
+✅ Removed barrier timeout parameter (compatibility fix)
+✅ Clean file naming (no GPU suffixes in final files)
 ✅ Better error handling and cleanup
-✅ Improved distributed synchronization
-✅ Proper consolidation logic
+✅ Simplified distributed coordination
 """
 
 import sys
@@ -510,22 +510,13 @@ def production_collate_fn(batch):
         return None
 
 def setup_distributed_production(rank: int, world_size: int, master_port: str = "12355"):
-    """Production distributed setup with enhanced multi-node support"""
+    """FIXED: Production distributed setup for single node operation"""
     try:
-        # Handle multi-node SLURM setup
-        if "SLURM_LOCALID" in os.environ:
-            local_rank = int(os.environ["SLURM_LOCALID"])
-        elif "SLURM_GPUS_ON_NODE" in os.environ:
-            gpus_per_node = int(os.environ["SLURM_GPUS_ON_NODE"])
-            local_rank = rank % gpus_per_node
-        else:
-            local_rank = rank
+        # FIXED: Single node setup - much simpler
+        local_rank = rank  # For single node, rank == local_rank
         
-        # Get master address for multi-node
-        if "MASTER_ADDR" in os.environ:
-            master_addr = os.environ["MASTER_ADDR"]
-        else:
-            master_addr = "localhost"
+        # FIXED: Master address is localhost for single node
+        master_addr = "localhost"
         
         os.environ['MASTER_ADDR'] = master_addr
         os.environ['MASTER_PORT'] = master_port
@@ -533,7 +524,7 @@ def setup_distributed_production(rank: int, world_size: int, master_port: str = 
         os.environ['LOCAL_RANK'] = str(local_rank)
         os.environ['WORLD_SIZE'] = str(world_size)
         
-        print(f"[Rank {rank}] Distributed setup: {master_addr}:{master_port}, Local GPU: {local_rank}")
+        print(f"[Rank {rank}] Single-node distributed setup: {master_addr}:{master_port}, Local GPU: {local_rank}")
         
         # Set device
         if torch.cuda.is_available():
@@ -544,16 +535,16 @@ def setup_distributed_production(rank: int, world_size: int, master_port: str = 
             device = torch.device('cpu')
             backend = 'gloo'
         
-        # Initialize process group
+        # Initialize process group with shorter timeout for single node
         dist.init_process_group(
             backend=backend,
             init_method='env://',
             world_size=world_size,
             rank=rank,
-            timeout=timedelta(minutes=120)  # Extended timeout for large jobs
+            timeout=timedelta(minutes=10)  # Shorter timeout for single node
         )
         
-        print(f"[Rank {rank}] ✅ Distributed environment ready")
+        print(f"[Rank {rank}] ✅ Single-node distributed environment ready")
         return device
         
     except Exception as e:
@@ -564,8 +555,8 @@ def cleanup_distributed():
     """Clean up distributed environment"""
     try:
         if dist.is_initialized():
-            # FIXED: Properly synchronize before cleanup
-            dist.barrier(timeout=timedelta(seconds=30))
+            # FIXED: Remove timeout parameter for compatibility
+            dist.barrier()
             dist.destroy_process_group()
             print("🔧 Distributed environment cleaned up")
     except Exception as e:
@@ -588,7 +579,7 @@ def process_single_tar_production(
     print(f"[GPU {rank}] 🏭 PRODUCTION processing shard {shard_idx}: {Path(tar_file_path).name}")
     
     mode_suffix = "cls_patch" if include_cls else "patch_only"
-    # FIXED: Use temporary GPU-specific name during processing
+    # Use temporary GPU-specific name during processing
     temp_shard_filename = f"embeddings_shard_{shard_idx:05d}_{mode_suffix}_gpu{rank}.pkl"
     temp_shard_path = output_dir / temp_shard_filename
     
@@ -758,16 +749,17 @@ def process_single_tar_production(
                         'tokens': target_tokens,
                         'include_cls': include_cls,
                         'mode': mode_suffix,
-                        'extraction_method': 'production_v1',
-                        'format_version': f'blip3o_{target_tokens}_tokens_production_v1',
+                        'extraction_method': 'production_single_node_v1',
+                        'format_version': f'blip3o_{target_tokens}_tokens_single_node_v1',
                         'extraction_time': time.time() - start_time,
                         'distributed': world_size > 1,
                         'rank': rank,
                         'world_size': world_size,
+                        'single_node': True,  # Mark as single node
                         'production_features': {
                             'robust_error_handling': True,
                             'memory_optimized': True,
-                            'multi_node_support': True,
+                            'single_node_optimized': True,
                             'batch_fallback': True,
                         },
                         'performance': {
@@ -844,7 +836,7 @@ def process_tar_files_on_gpu(
     target_tokens: int = 256,
     master_port: str = "12355"
 ):
-    """Production multi-GPU TAR processing with proper termination"""
+    """FIXED: Production single-node multi-GPU TAR processing"""
     
     # Setup signal handlers for proper cleanup
     def signal_handler(signum, frame):
@@ -859,7 +851,7 @@ def process_tar_files_on_gpu(
     device = setup_distributed_production(rank, world_size, master_port)
     
     try:
-        print(f"[GPU {rank}] 🏭 Starting PRODUCTION extraction")
+        print(f"[GPU {rank}] 🏭 Starting PRODUCTION extraction (single-node)")
         print(f"[GPU {rank}] Processing {len(tar_files)} total TAR files")
         
         # Load models
@@ -873,9 +865,9 @@ def process_tar_files_on_gpu(
         
         if not assigned_files:
             print(f"[GPU {rank}] No files assigned")
-            # FIXED: Still need to participate in barriers
+            # Still need to participate in barriers
             if dist.is_initialized():
-                dist.barrier()
+                dist.barrier()  # FIXED: No timeout parameter
             return
         
         print(f"[GPU {rank}] Processing {len(assigned_files)} files with batch_size={batch_size}")
@@ -920,20 +912,20 @@ def process_tar_files_on_gpu(
         print(f"[GPU {rank}] 📊 Summary: {successful_shards}/{len(assigned_files)} shards, "
               f"{total_samples_processed:,} samples, {avg_sps:.1f} avg sps")
         
-        # FIXED: Synchronize all GPUs before ending
+        # FIXED: Synchronize all GPUs before ending (no timeout parameter)
         if dist.is_initialized():
             print(f"[GPU {rank}] Waiting for all ranks to complete...")
-            dist.barrier(timeout=timedelta(minutes=10))
+            dist.barrier()  # FIXED: Removed timeout parameter
         
         print(f"[GPU {rank}] ✅ PRODUCTION extraction completed")
         
     except Exception as e:
         print(f"[GPU {rank}] ❌ Critical error: {e}")
         traceback.print_exc()
-        # FIXED: Still participate in barrier even on error
+        # Still participate in barrier even on error
         try:
             if dist.is_initialized():
-                dist.barrier(timeout=timedelta(seconds=30))
+                dist.barrier()  # FIXED: No timeout parameter
         except:
             pass
         raise
@@ -949,7 +941,7 @@ def process_tar_files_on_gpu(
         cleanup_distributed()
 
 def consolidate_gpu_outputs_production(output_dir: Path, world_size: int, mode_suffix: str, total_shards: int) -> Dict[str, Any]:
-    """FIXED: Production GPU output consolidation with proper file naming"""
+    """FIXED: Production GPU output consolidation with clean file naming"""
     
     print("🔄 Consolidating PRODUCTION GPU outputs...")
     
@@ -1024,9 +1016,10 @@ def consolidate_gpu_outputs_production(output_dir: Path, world_size: int, mode_s
         if 'config' in consolidated_data:
             consolidated_data['config']['production_version'] = True
             consolidated_data['config']['consolidation_timestamp'] = time.time()
+            consolidated_data['config']['single_node_consolidation'] = True
         
-        # FIXED: Save consolidated shard with clean filename (no GPU suffix)
-        final_output_path = output_dir / f"embeddings_shard_{shard_idx:05d}_{mode_suffix}.pkl"
+        # FIXED: Save consolidated shard with CLEAN filename (no GPU suffix, no mode suffix)
+        final_output_path = output_dir / f"embeddings_shard_{shard_idx:05d}.pkl"
         
         try:
             temp_path = final_output_path.with_suffix('.tmp')
@@ -1038,7 +1031,7 @@ def consolidate_gpu_outputs_production(output_dir: Path, world_size: int, mode_s
             consolidation_results['total_samples'] += consolidated_data.get('total_samples', 0)
             consolidation_results['final_files'].append(str(final_output_path))
             
-            # FIXED: Clean up GPU-specific files after successful consolidation
+            # Clean up GPU-specific files after successful consolidation
             for gpu_file in gpu_files:
                 try:
                     gpu_file.unlink()
@@ -1058,8 +1051,8 @@ def consolidate_gpu_outputs_production(output_dir: Path, world_size: int, mode_s
     print(f"✅ PRODUCTION consolidation completed: {consolidation_results['consolidated_shards']} shards, "
           f"{consolidation_results['total_samples']:,} samples")
     
-    # FIXED: Check final file naming
-    print("📁 Final files created:")
+    # Show final clean file naming
+    print("📁 Final files created (clean naming):")
     for final_file in consolidation_results['final_files']:
         file_path = Path(final_file)
         file_size_mb = file_path.stat().st_size / (1024 * 1024)
@@ -1068,17 +1061,17 @@ def consolidate_gpu_outputs_production(output_dir: Path, world_size: int, mode_s
     return consolidation_results
 
 def main():
-    """Main production extraction function"""
+    """Main production extraction function for single node"""
     
-    parser = argparse.ArgumentParser(description="PRODUCTION Multi-GPU BLIP3-o Embedding Extraction")
+    parser = argparse.ArgumentParser(description="PRODUCTION Single-Node Multi-GPU BLIP3-o Embedding Extraction")
     parser.add_argument("--include_cls", action="store_true", default=False,
                        help="Include CLS token (257 tokens) or patches only (256 tokens)")
     parser.add_argument("--max_shards", type=int, default=0,
                        help="Maximum number of shards to process (0 = ALL)")
     parser.add_argument("--batch_size", type=int, default=32,
                        help="Batch size for processing")
-    parser.add_argument("--world_size", type=int, default=0,
-                       help="Number of GPUs to use (0 = auto-detect)")
+    parser.add_argument("--world_size", type=int, default=4,
+                       help="Number of GPUs to use (fixed to 4 for single node)")
     parser.add_argument("--master_port", type=str, default="12361",
                        help="Master port for distributed communication")
     parser.add_argument("--output_dir", type=str, default=None,
@@ -1086,28 +1079,18 @@ def main():
     
     args = parser.parse_args()
     
-    # Auto-detect GPU configuration
-    if args.world_size == 0:
-        if torch.cuda.is_available():
-            if "SLURM_NTASKS" in os.environ:
-                args.world_size = int(os.environ["SLURM_NTASKS"])
-                print(f"🔍 SLURM detected: {args.world_size} total GPUs across nodes")
-            else:
-                args.world_size = torch.cuda.device_count()
-                print(f"🔍 Local detection: {args.world_size} GPUs")
-        else:
-            print("❌ CUDA not available!")
-            return 1
+    # FIXED: Force single node with 4 GPUs
+    args.world_size = 4
     
     # Setup
     target_tokens = 257 if args.include_cls else 256
     mode_name = "CLS+Patches" if args.include_cls else "Patches only"
     mode_suffix = "cls_patch" if args.include_cls else "patch_only"
     
-    print("🏭 PRODUCTION Multi-GPU BLIP3-o Embedding Extraction")
+    print("🏭 PRODUCTION Single-Node 4-GPU BLIP3-o Embedding Extraction")
     print("=" * 70)
     print(f"Mode: {mode_name} ({target_tokens} tokens)")
-    print(f"GPUs: {args.world_size}")
+    print(f"GPUs: {args.world_size} (single node)")
     print(f"Batch size: {args.batch_size}")
     print(f"Max shards: {'ALL' if args.max_shards == 0 else args.max_shards}")
     print("=" * 70)
@@ -1150,9 +1133,9 @@ def main():
     
     start_time = time.time()
     
-    # Multi-GPU production processing
+    # Single-node multi-GPU production processing
     try:
-        print("\n🏭 Starting PRODUCTION multi-GPU processing...")
+        print("\n🏭 Starting PRODUCTION single-node multi-GPU processing...")
         mp.spawn(
             process_tar_files_on_gpu,
             args=(
@@ -1170,7 +1153,7 @@ def main():
         
         print("✅ All GPU processes completed")
         
-        # FIXED: Consolidate results
+        # Consolidate results
         consolidation_results = consolidate_gpu_outputs_production(
             output_dir,
             args.world_size,
@@ -1188,19 +1171,19 @@ def main():
     
     manifest_data = {
         'extraction_info': {
-            'method': 'production_v1',
+            'method': 'production_single_node_v1',
             'world_size': args.world_size,
             'extraction_time_seconds': processing_time,
             'timestamp': time.time(),
+            'single_node': True,
             'production_features': {
                 'robust_error_handling': True,
                 'memory_optimized': True,
-                'multi_node_support': True,
+                'single_node_optimized': True,
                 'batch_fallback': True,
-                'enhanced_consolidation': True,
                 'clean_file_naming': True,  # FIXED
             },
-            'approach': 'production_large_scale'
+            'approach': 'production_single_node'
         },
         'consolidation_results': consolidation_results,
         'performance_stats': consolidation_results.get('performance_stats', {}),
@@ -1208,7 +1191,7 @@ def main():
             'tokens_per_sample': target_tokens,
             'include_cls': args.include_cls,
         },
-        'format_version': f'blip3o_{target_tokens}_tokens_production_v1',
+        'format_version': f'blip3o_{target_tokens}_tokens_single_node_v1',
         'total_shards': consolidation_results['consolidated_shards'],
         'total_samples': consolidation_results['total_samples'],
         'failed_shards': consolidation_results.get('failed_shards', []),
@@ -1226,7 +1209,7 @@ def main():
     
     # Final results
     print("\n" + "=" * 70)
-    print("🎉 PRODUCTION EXTRACTION COMPLETED!")
+    print("🎉 SINGLE-NODE PRODUCTION EXTRACTION COMPLETED!")
     print("=" * 70)
     
     actual_samples = consolidation_results['total_samples']
@@ -1243,20 +1226,20 @@ def main():
     print(f"📊 Files: {len(consolidation_results['final_files'])} embedding files")
     print(f"📋 Manifest: {manifest_path}")
     
-    # FIXED: Show clean file names
-    print(f"\n✅ Clean file naming (no GPU suffixes):")
+    # Show clean file names
+    print(f"\n✅ Clean file naming (format: embeddings_shard_XXXXX.pkl):")
     for final_file in consolidation_results['final_files'][:5]:  # Show first 5
         print(f"   📄 {Path(final_file).name}")
     if len(consolidation_results['final_files']) > 5:
         print(f"   ... and {len(consolidation_results['final_files']) - 5} more files")
     
     if consolidation_results['consolidated_shards'] > 0:
-        print(f"\n🎉 SUCCESS! PRODUCTION extraction ready for large-scale training!")
+        print(f"\n🎉 SUCCESS! Single-node production extraction ready for training!")
         print(f"Next steps:")
-        print(f"  # For distributed training:")
-        print(f"  torchrun --nproc_per_node={args.world_size} train_dit_distributed.py \\")
+        print(f"  # For single-node training:")
+        print(f"  torchrun --nproc_per_node=4 train_dit_distributed.py \\")
         print(f"    --chunked_embeddings_dir {output_dir} \\")
-        print(f"    --distributed --world_size {args.world_size}")
+        print(f"    --distributed --world_size 4")
     else:
         print(f"\n❌ No shards processed successfully")
     
