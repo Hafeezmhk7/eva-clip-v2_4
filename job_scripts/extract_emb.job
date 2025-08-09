@@ -69,7 +69,7 @@ echo "Output directory: ${BLIP3O_EMBEDDINGS}/patch_embeddings_short_256"
 WORLD_SIZE=${SLURM_NTASKS:-8}
 MASTER_PORT="12361"
 BATCH_SIZE=64  # Conservative for stability
-MAX_SHARDS=10   # FIXED: 0 means process ALL shards
+MAX_SHARDS=5   # FIXED: 0 means process ALL shards
 INCLUDE_CLS=false
 
 # Parse command line arguments
