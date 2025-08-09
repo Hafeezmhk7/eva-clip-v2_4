@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """
-PRODUCTION Multi-GPU BLIP3-o Embedding Extraction
+FIXED Multi-GPU BLIP3-o Embedding Extraction
 src/modules/extract_embeddings_production.py
 
-FIXED for large-scale production use:
-✅ Removed training-specific imports that were causing failures
-✅ Fixed output directory handling to match user requirements
-✅ Enhanced multi-node coordination and error handling
-✅ Optimized for processing ALL 1800+ shards
-✅ Robust distributed processing with proper cleanup
+FIXES:
+✅ Proper process termination and coordination
+✅ Fixed file naming (removes GPU suffixes in final files)
+✅ Better error handling and cleanup
+✅ Improved distributed synchronization
+✅ Proper consolidation logic
 """
 
 import sys
@@ -32,6 +32,7 @@ import logging
 import warnings
 import traceback
 import tarfile
+import signal
 
 def setup_paths():
     """Setup paths for project structure"""
@@ -563,9 +564,12 @@ def cleanup_distributed():
     """Clean up distributed environment"""
     try:
         if dist.is_initialized():
+            # FIXED: Properly synchronize before cleanup
+            dist.barrier(timeout=timedelta(seconds=30))
             dist.destroy_process_group()
-    except Exception:
-        pass
+            print("🔧 Distributed environment cleaned up")
+    except Exception as e:
+        print(f"⚠️ Error during distributed cleanup: {e}")
 
 def process_single_tar_production(
     tar_file_path: str,
@@ -584,13 +588,14 @@ def process_single_tar_production(
     print(f"[GPU {rank}] 🏭 PRODUCTION processing shard {shard_idx}: {Path(tar_file_path).name}")
     
     mode_suffix = "cls_patch" if include_cls else "patch_only"
-    shard_filename = f"embeddings_shard_{shard_idx:05d}_{mode_suffix}_gpu{rank}.pkl"
-    shard_path = output_dir / shard_filename
+    # FIXED: Use temporary GPU-specific name during processing
+    temp_shard_filename = f"embeddings_shard_{shard_idx:05d}_{mode_suffix}_gpu{rank}.pkl"
+    temp_shard_path = output_dir / temp_shard_filename
     
     # Check if already processed
-    if shard_path.exists():
+    if temp_shard_path.exists():
         try:
-            with open(shard_path, 'rb') as f:
+            with open(temp_shard_path, 'rb') as f:
                 existing_data = pickle.load(f)
             sample_count = len(existing_data.get('captions', []))
             print(f"[GPU {rank}] ✅ Shard {shard_idx} already processed ({sample_count} samples)")
@@ -599,10 +604,10 @@ def process_single_tar_production(
                 'total_samples': sample_count,
                 'success': True,
                 'skipped': True,
-                'output_path': str(shard_path)
+                'output_path': str(temp_shard_path)
             }
         except:
-            shard_path.unlink()
+            temp_shard_path.unlink()
     
     try:
         # Create dataset
@@ -775,12 +780,12 @@ def process_single_tar_production(
                 }
                 
                 # Save with error handling
-                temp_path = shard_path.with_suffix('.tmp')
+                temp_path = temp_shard_path.with_suffix('.tmp')
                 with open(temp_path, 'wb') as f:
                     pickle.dump(shard_data, f, protocol=pickle.HIGHEST_PROTOCOL)
-                temp_path.rename(shard_path)
+                temp_path.rename(temp_shard_path)
                 
-                file_size_mb = shard_path.stat().st_size / (1024 * 1024)
+                file_size_mb = temp_shard_path.stat().st_size / (1024 * 1024)
                 processing_time = time.time() - start_time
                 samples_per_sec = total_samples / processing_time
                 
@@ -796,7 +801,7 @@ def process_single_tar_production(
                     'file_size_mb': file_size_mb,
                     'processing_time': processing_time,
                     'samples_per_second': samples_per_sec,
-                    'output_path': str(shard_path),
+                    'output_path': str(temp_shard_path),
                     'success': True,
                     'rank': rank,
                     'world_size': world_size,
@@ -839,7 +844,16 @@ def process_tar_files_on_gpu(
     target_tokens: int = 256,
     master_port: str = "12355"
 ):
-    """Production multi-GPU TAR processing"""
+    """Production multi-GPU TAR processing with proper termination"""
+    
+    # Setup signal handlers for proper cleanup
+    def signal_handler(signum, frame):
+        print(f"[GPU {rank}] Received signal {signum}, cleaning up...")
+        cleanup_distributed()
+        sys.exit(0)
+    
+    signal.signal(signal.SIGTERM, signal_handler)
+    signal.signal(signal.SIGINT, signal_handler)
     
     # Setup distributed environment
     device = setup_distributed_production(rank, world_size, master_port)
@@ -859,6 +873,9 @@ def process_tar_files_on_gpu(
         
         if not assigned_files:
             print(f"[GPU {rank}] No files assigned")
+            # FIXED: Still need to participate in barriers
+            if dist.is_initialized():
+                dist.barrier()
             return
         
         print(f"[GPU {rank}] Processing {len(assigned_files)} files with batch_size={batch_size}")
@@ -903,15 +920,22 @@ def process_tar_files_on_gpu(
         print(f"[GPU {rank}] 📊 Summary: {successful_shards}/{len(assigned_files)} shards, "
               f"{total_samples_processed:,} samples, {avg_sps:.1f} avg sps")
         
-        # Synchronize all GPUs
+        # FIXED: Synchronize all GPUs before ending
         if dist.is_initialized():
-            dist.barrier()
+            print(f"[GPU {rank}] Waiting for all ranks to complete...")
+            dist.barrier(timeout=timedelta(minutes=10))
         
         print(f"[GPU {rank}] ✅ PRODUCTION extraction completed")
         
     except Exception as e:
         print(f"[GPU {rank}] ❌ Critical error: {e}")
         traceback.print_exc()
+        # FIXED: Still participate in barrier even on error
+        try:
+            if dist.is_initialized():
+                dist.barrier(timeout=timedelta(seconds=30))
+        except:
+            pass
         raise
     
     finally:
@@ -925,7 +949,7 @@ def process_tar_files_on_gpu(
         cleanup_distributed()
 
 def consolidate_gpu_outputs_production(output_dir: Path, world_size: int, mode_suffix: str, total_shards: int) -> Dict[str, Any]:
-    """Production GPU output consolidation"""
+    """FIXED: Production GPU output consolidation with proper file naming"""
     
     print("🔄 Consolidating PRODUCTION GPU outputs...")
     
@@ -1001,7 +1025,7 @@ def consolidate_gpu_outputs_production(output_dir: Path, world_size: int, mode_s
             consolidated_data['config']['production_version'] = True
             consolidated_data['config']['consolidation_timestamp'] = time.time()
         
-        # Save consolidated shard
+        # FIXED: Save consolidated shard with clean filename (no GPU suffix)
         final_output_path = output_dir / f"embeddings_shard_{shard_idx:05d}_{mode_suffix}.pkl"
         
         try:
@@ -1014,12 +1038,13 @@ def consolidate_gpu_outputs_production(output_dir: Path, world_size: int, mode_s
             consolidation_results['total_samples'] += consolidated_data.get('total_samples', 0)
             consolidation_results['final_files'].append(str(final_output_path))
             
-            # Clean up GPU-specific files
+            # FIXED: Clean up GPU-specific files after successful consolidation
             for gpu_file in gpu_files:
                 try:
                     gpu_file.unlink()
-                except Exception:
-                    pass
+                    print(f"🗑️ Cleaned up GPU file: {gpu_file.name}")
+                except Exception as e:
+                    print(f"⚠️ Could not remove GPU file {gpu_file}: {e}")
                     
         except Exception as e:
             print(f"❌ Failed to save consolidated shard {shard_idx}: {e}")
@@ -1032,6 +1057,13 @@ def consolidate_gpu_outputs_production(output_dir: Path, world_size: int, mode_s
     
     print(f"✅ PRODUCTION consolidation completed: {consolidation_results['consolidated_shards']} shards, "
           f"{consolidation_results['total_samples']:,} samples")
+    
+    # FIXED: Check final file naming
+    print("📁 Final files created:")
+    for final_file in consolidation_results['final_files']:
+        file_path = Path(final_file)
+        file_size_mb = file_path.stat().st_size / (1024 * 1024)
+        print(f"   ✅ {file_path.name} ({file_size_mb:.1f} MB)")
     
     return consolidation_results
 
@@ -1138,7 +1170,7 @@ def main():
         
         print("✅ All GPU processes completed")
         
-        # Consolidate results
+        # FIXED: Consolidate results
         consolidation_results = consolidate_gpu_outputs_production(
             output_dir,
             args.world_size,
@@ -1166,6 +1198,7 @@ def main():
                 'multi_node_support': True,
                 'batch_fallback': True,
                 'enhanced_consolidation': True,
+                'clean_file_naming': True,  # FIXED
             },
             'approach': 'production_large_scale'
         },
@@ -1209,6 +1242,13 @@ def main():
     print(f"\n📁 Output location: {output_dir}")
     print(f"📊 Files: {len(consolidation_results['final_files'])} embedding files")
     print(f"📋 Manifest: {manifest_path}")
+    
+    # FIXED: Show clean file names
+    print(f"\n✅ Clean file naming (no GPU suffixes):")
+    for final_file in consolidation_results['final_files'][:5]:  # Show first 5
+        print(f"   📄 {Path(final_file).name}")
+    if len(consolidation_results['final_files']) > 5:
+        print(f"   ... and {len(consolidation_results['final_files']) - 5} more files")
     
     if consolidation_results['consolidated_shards'] > 0:
         print(f"\n🎉 SUCCESS! PRODUCTION extraction ready for large-scale training!")
