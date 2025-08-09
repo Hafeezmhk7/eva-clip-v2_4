@@ -1,0 +1,2111 @@
+🔍 SLURM Environment Debug:
+SLURM_PROCID: 0
+SLURM_LOCALID: 0
+SLURM_NTASKS: 8
+SLURM_GPUS_ON_NODE: 4
+SLURM_STEP_NODELIST: 
+============================================================================================== 
+Warning! Mixing Conda and module environments may lead to corruption of the
+user environment. 
+We do not recommend users mixing those two environments unless absolutely
+necessary. Note that 
+SURF does not provide any support for Conda environment.
+For more information, please refer to our software policy page:
+https://servicedesk.surf.nl/wiki/display/WIKI/Software+policy+Snellius#SoftwarepolicySnellius-UseofAnacondaandMinicondaenvironmentsonSnellius 
+
+Remember that many packages have already been installed on the system and can
+be loaded using 
+the 'module load <package__name>' command. If you are uncertain if a package is
+already available 
+on the system, please use 'module avail' or 'module spider' to search for it.
+============================================================================================== 
+⚠️ Failed to import model: cannot import name 'BLIP3oCLIPDiTModel' from 'src.modules.models.blip3o_dit' (/gpfs/home4/azadaianchuk1/eva-clip-v2_4/src/modules/models/blip3o_dit.py)
+⚠️ Failed to import model: cannot import name 'BLIP3oCLIPDiTModel' from 'src.modules.models.blip3o_dit' (/gpfs/home4/azadaianchuk1/eva-clip-v2_4/src/modules/models/blip3o_dit.py)
+⚠️ Failed to import model: cannot import name 'BLIP3oCLIPDiTModel' from 'src.modules.models.blip3o_dit' (/gpfs/home4/azadaianchuk1/eva-clip-v2_4/src/modules/models/blip3o_dit.py)
+⚠️ Failed to import model: cannot import name 'BLIP3oCLIPDiTModel' from 'src.modules.models.blip3o_dit' (/gpfs/home4/azadaianchuk1/eva-clip-v2_4/src/modules/models/blip3o_dit.py)
+⚠️ Failed to import loss: cannot import name 'BLIP3oCLIPFlowMatchingLoss' from 'src.modules.losses.blip3o_fm_loss' (/gpfs/home4/azadaianchuk1/eva-clip-v2_4/src/modules/losses/blip3o_fm_loss.py)
+⚠️ Failed to import loss: cannot import name 'BLIP3oCLIPFlowMatchingLoss' from 'src.modules.losses.blip3o_fm_loss' (/gpfs/home4/azadaianchuk1/eva-clip-v2_4/src/modules/losses/blip3o_fm_loss.py)
+⚠️ Failed to import loss: cannot import name 'BLIP3oCLIPFlowMatchingLoss' from 'src.modules.losses.blip3o_fm_loss' (/gpfs/home4/azadaianchuk1/eva-clip-v2_4/src/modules/losses/blip3o_fm_loss.py)
+⚠️ Failed to import loss: cannot import name 'BLIP3oCLIPFlowMatchingLoss' from 'src.modules.losses.blip3o_fm_loss' (/gpfs/home4/azadaianchuk1/eva-clip-v2_4/src/modules/losses/blip3o_fm_loss.py)
+⚠️ Failed to import model: cannot import name 'BLIP3oCLIPDiTModel' from 'src.modules.models.blip3o_dit' (/gpfs/home4/azadaianchuk1/eva-clip-v2_4/src/modules/models/blip3o_dit.py)
+⚠️ Failed to import model: cannot import name 'BLIP3oCLIPDiTModel' from 'src.modules.models.blip3o_dit' (/gpfs/home4/azadaianchuk1/eva-clip-v2_4/src/modules/models/blip3o_dit.py)
+⚠️ Failed to import model: cannot import name 'BLIP3oCLIPDiTModel' from 'src.modules.models.blip3o_dit' (/gpfs/home4/azadaianchuk1/eva-clip-v2_4/src/modules/models/blip3o_dit.py)
+⚠️ Failed to import model: cannot import name 'BLIP3oCLIPDiTModel' from 'src.modules.models.blip3o_dit' (/gpfs/home4/azadaianchuk1/eva-clip-v2_4/src/modules/models/blip3o_dit.py)
+⚠️ Failed to import loss: cannot import name 'BLIP3oCLIPFlowMatchingLoss' from 'src.modules.losses.blip3o_fm_loss' (/gpfs/home4/azadaianchuk1/eva-clip-v2_4/src/modules/losses/blip3o_fm_loss.py)
+⚠️ Failed to import loss: cannot import name 'BLIP3oCLIPFlowMatchingLoss' from 'src.modules.losses.blip3o_fm_loss' (/gpfs/home4/azadaianchuk1/eva-clip-v2_4/src/modules/losses/blip3o_fm_loss.py)
+⚠️ Failed to import loss: cannot import name 'BLIP3oCLIPFlowMatchingLoss' from 'src.modules.losses.blip3o_fm_loss' (/gpfs/home4/azadaianchuk1/eva-clip-v2_4/src/modules/losses/blip3o_fm_loss.py)
+⚠️ Failed to import loss: cannot import name 'BLIP3oCLIPFlowMatchingLoss' from 'src.modules.losses.blip3o_fm_loss' (/gpfs/home4/azadaianchuk1/eva-clip-v2_4/src/modules/losses/blip3o_fm_loss.py)
+⚠️ Missing components: ['model', 'loss']
+⚠️ Missing components: ['model', 'loss']
+⚠️ Missing components: ['model', 'loss']
+⚠️ Partial initialization. Missing: ['model', 'loss']
+⚠️ Missing components: ['model', 'loss']
+⚠️ Partial initialization. Missing: ['model', 'loss']
+⚠️ Partial initialization. Missing: ['model', 'loss']
+⚠️ Partial initialization. Missing: ['model', 'loss']
+⚠️ Missing components: ['model', 'loss']
+⚠️ Missing components: ['model', 'loss']
+⚠️ Missing components: ['model', 'loss']
+⚠️ Partial initialization. Missing: ['model', 'loss']
+⚠️ Partial initialization. Missing: ['model', 'loss']
+⚠️ Missing components: ['model', 'loss']
+⚠️ Partial initialization. Missing: ['model', 'loss']
+⚠️ Partial initialization. Missing: ['model', 'loss']
+Using a slow image processor as `use_fast` is unset and a slow processor was saved with this model. `use_fast=True` will be the default behavior in v4.52, even if the model was saved with a slow processor. This will result in minor differences in outputs. You'll still be able to use a slow processor with `use_fast=False`.
+Using a slow image processor as `use_fast` is unset and a slow processor was saved with this model. `use_fast=True` will be the default behavior in v4.52, even if the model was saved with a slow processor. This will result in minor differences in outputs. You'll still be able to use a slow processor with `use_fast=False`.
+Using a slow image processor as `use_fast` is unset and a slow processor was saved with this model. `use_fast=True` will be the default behavior in v4.52, even if the model was saved with a slow processor. This will result in minor differences in outputs. You'll still be able to use a slow processor with `use_fast=False`.
+Using a slow image processor as `use_fast` is unset and a slow processor was saved with this model. `use_fast=True` will be the default behavior in v4.52, even if the model was saved with a slow processor. This will result in minor differences in outputs. You'll still be able to use a slow processor with `use_fast=False`.
+Using a slow image processor as `use_fast` is unset and a slow processor was saved with this model. `use_fast=True` will be the default behavior in v4.52, even if the model was saved with a slow processor. This will result in minor differences in outputs. You'll still be able to use a slow processor with `use_fast=False`.
+Using a slow image processor as `use_fast` is unset and a slow processor was saved with this model. `use_fast=True` will be the default behavior in v4.52, even if the model was saved with a slow processor. This will result in minor differences in outputs. You'll still be able to use a slow processor with `use_fast=False`.
+Using a slow image processor as `use_fast` is unset and a slow processor was saved with this model. `use_fast=True` will be the default behavior in v4.52, even if the model was saved with a slow processor. This will result in minor differences in outputs. You'll still be able to use a slow processor with `use_fast=False`.
+Using a slow image processor as `use_fast` is unset and a slow processor was saved with this model. `use_fast=True` will be the default behavior in v4.52, even if the model was saved with a slow processor. This will result in minor differences in outputs. You'll still be able to use a slow processor with `use_fast=False`.
+A new version of the following files was downloaded from https://huggingface.co/BAAI/EVA-CLIP-8B:
+- configuration_evaclip.py
+. Make sure to double-check they do not contain any added malicious code. To avoid downloading new versions of the code file, you can pin a revision.
+A new version of the following files was downloaded from https://huggingface.co/BAAI/EVA-CLIP-8B:
+- configuration_evaclip.py
+. Make sure to double-check they do not contain any added malicious code. To avoid downloading new versions of the code file, you can pin a revision.
+A new version of the following files was downloaded from https://huggingface.co/BAAI/EVA-CLIP-8B:
+- configuration_evaclip.py
+. Make sure to double-check they do not contain any added malicious code. To avoid downloading new versions of the code file, you can pin a revision.
+A new version of the following files was downloaded from https://huggingface.co/BAAI/EVA-CLIP-8B:
+- modeling_evaclip.py
+. Make sure to double-check they do not contain any added malicious code. To avoid downloading new versions of the code file, you can pin a revision.
+A new version of the following files was downloaded from https://huggingface.co/BAAI/EVA-CLIP-8B:
+- modeling_evaclip.py
+. Make sure to double-check they do not contain any added malicious code. To avoid downloading new versions of the code file, you can pin a revision.
+A new version of the following files was downloaded from https://huggingface.co/BAAI/EVA-CLIP-8B:
+- modeling_evaclip.py
+. Make sure to double-check they do not contain any added malicious code. To avoid downloading new versions of the code file, you can pin a revision.
+A new version of the following files was downloaded from https://huggingface.co/BAAI/EVA-CLIP-8B:
+- modeling_evaclip.py
+. Make sure to double-check they do not contain any added malicious code. To avoid downloading new versions of the code file, you can pin a revision.
+
+🗂️  BLIP3-o Workspace Status (Job 13587789)
+======================================================================
+📁 Directory Structure:
+   Persistent Workspace: /scratch-shared/azadaianchuk1/blip3o_workspace
+   Job Temp:            /scratch-local/azadaianchuk1.13587789/blip3o_job_13587789
+   ✅ Using scratch-shared (good choice)
+
+📊 Directory Usage:
+   workspace           :  1810.89 GB (5,932 files)
+   datasets            :   770.17 GB (5,492 files)
+   embeddings          :   946.66 GB (134 files)
+   checkpoints         :    94.07 GB (238 files)
+   logs                :     0.00 GB (1 files)
+   metadata            :     0.00 GB (62 files)
+   job_temp            :     0.00 GB (9 files)
+   cache               :     0.00 GB (5 files)
+   working             :     0.00 GB (0 files)
+   temp_checkpoints    :     0.00 GB (0 files)
+
+💾 System Disk Usage:
+   persistent_workspace_system: 2152722.6 GB free (15.0% used) - /scratch-shared/azadaianchuk1/blip3o_workspace
+   job_temp_system     : 2152722.6 GB free (15.0% used) - /scratch-local/azadaianchuk1.13587789/blip3o_job_13587789
+   home_system         :  60246.0 GB free (51.3% used) - /home/azadaianchuk1
+
+⏰ Storage Policies:
+   Persistent (scratch-shared): 14 days automatic cleanup
+   Job temp (TMPDIR):           Deleted when job ends
+   Home directory:              200 GiB quota, backed up
+
+💡 Recommendations:
+   • Keep embeddings in persistent workspace
+   • Save final models to home directory for long-term storage
+   • Use temp directories for processing and cache
+   • Monitor disk usage to avoid quotas
+======================================================================
+Found 20 valid tar files (8.43 GB)
+[Rank 1] Starting with 20 TAR files
+[Rank 1] Using local GPU 1
+[Rank 1] MASTER_ADDR: 172.18.62.33, LOCAL_RANK: 1
+[GPU 1] 🔧 Starting STABLE extraction (conservative but reliable)
+[GPU 1] Loading models with stable optimizations...
+
+🗂️  BLIP3-o Workspace Status (Job 13587789)
+======================================================================
+📁 Directory Structure:
+   Persistent Workspace: /scratch-shared/azadaianchuk1/blip3o_workspace
+   Job Temp:            /scratch-local/azadaianchuk1.13587789/blip3o_job_13587789
+   ✅ Using scratch-shared (good choice)
+
+📊 Directory Usage:
+   workspace           :  1810.89 GB (5,932 files)
+   datasets            :   770.17 GB (5,492 files)
+   embeddings          :   946.66 GB (134 files)
+   checkpoints         :    94.07 GB (238 files)
+   logs                :     0.00 GB (1 files)
+   metadata            :     0.00 GB (62 files)
+   job_temp            :     0.00 GB (9 files)
+   cache               :     0.00 GB (5 files)
+   working             :     0.00 GB (0 files)
+   temp_checkpoints    :     0.00 GB (0 files)
+
+💾 System Disk Usage:
+   persistent_workspace_system: 2152722.6 GB free (15.0% used) - /scratch-shared/azadaianchuk1/blip3o_workspace
+   job_temp_system     : 2152722.6 GB free (15.0% used) - /scratch-local/azadaianchuk1.13587789/blip3o_job_13587789
+   home_system         :  60246.0 GB free (51.3% used) - /home/azadaianchuk1
+
+⏰ Storage Policies:
+   Persistent (scratch-shared): 14 days automatic cleanup
+   Job temp (TMPDIR):           Deleted when job ends
+   Home directory:              200 GiB quota, backed up
+
+💡 Recommendations:
+   • Keep embeddings in persistent workspace
+   • Save final models to home directory for long-term storage
+   • Use temp directories for processing and cache
+   • Monitor disk usage to avoid quotas
+======================================================================
+Found 20 valid tar files (8.43 GB)
+[Rank 2] Starting with 20 TAR files
+[Rank 2] Using local GPU 2
+[Rank 2] MASTER_ADDR: 172.18.62.33, LOCAL_RANK: 2
+[GPU 2] 🔧 Starting STABLE extraction (conservative but reliable)
+[GPU 2] Loading models with stable optimizations...
+
+🗂️  BLIP3-o Workspace Status (Job 13587789)
+======================================================================
+📁 Directory Structure:
+   Persistent Workspace: /scratch-shared/azadaianchuk1/blip3o_workspace
+   Job Temp:            /scratch-local/azadaianchuk1.13587789/blip3o_job_13587789
+   ✅ Using scratch-shared (good choice)
+
+📊 Directory Usage:
+   workspace           :  1810.89 GB (5,932 files)
+   datasets            :   770.17 GB (5,492 files)
+   embeddings          :   946.66 GB (134 files)
+   checkpoints         :    94.07 GB (238 files)
+   logs                :     0.00 GB (1 files)
+   metadata            :     0.00 GB (62 files)
+   job_temp            :     0.00 GB (9 files)
+   cache               :     0.00 GB (5 files)
+   working             :     0.00 GB (0 files)
+   temp_checkpoints    :     0.00 GB (0 files)
+
+💾 System Disk Usage:
+   persistent_workspace_system: 2152722.6 GB free (15.0% used) - /scratch-shared/azadaianchuk1/blip3o_workspace
+   job_temp_system     : 2152722.6 GB free (15.0% used) - /scratch-local/azadaianchuk1.13587789/blip3o_job_13587789
+   home_system         :  60246.0 GB free (51.3% used) - /home/azadaianchuk1
+
+⏰ Storage Policies:
+   Persistent (scratch-shared): 14 days automatic cleanup
+   Job temp (TMPDIR):           Deleted when job ends
+   Home directory:              200 GiB quota, backed up
+
+💡 Recommendations:
+   • Keep embeddings in persistent workspace
+   • Save final models to home directory for long-term storage
+   • Use temp directories for processing and cache
+   • Monitor disk usage to avoid quotas
+======================================================================
+Found 20 valid tar files (8.43 GB)
+[Rank 0] Starting with 20 TAR files
+[Rank 0] Using local GPU 0
+[Rank 0] MASTER_ADDR: 172.18.62.33, LOCAL_RANK: 0
+[GPU 0] 🔧 Starting STABLE extraction (conservative but reliable)
+[GPU 0] Loading models with stable optimizations...
+
+🗂️  BLIP3-o Workspace Status (Job 13587789)
+======================================================================
+📁 Directory Structure:
+   Persistent Workspace: /scratch-shared/azadaianchuk1/blip3o_workspace
+   Job Temp:            /scratch-local/azadaianchuk1.13587789/blip3o_job_13587789
+   ✅ Using scratch-shared (good choice)
+
+📊 Directory Usage:
+   workspace           :  1810.89 GB (5,932 files)
+   datasets            :   770.17 GB (5,492 files)
+   embeddings          :   946.66 GB (134 files)
+   checkpoints         :    94.07 GB (238 files)
+   logs                :     0.00 GB (1 files)
+   metadata            :     0.00 GB (62 files)
+   job_temp            :     0.00 GB (9 files)
+   cache               :     0.00 GB (5 files)
+   working             :     0.00 GB (0 files)
+   temp_checkpoints    :     0.00 GB (0 files)
+
+💾 System Disk Usage:
+   persistent_workspace_system: 2152722.6 GB free (15.0% used) - /scratch-shared/azadaianchuk1/blip3o_workspace
+   job_temp_system     : 2152722.6 GB free (15.0% used) - /scratch-local/azadaianchuk1.13587789/blip3o_job_13587789
+   home_system         :  60246.0 GB free (51.3% used) - /home/azadaianchuk1
+
+⏰ Storage Policies:
+   Persistent (scratch-shared): 14 days automatic cleanup
+   Job temp (TMPDIR):           Deleted when job ends
+   Home directory:              200 GiB quota, backed up
+
+💡 Recommendations:
+   • Keep embeddings in persistent workspace
+   • Save final models to home directory for long-term storage
+   • Use temp directories for processing and cache
+   • Monitor disk usage to avoid quotas
+======================================================================
+Found 20 valid tar files (8.43 GB)
+[Rank 3] Starting with 20 TAR files
+[Rank 3] Using local GPU 3
+[Rank 3] MASTER_ADDR: 172.18.62.33, LOCAL_RANK: 3
+[GPU 3] 🔧 Starting STABLE extraction (conservative but reliable)
+[GPU 3] Loading models with stable optimizations...
+A new version of the following files was downloaded from https://huggingface.co/BAAI/EVA-CLIP-8B:
+- configuration_evaclip.py
+. Make sure to double-check they do not contain any added malicious code. To avoid downloading new versions of the code file, you can pin a revision.
+A new version of the following files was downloaded from https://huggingface.co/BAAI/EVA-CLIP-8B:
+- configuration_evaclip.py
+. Make sure to double-check they do not contain any added malicious code. To avoid downloading new versions of the code file, you can pin a revision.
+A new version of the following files was downloaded from https://huggingface.co/BAAI/EVA-CLIP-8B:
+- configuration_evaclip.py
+. Make sure to double-check they do not contain any added malicious code. To avoid downloading new versions of the code file, you can pin a revision.
+A new version of the following files was downloaded from https://huggingface.co/BAAI/EVA-CLIP-8B:
+- modeling_evaclip.py
+. Make sure to double-check they do not contain any added malicious code. To avoid downloading new versions of the code file, you can pin a revision.
+A new version of the following files was downloaded from https://huggingface.co/BAAI/EVA-CLIP-8B:
+- modeling_evaclip.py
+. Make sure to double-check they do not contain any added malicious code. To avoid downloading new versions of the code file, you can pin a revision.
+A new version of the following files was downloaded from https://huggingface.co/BAAI/EVA-CLIP-8B:
+- modeling_evaclip.py
+. Make sure to double-check they do not contain any added malicious code. To avoid downloading new versions of the code file, you can pin a revision.
+A new version of the following files was downloaded from https://huggingface.co/BAAI/EVA-CLIP-8B:
+- modeling_evaclip.py
+. Make sure to double-check they do not contain any added malicious code. To avoid downloading new versions of the code file, you can pin a revision.
+
+🗂️  BLIP3-o Workspace Status (Job 13587789)
+======================================================================
+📁 Directory Structure:
+   Persistent Workspace: /scratch-shared/azadaianchuk1/blip3o_workspace
+   Job Temp:            /scratch-local/azadaianchuk1.13587789/blip3o_job_13587789
+   ✅ Using scratch-shared (good choice)
+
+📊 Directory Usage:
+   workspace           :  1810.89 GB (5,932 files)
+   datasets            :   770.17 GB (5,492 files)
+   embeddings          :   946.66 GB (134 files)
+   checkpoints         :    94.07 GB (238 files)
+   logs                :     0.00 GB (1 files)
+   metadata            :     0.00 GB (62 files)
+   job_temp            :     0.00 GB (9 files)
+   cache               :     0.00 GB (5 files)
+   working             :     0.00 GB (0 files)
+   temp_checkpoints    :     0.00 GB (0 files)
+
+💾 System Disk Usage:
+   persistent_workspace_system: 2152578.9 GB free (15.0% used) - /scratch-shared/azadaianchuk1/blip3o_workspace
+   job_temp_system     : 2152578.9 GB free (15.0% used) - /scratch-local/azadaianchuk1.13587789/blip3o_job_13587789
+   home_system         :  60245.9 GB free (51.3% used) - /home/azadaianchuk1
+
+⏰ Storage Policies:
+   Persistent (scratch-shared): 14 days automatic cleanup
+   Job temp (TMPDIR):           Deleted when job ends
+   Home directory:              200 GiB quota, backed up
+
+💡 Recommendations:
+   • Keep embeddings in persistent workspace
+   • Save final models to home directory for long-term storage
+   • Use temp directories for processing and cache
+   • Monitor disk usage to avoid quotas
+======================================================================
+Found 20 valid tar files (8.43 GB)
+[Rank 6] Starting with 20 TAR files
+[Rank 6] Using local GPU 2
+[Rank 6] MASTER_ADDR: 172.18.62.33, LOCAL_RANK: 2
+[GPU 6] 🔧 Starting STABLE extraction (conservative but reliable)
+[GPU 6] Loading models with stable optimizations...
+
+🗂️  BLIP3-o Workspace Status (Job 13587789)
+======================================================================
+📁 Directory Structure:
+   Persistent Workspace: /scratch-shared/azadaianchuk1/blip3o_workspace
+   Job Temp:            /scratch-local/azadaianchuk1.13587789/blip3o_job_13587789
+   ✅ Using scratch-shared (good choice)
+
+📊 Directory Usage:
+   workspace           :  1810.89 GB (5,932 files)
+   datasets            :   770.17 GB (5,492 files)
+   embeddings          :   946.66 GB (134 files)
+   checkpoints         :    94.07 GB (238 files)
+   logs                :     0.00 GB (1 files)
+   metadata            :     0.00 GB (62 files)
+   job_temp            :     0.00 GB (9 files)
+   cache               :     0.00 GB (5 files)
+   working             :     0.00 GB (0 files)
+   temp_checkpoints    :     0.00 GB (0 files)
+
+💾 System Disk Usage:
+   persistent_workspace_system: 2152578.9 GB free (15.0% used) - /scratch-shared/azadaianchuk1/blip3o_workspace
+   job_temp_system     : 2152578.9 GB free (15.0% used) - /scratch-local/azadaianchuk1.13587789/blip3o_job_13587789
+   home_system         :  60245.9 GB free (51.3% used) - /home/azadaianchuk1
+
+⏰ Storage Policies:
+   Persistent (scratch-shared): 14 days automatic cleanup
+   Job temp (TMPDIR):           Deleted when job ends
+   Home directory:              200 GiB quota, backed up
+
+💡 Recommendations:
+   • Keep embeddings in persistent workspace
+   • Save final models to home directory for long-term storage
+   • Use temp directories for processing and cache
+   • Monitor disk usage to avoid quotas
+======================================================================
+Found 20 valid tar files (8.43 GB)
+[Rank 4] Starting with 20 TAR files
+[Rank 4] Using local GPU 0
+[Rank 4] MASTER_ADDR: 172.18.62.33, LOCAL_RANK: 0
+[GPU 4] 🔧 Starting STABLE extraction (conservative but reliable)
+[GPU 4] Loading models with stable optimizations...
+
+🗂️  BLIP3-o Workspace Status (Job 13587789)
+======================================================================
+📁 Directory Structure:
+   Persistent Workspace: /scratch-shared/azadaianchuk1/blip3o_workspace
+   Job Temp:            /scratch-local/azadaianchuk1.13587789/blip3o_job_13587789
+   ✅ Using scratch-shared (good choice)
+
+📊 Directory Usage:
+   workspace           :  1810.89 GB (5,932 files)
+   datasets            :   770.17 GB (5,492 files)
+   embeddings          :   946.66 GB (134 files)
+   checkpoints         :    94.07 GB (238 files)
+   logs                :     0.00 GB (1 files)
+   metadata            :     0.00 GB (62 files)
+   job_temp            :     0.00 GB (9 files)
+   cache               :     0.00 GB (5 files)
+   working             :     0.00 GB (0 files)
+   temp_checkpoints    :     0.00 GB (0 files)
+
+💾 System Disk Usage:
+   persistent_workspace_system: 2152578.9 GB free (15.0% used) - /scratch-shared/azadaianchuk1/blip3o_workspace
+   job_temp_system     : 2152578.9 GB free (15.0% used) - /scratch-local/azadaianchuk1.13587789/blip3o_job_13587789
+   home_system         :  60245.9 GB free (51.3% used) - /home/azadaianchuk1
+
+⏰ Storage Policies:
+   Persistent (scratch-shared): 14 days automatic cleanup
+   Job temp (TMPDIR):           Deleted when job ends
+   Home directory:              200 GiB quota, backed up
+
+💡 Recommendations:
+   • Keep embeddings in persistent workspace
+   • Save final models to home directory for long-term storage
+   • Use temp directories for processing and cache
+   • Monitor disk usage to avoid quotas
+======================================================================
+Found 20 valid tar files (8.43 GB)
+[Rank 5] Starting with 20 TAR files
+[Rank 5] Using local GPU 1
+[Rank 5] MASTER_ADDR: 172.18.62.33, LOCAL_RANK: 1
+[GPU 5] 🔧 Starting STABLE extraction (conservative but reliable)
+[GPU 5] Loading models with stable optimizations...
+
+🗂️  BLIP3-o Workspace Status (Job 13587789)
+======================================================================
+📁 Directory Structure:
+   Persistent Workspace: /scratch-shared/azadaianchuk1/blip3o_workspace
+   Job Temp:            /scratch-local/azadaianchuk1.13587789/blip3o_job_13587789
+   ✅ Using scratch-shared (good choice)
+
+📊 Directory Usage:
+   workspace           :  1810.89 GB (5,932 files)
+   datasets            :   770.17 GB (5,492 files)
+   embeddings          :   946.66 GB (134 files)
+   checkpoints         :    94.07 GB (238 files)
+   logs                :     0.00 GB (1 files)
+   metadata            :     0.00 GB (62 files)
+   job_temp            :     0.00 GB (9 files)
+   cache               :     0.00 GB (5 files)
+   working             :     0.00 GB (0 files)
+   temp_checkpoints    :     0.00 GB (0 files)
+
+💾 System Disk Usage:
+   persistent_workspace_system: 2152578.9 GB free (15.0% used) - /scratch-shared/azadaianchuk1/blip3o_workspace
+   job_temp_system     : 2152578.9 GB free (15.0% used) - /scratch-local/azadaianchuk1.13587789/blip3o_job_13587789
+   home_system         :  60245.9 GB free (51.3% used) - /home/azadaianchuk1
+
+⏰ Storage Policies:
+   Persistent (scratch-shared): 14 days automatic cleanup
+   Job temp (TMPDIR):           Deleted when job ends
+   Home directory:              200 GiB quota, backed up
+
+💡 Recommendations:
+   • Keep embeddings in persistent workspace
+   • Save final models to home directory for long-term storage
+   • Use temp directories for processing and cache
+   • Monitor disk usage to avoid quotas
+======================================================================
+Found 20 valid tar files (8.43 GB)
+[Rank 7] Starting with 20 TAR files
+[Rank 7] Using local GPU 3
+[Rank 7] MASTER_ADDR: 172.18.62.33, LOCAL_RANK: 3
+[GPU 7] 🔧 Starting STABLE extraction (conservative but reliable)
+[GPU 7] Loading models with stable optimizations...
+Fetching 4 files:   0%|          | 0/4 [00:00<?, ?it/s]Fetching 4 files:  25%|██▌       | 1/4 [00:17<00:53, 17.89s/it]Fetching 4 files: 100%|██████████| 4/4 [00:17<00:00,  4.47s/it]
+Fetching 4 files:   0%|          | 0/4 [00:00<?, ?it/s]Fetching 4 files:  25%|██▌       | 1/4 [00:17<00:53, 17.91s/it]Fetching 4 files: 100%|██████████| 4/4 [00:17<00:00,  4.48s/it]
+Fetching 4 files:   0%|          | 0/4 [00:00<?, ?it/s]Fetching 4 files:  25%|██▌       | 1/4 [00:17<00:53, 17.79s/it]Fetching 4 files: 100%|██████████| 4/4 [00:17<00:00,  4.45s/it]
+Fetching 4 files:   0%|          | 0/4 [00:00<?, ?it/s]Fetching 4 files:  25%|██▌       | 1/4 [00:17<00:53, 17.89s/it]Fetching 4 files: 100%|██████████| 4/4 [00:17<00:00,  4.47s/it]
+Fetching 4 files:   0%|          | 0/4 [00:00<?, ?it/s]Fetching 4 files:  25%|██▌       | 1/4 [00:17<00:53, 17.97s/it]Fetching 4 files:  75%|███████▌  | 3/4 [00:18<00:04,  4.72s/it]Fetching 4 files: 100%|██████████| 4/4 [00:18<00:00,  4.53s/it]
+Fetching 4 files:   0%|          | 0/4 [00:00<?, ?it/s]Fetching 4 files:  25%|██▌       | 1/4 [00:17<00:53, 17.92s/it]Fetching 4 files:  75%|███████▌  | 3/4 [00:18<00:04,  4.70s/it]Fetching 4 files: 100%|██████████| 4/4 [00:18<00:00,  4.52s/it]
+Fetching 4 files:   0%|          | 0/4 [00:00<?, ?it/s]Fetching 4 files:  25%|██▌       | 1/4 [00:17<00:53, 17.97s/it]Fetching 4 files:  75%|███████▌  | 3/4 [00:18<00:04,  4.73s/it]Fetching 4 files: 100%|██████████| 4/4 [00:18<00:00,  4.54s/it]
+Fetching 4 files:   0%|          | 0/4 [00:00<?, ?it/s]Fetching 4 files:  25%|██▌       | 1/4 [00:17<00:53, 17.95s/it]Fetching 4 files:  75%|███████▌  | 3/4 [00:18<00:04,  4.74s/it]Fetching 4 files: 100%|██████████| 4/4 [00:18<00:00,  4.54s/it]
+Loading checkpoint shards:   0%|          | 0/4 [00:00<?, ?it/s]Loading checkpoint shards:  25%|██▌       | 1/4 [00:27<01:21, 27.23s/it]Loading checkpoint shards:  50%|█████     | 2/4 [00:46<00:44, 22.28s/it]Loading checkpoint shards:  75%|███████▌  | 3/4 [01:07<00:21, 21.81s/it]Loading checkpoint shards: 100%|██████████| 4/4 [01:14<00:00, 15.99s/it]Loading checkpoint shards: 100%|██████████| 4/4 [01:14<00:00, 18.59s/it]
+Loading checkpoint shards:   0%|          | 0/4 [00:00<?, ?it/s]Loading checkpoint shards:  25%|██▌       | 1/4 [00:27<01:21, 27.22s/it]Loading checkpoint shards:  50%|█████     | 2/4 [00:46<00:44, 22.27s/it]Loading checkpoint shards:  75%|███████▌  | 3/4 [01:07<00:21, 21.80s/it]Loading checkpoint shards: 100%|██████████| 4/4 [01:14<00:00, 15.99s/it]Loading checkpoint shards: 100%|██████████| 4/4 [01:14<00:00, 18.59s/it]
+Loading checkpoint shards:   0%|          | 0/4 [00:00<?, ?it/s]Loading checkpoint shards:  25%|██▌       | 1/4 [00:27<01:21, 27.24s/it]Loading checkpoint shards:  50%|█████     | 2/4 [00:46<00:44, 22.26s/it]Loading checkpoint shards:  75%|███████▌  | 3/4 [01:07<00:21, 21.81s/it]Loading checkpoint shards: 100%|██████████| 4/4 [01:14<00:00, 15.99s/it]Loading checkpoint shards: 100%|██████████| 4/4 [01:14<00:00, 18.59s/it]
+Loading checkpoint shards:   0%|          | 0/4 [00:00<?, ?it/s]Loading checkpoint shards:  25%|██▌       | 1/4 [00:27<01:21, 27.27s/it]Loading checkpoint shards:  50%|█████     | 2/4 [00:46<00:44, 22.27s/it]Loading checkpoint shards:  75%|███████▌  | 3/4 [01:07<00:21, 21.81s/it]Loading checkpoint shards: 100%|██████████| 4/4 [01:14<00:00, 15.99s/it]Loading checkpoint shards: 100%|██████████| 4/4 [01:14<00:00, 18.59s/it]
+Loading checkpoint shards:   0%|          | 0/4 [00:00<?, ?it/s]Loading checkpoint shards:  25%|██▌       | 1/4 [00:27<01:22, 27.56s/it]Loading checkpoint shards:  50%|█████     | 2/4 [00:45<00:44, 22.10s/it]Loading checkpoint shards:  75%|███████▌  | 3/4 [01:05<00:20, 20.91s/it]Loading checkpoint shards: 100%|██████████| 4/4 [01:12<00:00, 15.36s/it]Loading checkpoint shards: 100%|██████████| 4/4 [01:12<00:00, 18.04s/it]
+Loading checkpoint shards:   0%|          | 0/4 [00:00<?, ?it/s]Loading checkpoint shards:  25%|██▌       | 1/4 [00:27<01:22, 27.52s/it]Loading checkpoint shards:  50%|█████     | 2/4 [00:45<00:44, 22.09s/it]Loading checkpoint shards:  75%|███████▌  | 3/4 [01:05<00:20, 20.90s/it]Loading checkpoint shards: 100%|██████████| 4/4 [01:12<00:00, 15.36s/it]Loading checkpoint shards: 100%|██████████| 4/4 [01:12<00:00, 18.04s/it]
+Loading checkpoint shards:   0%|          | 0/4 [00:00<?, ?it/s]Loading checkpoint shards:  25%|██▌       | 1/4 [00:27<01:22, 27.60s/it]Loading checkpoint shards:  50%|█████     | 2/4 [00:45<00:44, 22.12s/it]Loading checkpoint shards:  75%|███████▌  | 3/4 [01:05<00:20, 20.92s/it]Loading checkpoint shards: 100%|██████████| 4/4 [01:12<00:00, 15.36s/it]Loading checkpoint shards: 100%|██████████| 4/4 [01:12<00:00, 18.06s/it]
+Loading checkpoint shards:   0%|          | 0/4 [00:00<?, ?it/s]Loading checkpoint shards:  25%|██▌       | 1/4 [00:27<01:22, 27.59s/it]Loading checkpoint shards:  50%|█████     | 2/4 [00:45<00:44, 22.11s/it]Loading checkpoint shards:  75%|███████▌  | 3/4 [01:05<00:20, 20.91s/it]Loading checkpoint shards: 100%|██████████| 4/4 [01:12<00:00, 15.36s/it]Loading checkpoint shards: 100%|██████████| 4/4 [01:12<00:00, 18.05s/it]
+[GPU 0] ✅ Models loaded with stable optimizations
+[GPU 0] Processing 3 files with stable batch_size=128
+[GPU 0] 🔧 STABLE processing shard 0: 00000.tar (batch_size=128)
+[GPU 0] Processing 2646 images from 00000.tar
+[GPU 0] Loaded 2646 valid samples (skipped 0 errors)
+[GPU 0] Dataset size: 2646 samples
+[GPU 2] ✅ Models loaded with stable optimizations
+[GPU 2] Processing 3 files with stable batch_size=128
+[GPU 2] 🔧 STABLE processing shard 2: 00002.tar (batch_size=128)
+[GPU 2] Processing 2585 images from 00002.tar
+[GPU 2] Loaded 2585 valid samples (skipped 0 errors)
+[GPU 2] Dataset size: 2585 samples
+
+
+[GPU 1] ✅ Models loaded with stable optimizations
+[GPU 1] Processing 3 files with stable batch_size=128
+[GPU 1] 🔧 STABLE processing shard 1: 00001.tar (batch_size=128)
+[GPU 1] Processing 2601 images from 00001.tar
+[GPU 1] Loaded 2601 valid samples (skipped 0 errors)
+[GPU 1] Dataset size: 2601 samples
+
+[GPU 3] ✅ Models loaded with stable optimizations
+[GPU 3] Processing 3 files with stable batch_size=128
+[GPU 3] 🔧 STABLE processing shard 3: 00003.tar (batch_size=128)
+[GPU 3] Processing 2617 images from 00003.tar
+[GPU 3] Loaded 2617 valid samples (skipped 0 errors)
+[GPU 3] Dataset size: 2617 samples
+
+
+
+[GPU 5] ✅ Models loaded with stable optimizations
+[GPU 5] Processing 2 files with stable batch_size=128
+[GPU 5] 🔧 STABLE processing shard 5: 00005.tar (batch_size=128)
+[GPU 5] Processing 2587 images from 00005.tar
+[GPU 5] Loaded 2587 valid samples (skipped 0 errors)
+[GPU 5] Dataset size: 2587 samples
+
+
+
+
+
+[GPU 4] ✅ Models loaded with stable optimizations
+[GPU 4] Processing 2 files with stable batch_size=128
+[GPU 4] 🔧 STABLE processing shard 4: 00004.tar (batch_size=128)
+[GPU 4] Processing 2702 images from 00004.tar
+[GPU 4] Loaded 2702 valid samples (skipped 0 errors)
+[GPU 4] Dataset size: 2702 samples
+
+
+
+
+[GPU 7] ✅ Models loaded with stable optimizations
+[GPU 7] Processing 2 files with stable batch_size=128
+[GPU 7] 🔧 STABLE processing shard 7: 00007.tar (batch_size=128)
+[GPU 7] Processing 2603 images from 00007.tar
+[GPU 7] Loaded 2603 valid samples (skipped 0 errors)
+[GPU 7] Dataset size: 2603 samples
+
+
+
+
+
+
+
+[GPU 6] ✅ Models loaded with stable optimizations
+[GPU 6] Processing 2 files with stable batch_size=128
+[GPU 6] 🔧 STABLE processing shard 6: 00006.tar (batch_size=128)
+[GPU 6] Processing 2573 images from 00006.tar
+[GPU 6] Loaded 2573 valid samples (skipped 0 errors)
+[GPU 6] Dataset size: 2573 samples
+
+
+
+
+
+
+GPU1 Shard1:   0%|          | 0/21 [00:00<?, ?batch/s][A
+GPU1 Shard1:   0%|          | 0/21 [00:06<?, ?batch/s, samples=128, sps=21.1, errors=0][A
+GPU2 Shard2:   0%|          | 0/21 [00:00<?, ?batch/s][A[A
+
+GPU2 Shard2:   0%|          | 0/21 [00:07<?, ?batch/s, samples=128, sps=16.2, errors=0][A[A
+
+GPU4 Shard4:   0%|          | 0/22 [00:00<?, ?batch/s][A[A[A[A
+
+
+
+GPU4 Shard4:   0%|          | 0/22 [00:06<?, ?batch/s, samples=128, sps=20.8, errors=0][A[A[A[A
+
+
+
+GPU5 Shard5:   0%|          | 0/21 [00:00<?, ?batch/s][A[A[A[A[A
+
+
+
+
+GPU5 Shard5:   0%|          | 0/21 [00:07<?, ?batch/s, samples=128, sps=16.4, errors=0][A[A[A[A[A
+
+
+
+
+GPU3 Shard3:   0%|          | 0/21 [00:00<?, ?batch/s][A[A[A
+
+
+GPU3 Shard3:   0%|          | 0/21 [00:08<?, ?batch/s, samples=128, sps=14.4, errors=0][A[A[A
+
+
+GPU6 Shard6:   0%|          | 0/21 [00:00<?, ?batch/s][A[A[A[A[A[A
+
+
+
+
+
+GPU6 Shard6:   0%|          | 0/21 [00:07<?, ?batch/s, samples=128, sps=17.2, errors=0][A[A[A[A[A[A
+
+
+
+
+
+GPU7 Shard7:   0%|          | 0/21 [00:00<?, ?batch/s][A[A[A[A[A[A[A
+
+
+
+
+
+
+GPU7 Shard7:   0%|          | 0/21 [00:07<?, ?batch/s, samples=128, sps=16.7, errors=0][A[A[A[A[A[A[A
+
+
+
+
+
+
+GPU1 Shard1:   5%|▍         | 1/21 [00:06<02:01,  6.08s/batch, samples=128, sps=21.1, errors=0][A
+GPU1 Shard1:   5%|▍         | 1/21 [00:10<02:01,  6.08s/batch, samples=256, sps=23.9, errors=0][A
+GPU4 Shard4:   5%|▍         | 1/22 [00:06<02:09,  6.15s/batch, samples=128, sps=20.8, errors=0][A[A[A[A
+
+
+
+GPU4 Shard4:   5%|▍         | 1/22 [00:10<02:09,  6.15s/batch, samples=256, sps=24.4, errors=0][A[A[A[A
+
+
+
+GPU2 Shard2:   5%|▍         | 1/21 [00:07<02:37,  7.89s/batch, samples=128, sps=16.2, errors=0][A[A
+
+GPU2 Shard2:   5%|▍         | 1/21 [00:12<02:37,  7.89s/batch, samples=256, sps=20.7, errors=0][A[A
+
+GPU5 Shard5:   5%|▍         | 1/21 [00:07<02:36,  7.81s/batch, samples=128, sps=16.4, errors=0][A[A[A[A[A
+
+
+
+
+GPU5 Shard5:   5%|▍         | 1/21 [00:12<02:36,  7.81s/batch, samples=256, sps=20.9, errors=0][A[A[A[A[A
+
+
+
+
+GPU3 Shard3:   5%|▍         | 1/21 [00:08<02:57,  8.86s/batch, samples=128, sps=14.4, errors=0][A[A[A
+
+
+GPU3 Shard3:   5%|▍         | 1/21 [00:13<02:57,  8.86s/batch, samples=256, sps=19.3, errors=0][A[A[A
+
+
+GPU6 Shard6:   5%|▍         | 1/21 [00:07<02:28,  7.44s/batch, samples=128, sps=17.2, errors=0][A[A[A[A[A[A
+
+
+
+
+
+GPU6 Shard6:   5%|▍         | 1/21 [00:11<02:28,  7.44s/batch, samples=256, sps=21.6, errors=0][A[A[A[A[A[A
+
+
+
+
+
+GPU7 Shard7:   5%|▍         | 1/21 [00:07<02:33,  7.66s/batch, samples=128, sps=16.7, errors=0][A[A[A[A[A[A[A
+
+
+
+
+
+
+GPU7 Shard7:   5%|▍         | 1/21 [00:12<02:33,  7.66s/batch, samples=256, sps=21.1, errors=0][A[A[A[A[A[A[A
+
+
+
+
+
+
+GPU1 Shard1:  10%|▉         | 2/21 [00:10<01:39,  5.24s/batch, samples=256, sps=23.9, errors=0][A
+GPU1 Shard1:  10%|▉         | 2/21 [00:15<01:39,  5.24s/batch, samples=384, sps=25.4, errors=0][A
+GPU4 Shard4:   9%|▉         | 2/22 [00:10<01:41,  5.10s/batch, samples=256, sps=24.4, errors=0][A[A[A[A
+
+
+
+GPU4 Shard4:   9%|▉         | 2/22 [00:14<01:41,  5.10s/batch, samples=384, sps=25.8, errors=0][A[A[A[A
+
+
+
+GPU2 Shard2:  10%|▉         | 2/21 [00:12<01:51,  5.87s/batch, samples=256, sps=20.7, errors=0][A[A
+
+GPU2 Shard2:  10%|▉         | 2/21 [00:16<01:51,  5.87s/batch, samples=384, sps=23.0, errors=0][A[A
+
+GPU5 Shard5:  10%|▉         | 2/21 [00:12<01:50,  5.84s/batch, samples=256, sps=20.9, errors=0][A[A[A[A[A
+
+
+
+
+GPU5 Shard5:  10%|▉         | 2/21 [00:16<01:50,  5.84s/batch, samples=384, sps=23.1, errors=0][A[A[A[A[A
+
+
+
+
+GPU3 Shard3:  10%|▉         | 2/21 [00:13<01:58,  6.24s/batch, samples=256, sps=19.3, errors=0][A[A[A
+
+
+GPU3 Shard3:  10%|▉         | 2/21 [00:17<01:58,  6.24s/batch, samples=384, sps=21.7, errors=0][A[A[A
+
+
+GPU6 Shard6:  10%|▉         | 2/21 [00:11<01:47,  5.65s/batch, samples=256, sps=21.6, errors=0][A[A[A[A[A[A
+
+
+
+
+
+GPU6 Shard6:  10%|▉         | 2/21 [00:16<01:47,  5.65s/batch, samples=384, sps=23.7, errors=0][A[A[A[A[A[A
+
+
+
+
+
+GPU7 Shard7:  10%|▉         | 2/21 [00:12<01:49,  5.79s/batch, samples=256, sps=21.1, errors=0][A[A[A[A[A[A[A
+
+
+
+
+
+
+GPU7 Shard7:  10%|▉         | 2/21 [00:16<01:49,  5.79s/batch, samples=384, sps=23.2, errors=0][A[A[A[A[A[A[A
+
+
+
+
+
+
+GPU1 Shard1:  14%|█▍        | 3/21 [00:15<01:27,  4.86s/batch, samples=384, sps=25.4, errors=0][A
+GPU1 Shard1:  14%|█▍        | 3/21 [00:19<01:27,  4.86s/batch, samples=512, sps=26.0, errors=0][A
+GPU2 Shard2:  14%|█▍        | 3/21 [00:16<01:33,  5.19s/batch, samples=384, sps=23.0, errors=0][A[A
+
+GPU2 Shard2:  14%|█▍        | 3/21 [00:21<01:33,  5.19s/batch, samples=512, sps=24.3, errors=0][A[A
+
+GPU4 Shard4:  14%|█▎        | 3/22 [00:14<01:30,  4.78s/batch, samples=384, sps=25.8, errors=0][A[A[A[A
+
+
+
+GPU4 Shard4:  14%|█▎        | 3/22 [00:19<01:30,  4.78s/batch, samples=512, sps=26.4, errors=0][A[A[A[A
+
+
+
+GPU5 Shard5:  14%|█▍        | 3/21 [00:16<01:32,  5.16s/batch, samples=384, sps=23.1, errors=0][A[A[A[A[A
+
+
+
+
+GPU5 Shard5:  14%|█▍        | 3/21 [00:21<01:32,  5.16s/batch, samples=512, sps=24.3, errors=0][A[A[A[A[A
+
+
+
+
+GPU3 Shard3:  14%|█▍        | 3/21 [00:17<01:37,  5.41s/batch, samples=384, sps=21.7, errors=0][A[A[A
+
+
+GPU3 Shard3:  14%|█▍        | 3/21 [00:22<01:37,  5.41s/batch, samples=512, sps=23.2, errors=0][A[A[A
+
+
+GPU6 Shard6:  14%|█▍        | 3/21 [00:16<01:31,  5.06s/batch, samples=384, sps=23.7, errors=0][A[A[A[A[A[A
+
+
+
+
+
+GPU6 Shard6:  14%|█▍        | 3/21 [00:20<01:31,  5.06s/batch, samples=512, sps=24.7, errors=0][A[A[A[A[A[A
+
+
+
+
+
+GPU7 Shard7:  14%|█▍        | 3/21 [00:16<01:32,  5.16s/batch, samples=384, sps=23.2, errors=0][A[A[A[A[A[A[A
+
+
+
+
+
+
+GPU7 Shard7:  14%|█▍        | 3/21 [00:21<01:32,  5.16s/batch, samples=512, sps=24.3, errors=0][A[A[A[A[A[A[A
+
+
+
+
+
+
+GPU0 Shard0:   0%|          | 0/21 [00:00<?, ?batch/s]GPU0 Shard0:   0%|          | 0/21 [00:06<?, ?batch/s, samples=128, sps=20.0, errors=0]GPU0 Shard0:   5%|▍         | 1/21 [00:06<02:08,  6.41s/batch, samples=128, sps=20.0, errors=0]GPU0 Shard0:   5%|▍         | 1/21 [00:11<02:08,  6.41s/batch, samples=256, sps=23.1, errors=0]GPU0 Shard0:  10%|▉         | 2/21 [00:11<01:42,  5.39s/batch, samples=256, sps=23.1, errors=0]GPU0 Shard0:  10%|▉         | 2/21 [00:15<01:42,  5.39s/batch, samples=384, sps=24.7, errors=0]GPU0 Shard0:  14%|█▍        | 3/21 [00:15<01:29,  4.96s/batch, samples=384, sps=24.7, errors=0]GPU0 Shard0:  14%|█▍        | 3/21 [00:19<01:29,  4.96s/batch, samples=512, sps=25.6, errors=0]GPU0 Shard0:  19%|█▉        | 4/21 [00:19<01:20,  4.76s/batch, samples=512, sps=25.6, errors=0]GPU0 Shard0:  19%|█▉        | 4/21 [00:24<01:20,  4.76s/batch, samples=640, sps=26.2, errors=0]GPU0 Shard0:  24%|██▍       | 5/21 [00:24<01:14,  4.64s/batch, samples=640, sps=26GPU1 Shard1:  19%|█▉        | 4/21 [00:19<01:20,  4.73s/batch, samples=512, sps=26.0, errors=0][A
+GPU1 Shard1:  19%|█▉        | 4/21 [00:24<01:20,  4.73s/batch, samples=640, sps=26.6, errors=0][A
+GPU4 Shard4:  18%|█▊        | 4/22 [00:19<01:23,  4.65s/batch, samples=512, sps=26.4, errors=0][A[A[A[A
+
+
+
+GPU4 Shard4:  18%|█▊        | 4/22 [00:23<01:23,  4.65s/batch, samples=640, sps=26.9, errors=0][A[A[A[A
+
+
+
+GPU2 Shard2:  19%|█▉        | 4/21 [00:21<01:22,  4.86s/batch, samples=512, sps=24.3, errors=0][A[A
+
+GPU2 Shard2:  19%|█▉        | 4/21 [00:25<01:22,  4.86s/batch, samples=640, sps=25.0, errors=0][A[A
+
+GPU5 Shard5:  19%|█▉        | 4/21 [00:21<01:22,  4.86s/batch, samples=512, sps=24.3, errors=0][A[A[A[A[A
+
+
+
+
+GPU5 Shard5:  19%|█▉        | 4/21 [00:25<01:22,  4.86s/batch, samples=640, sps=25.2, errors=0][A[A[A[A[A
+
+
+
+
+GPU3 Shard3:  19%|█▉        | 4/21 [00:22<01:25,  5.01s/batch, samples=512, sps=23.2, errors=0][A[A[A
+
+
+GPU3 Shard3:  19%|█▉        | 4/21 [00:26<01:25,  5.01s/batch, samples=640, sps=24.2, errors=0][A[A[A
+
+
+GPU6 Shard6:  19%|█▉        | 4/21 [00:20<01:22,  4.85s/batch, samples=512, sps=24.7, errors=0][A[A[A[A[A[A
+
+
+
+
+
+GPU6 Shard6:  19%|█▉        | 4/21 [00:25<01:22,  4.85s/batch, samples=640, sps=25.4, errors=0][A[A[A[A[A[A
+
+
+
+
+
+GPU7 Shard7:  19%|█▉        | 4/21 [00:21<01:23,  4.90s/batch, samples=512, sps=24.3, errors=0][A[A[A[A[A[A[A
+
+
+
+
+
+
+GPU7 Shard7:  19%|█▉        | 4/21 [00:25<01:23,  4.90s/batch, samples=640, sps=25.0, errors=0][A[A[A[A[A[A[A
+
+
+
+
+
+
+GPU1 Shard1:  24%|██▍       | 5/21 [00:24<01:13,  4.61s/batch, samples=640, sps=26.6, errors=0][A
+GPU1 Shard1:  24%|██▍       | 5/21 [00:28<01:13,  4.61s/batch, samples=768, sps=26.9, errors=0][A
+GPU4 Shard4:  23%|██▎       | 5/22 [00:23<01:17,  4.56s/batch, samples=640, sps=26.9, errors=0][A[A[A[A
+
+
+
+GPU4 Shard4:  23%|██▎       | 5/22 [00:28<01:17,  4.56s/batch, samples=768, sps=27.3, errors=0][A[A[A[A
+
+
+
+GPU2 Shard2:  24%|██▍       | 5/21 [00:25<01:15,  4.72s/batch, samples=640, sps=25.0, errors=0][A[A
+
+GPU2 Shard2:  24%|██▍       | 5/21 [00:29<01:15,  4.72s/batch, samples=768, sps=25.6, errors=0][A[A
+
+GPU5 Shard5:  24%|██▍       | 5/21 [00:25<01:14,  4.68s/batch, samples=640, sps=25.2, errors=0][A[A[A[A[A
+
+
+
+
+GPU5 Shard5:  24%|██▍       | 5/21 [00:29<01:14,  4.68s/batch, samples=768, sps=25.8, errors=0][A[A[A[A[A
+
+
+
+
+GPU3 Shard3:  24%|██▍       | 5/21 [00:26<01:16,  4.79s/batch, samples=640, sps=24.2, errors=0][A[A[A
+
+
+GPU3 Shard3:  24%|██▍       | 5/21 [00:30<01:16,  4.79s/batch, samples=768, sps=24.9, errors=0][A[A[A
+
+
+GPU6 Shard6:  24%|██▍       | 5/21 [00:25<01:15,  4.73s/batch, samples=640, sps=25.4, errors=0][A[A[A[A[A[A
+
+
+
+
+
+GPU6 Shard6:  24%|██▍       | 5/21 [00:29<01:15,  4.73s/batch, samples=768, sps=25.8, errors=0][A[A[A[A[A[A
+
+
+
+
+
+GPU7 Shard7:  24%|██▍       | 5/21 [00:25<01:16,  4.76s/batch, samples=640, sps=25.0, errors=0][A[A[A[A[A[A[A
+
+
+
+
+
+
+GPU7 Shard7:  24%|██▍       | 5/21 [00:29<01:16,  4.76s/batch, samples=768, sps=25.6, errors=0][A[A[A[A[A[A[A
+
+
+
+
+
+
+GPU1 Shard1:  29%|██▊       | 6/21 [00:28<01:08,  4.57s/batch, samples=768, sps=26.9, errors=0][A
+GPU1 Shard1:  29%|██▊       | 6/21 [00:32<01:08,  4.57s/batch, samples=896, sps=27.2, errors=0][A
+GPU4 Shard4:  27%|██▋       | 6/22 [00:28<01:12,  4.50s/batch, samples=768, sps=27.3, errors=0][A[A[A[A
+
+
+
+GPU4 Shard4:  27%|██▋       | 6/22 [00:32<01:12,  4.50s/batch, samples=896, sps=27.6, errors=0][A[A[A[A
+
+
+
+GPU2 Shard2:  29%|██▊       | 6/21 [00:29<01:09,  4.62s/batch, samples=768, sps=25.6, errors=0][A[A
+
+GPU2 Shard2:  29%|██▊       | 6/21 [00:34<01:09,  4.62s/batch, samples=896, sps=26.0, errors=0][A[A
+
+GPU5 Shard5:  29%|██▊       | 6/21 [00:29<01:08,  4.59s/batch, samples=768, sps=25.8, errors=0][A[A[A[A[A
+
+
+
+
+GPU5 Shard5:  29%|██▊       | 6/21 [00:34<01:08,  4.59s/batch, samples=896, sps=26.2, errors=0][A[A[A[A[A
+
+
+
+
+GPU3 Shard3:  29%|██▊       | 6/21 [00:30<01:09,  4.64s/batch, samples=768, sps=24.9, errors=0][A[A[A
+
+
+GPU3 Shard3:  29%|██▊       | 6/21 [00:35<01:09,  4.64s/batch, samples=896, sps=25.4, errors=0][A[A[A
+
+
+GPU6 Shard6:  29%|██▊       | 6/21 [00:29<01:09,  4.65s/batch, samples=768, sps=25.8, errors=0][A[A[A[A[A[A
+
+
+
+
+
+GPU6 Shard6:  29%|██▊       | 6/21 [00:34<01:09,  4.65s/batch, samples=896, sps=26.2, errors=0][A[A[A[A[A[A
+
+
+
+
+
+GPU7 Shard7:  29%|██▊       | 6/21 [00:29<01:09,  4.65s/batch, samples=768, sps=25.6, errors=0][A[A[A[A[A[A[A
+
+
+
+
+
+
+GPU7 Shard7:  29%|██▊       | 6/21 [00:34<01:09,  4.65s/batch, samples=896, sps=26.0, errors=0][A[A[A[A[A[A[A
+
+
+
+
+
+
+GPU1 Shard1:  33%|███▎      | 7/21 [00:32<01:03,  4.51s/batch, samples=896, sps=27.2, errors=0][A
+GPU1 Shard1:  33%|███▎      | 7/21 [00:37<01:03,  4.51s/batch, samples=1024, sps=27.4, errors=0][A
+GPU4 Shard4:  32%|███▏      | 7/22 [00:32<01:06,  4.45s/batch, samples=896, sps=27.6, errors=0][A[A[A[A
+
+
+
+GPU4 Shard4:  32%|███▏      | 7/22 [00:36<01:06,  4.45s/batch, samples=1024, sps=27.7, errors=0][A[A[A[A
+
+
+
+GPU2 Shard2:  33%|███▎      | 7/21 [00:34<01:03,  4.56s/batch, samples=896, sps=26.0, errors=0][A[A
+
+GPU2 Shard2:  33%|███▎      | 7/21 [00:38<01:03,  4.56s/batch, samples=1024, sps=26.3, errors=0][A[A
+
+GPU5 Shard5:  33%|███▎      | 7/21 [00:34<01:03,  4.52s/batch, samples=896, sps=26.2, errors=0][A[A[A[A[A
+
+
+
+
+GPU5 Shard5:  33%|███▎      | 7/21 [00:38<01:03,  4.52s/batch, samples=1024, sps=26.5, errors=0][A[A[A[A[A
+
+
+
+
+GPU3 Shard3:  33%|███▎      | 7/21 [00:35<01:04,  4.60s/batch, samples=896, sps=25.4, errors=0][A[A[A
+
+
+GPU3 Shard3:  33%|███▎      | 7/21 [00:39<01:04,  4.60s/batch, samples=1024, sps=25.7, errors=0][A[A[A
+
+
+GPU6 Shard6:  33%|███▎      | 7/21 [00:34<01:04,  4.60s/batch, samples=896, sps=26.2, errors=0][A[A[A[A[A[A
+
+
+
+
+
+GPU6 Shard6:  33%|███▎      | 7/21 [00:38<01:04,  4.60s/batch, samples=1024, sps=26.4, errors=0][A[A[A[A[A[A
+
+
+
+
+
+GPU7 Shard7:  33%|███▎      | 7/21 [00:34<01:03,  4.57s/batch, samples=896, sps=26.0, errors=0][A[A[A[A[A[A[A
+
+
+
+
+
+
+GPU7 Shard7:  33%|███▎      | 7/21 [00:38<01:03,  4.57s/batch, samples=1024, sps=26.4, errors=0][A[A[A[A[A[A[A
+
+
+
+
+
+
+GPU1 Shard1:  38%|███▊      | 8/21 [00:37<00:58,  4.50s/batch, samples=1024, sps=27.4, errors=0][A
+GPU1 Shard1:  38%|███▊      | 8/21 [00:41<00:58,  4.50s/batch, samples=1152, sps=27.5, errors=0][A
+GPU4 Shard4:  36%|███▋      | 8/22 [00:36<01:02,  4.45s/batch, samples=1024, sps=27.7, errors=0][A[A[A[A
+
+
+
+GPU4 Shard4:  36%|███▋      | 8/22 [00:41<01:02,  4.45s/batch, samples=1152, sps=27.8, errors=0][A[A[A[A
+
+
+
+GPU2 Shard2:  38%|███▊      | 8/21 [00:38<00:59,  4.55s/batch, samples=1024, sps=26.3, errors=0][A[A
+
+GPU2 Shard2:  38%|███▊      | 8/21 [00:43<00:59,  4.55s/batch, samples=1152, sps=26.5, errors=0][A[A
+
+GPU5 Shard5:  38%|███▊      | 8/21 [00:38<00:58,  4.49s/batch, samples=1024, sps=26.5, errors=0][A[A[A[A[A
+
+
+
+
+GPU5 Shard5:  38%|███▊      | 8/21 [00:43<00:58,  4.49s/batch, samples=1152, sps=26.7, errors=0][A[A[A[A[A
+
+
+
+
+GPU3 Shard3:  38%|███▊      | 8/21 [00:39<00:59,  4.55s/batch, samples=1024, sps=25.7, errors=0][A[A[A
+
+
+GPU3 Shard3:  38%|███▊      | 8/21 [00:44<00:59,  4.55s/batch, samples=1152, sps=26.0, errors=0][A[A[A
+
+
+GPU6 Shard6:  38%|███▊      | 8/21 [00:38<00:59,  4.57s/batch, samples=1024, sps=26.4, errors=0][A[A[A[A[A[A
+
+
+
+
+
+GPU6 Shard6:  38%|███▊      | 8/21 [00:43<00:59,  4.57s/batch, samples=1152, sps=26.7, errors=0][A[A[A[A[A[A
+
+
+
+
+
+GPU7 Shard7:  38%|███▊      | 8/21 [00:38<00:58,  4.53s/batch, samples=1024, sps=26.4, errors=0][A[A[A[A[A[A[A
+
+
+
+
+
+
+GPU7 Shard7:  38%|███▊      | 8/21 [00:43<00:58,  4.53s/batch, samples=1152, sps=26.6, errors=0][A[A[A[A[A[A[A
+
+
+
+
+
+
+.2, errors=0]GPU0 Shard0:  24%|██▍       | 5/21 [00:28<01:14,  4.64s/batch, samples=768, sps=26.7, errors=0]GPU0 Shard0:  29%|██▊       | 6/21 [00:28<01:08,  4.54s/batch, samples=768, sps=26.7, errors=0]GPU0 Shard0:  29%|██▊       | 6/21 [00:33<01:08,  4.54s/batch, samples=896, sps=27.0, errors=0]GPU0 Shard0:  33%|███▎      | 7/21 [00:33<01:03,  4.50s/batch, samples=896, sps=27.0, errors=0]GPU0 Shard0:  33%|███▎      | 7/21 [00:37<01:03,  4.50s/batch, samples=1024, sps=27.2, errors=0]GPU0 Shard0:  38%|███▊      | 8/21 [00:37<00:58,  4.50s/batch, samples=1024, sps=27.2, errors=0]GPU0 Shard0:  38%|███▊      | 8/21 [00:42<00:58,  4.50s/batch, samples=1152, sps=27.3, errors=0]GPU0 Shard0:  43%|████▎     | 9/21 [00:42<00:53,  4.50s/batch, samples=1152, sps=27.3, errors=0]GPU0 Shard0:  43%|████▎     | 9/21 [00:46<00:53,  4.50s/batch, samples=1280, sps=27.4, errors=0]GPU0 Shard0:  48%|████▊     | 10/21 [00:46<00:49,  4.51s/batcGPU1 Shard1:  43%|████▎     | 9/21 [00:41<00:53,  4.48s/batch, samples=1152, sps=27.5, errors=0][A
+GPU1 Shard1:  43%|████▎     | 9/21 [00:46<00:53,  4.48s/batch, samples=1280, sps=27.6, errors=0][A
+GPU4 Shard4:  41%|████      | 9/22 [00:41<00:57,  4.45s/batch, samples=1152, sps=27.8, errors=0][A[A[A[A
+
+
+
+GPU4 Shard4:  41%|████      | 9/22 [00:45<00:57,  4.45s/batch, samples=1280, sps=27.9, errors=0][A[A[A[A
+
+
+
+GPU5 Shard5:  43%|████▎     | 9/21 [00:43<00:54,  4.50s/batch, samples=1152, sps=26.7, errors=0][A[A[A[A[A
+
+
+
+
+GPU5 Shard5:  43%|████▎     | 9/21 [00:47<00:54,  4.50s/batch, samples=1280, sps=26.9, errors=0][A[A[A[A[A
+
+
+
+
+GPU2 Shard2:  43%|████▎     | 9/21 [00:43<00:54,  4.55s/batch, samples=1152, sps=26.5, errors=0][A[A
+
+GPU2 Shard2:  43%|████▎     | 9/21 [00:47<00:54,  4.55s/batch, samples=1280, sps=26.7, errors=0][A[A
+
+GPU3 Shard3:  43%|████▎     | 9/21 [00:44<00:54,  4.55s/batch, samples=1152, sps=26.0, errors=0][A[A[A
+
+
+GPU3 Shard3:  43%|████▎     | 9/21 [00:48<00:54,  4.55s/batch, samples=1280, sps=26.2, errors=0][A[A[A
+
+
+GPU6 Shard6:  43%|████▎     | 9/21 [00:43<00:54,  4.54s/batch, samples=1152, sps=26.7, errors=0][A[A[A[A[A[A
+
+
+
+
+
+GPU6 Shard6:  43%|████▎     | 9/21 [00:47<00:54,  4.54s/batch, samples=1280, sps=26.9, errors=0][A[A[A[A[A[A
+
+
+
+
+
+GPU7 Shard7:  43%|████▎     | 9/21 [00:43<00:53,  4.50s/batch, samples=1152, sps=26.6, errors=0][A[A[A[A[A[A[A
+
+
+
+
+
+
+GPU7 Shard7:  43%|████▎     | 9/21 [00:47<00:53,  4.50s/batch, samples=1280, sps=26.9, errors=0][A[A[A[A[A[A[A
+
+
+
+
+
+
+GPU1 Shard1:  48%|████▊     | 10/21 [00:46<00:49,  4.48s/batch, samples=1280, sps=27.6, errors=0][A
+GPU1 Shard1:  48%|████▊     | 10/21 [00:50<00:49,  4.48s/batch, samples=1408, sps=27.7, errors=0][A
+GPU4 Shard4:  45%|████▌     | 10/22 [00:45<00:53,  4.43s/batch, samples=1280, sps=27.9, errors=0][A[A[A[A
+
+
+
+GPU4 Shard4:  45%|████▌     | 10/22 [00:50<00:53,  4.43s/batch, samples=1408, sps=28.1, errors=0][A[A[A[A
+
+
+
+GPU2 Shard2:  48%|████▊     | 10/21 [00:47<00:49,  4.53s/batch, samples=1280, sps=26.7, errors=0][A[A
+
+GPU2 Shard2:  48%|████▊     | 10/21 [00:52<00:49,  4.53s/batch, samples=1408, sps=26.9, errors=0][A[A
+
+GPU5 Shard5:  48%|████▊     | 10/21 [00:47<00:49,  4.47s/batch, samples=1280, sps=26.9, errors=0][A[A[A[A[A
+
+
+
+
+GPU5 Shard5:  48%|████▊     | 10/21 [00:51<00:49,  4.47s/batch, samples=1408, sps=27.1, errors=0][A[A[A[A[A
+
+
+
+
+GPU3 Shard3:  48%|████▊     | 10/21 [00:48<00:49,  4.53s/batch, samples=1280, sps=26.2, errors=0][A[A[A
+
+
+GPU3 Shard3:  48%|████▊     | 10/21 [00:53<00:49,  4.53s/batch, samples=1408, sps=26.4, errors=0][A[A[A
+
+
+GPU7 Shard7:  48%|████▊     | 10/21 [00:47<00:49,  4.46s/batch, samples=1280, sps=26.9, errors=0][A[A[A[A[A[A[A
+
+
+
+
+
+
+GPU7 Shard7:  48%|████▊     | 10/21 [00:52<00:49,  4.46s/batch, samples=1408, sps=27.0, errors=0][A[A[A[A[A[A[A
+
+
+
+
+
+
+GPU6 Shard6:  48%|████▊     | 10/21 [00:47<00:49,  4.50s/batch, samples=1280, sps=26.9, errors=0][A[A[A[A[A[A
+
+
+
+
+
+GPU6 Shard6:  48%|████▊     | 10/21 [00:52<00:49,  4.50s/batch, samples=1408, sps=27.0, errors=0][A[A[A[A[A[A
+
+
+
+
+
+GPU1 Shard1:  52%|█████▏    | 11/21 [00:50<00:44,  4.47s/batch, samples=1408, sps=27.7, errors=0][A
+GPU1 Shard1:  52%|█████▏    | 11/21 [00:55<00:44,  4.47s/batch, samples=1536, sps=27.8, errors=0][A
+GPU4 Shard4:  50%|█████     | 11/22 [00:50<00:48,  4.41s/batch, samples=1408, sps=28.1, errors=0][A[A[A[A
+
+
+
+GPU4 Shard4:  50%|█████     | 11/22 [00:54<00:48,  4.41s/batch, samples=1536, sps=28.2, errors=0][A[A[A[A
+
+
+
+GPU5 Shard5:  52%|█████▏    | 11/21 [00:51<00:44,  4.46s/batch, samples=1408, sps=27.1, errors=0][A[A[A[A[A
+
+
+
+
+GPU5 Shard5:  52%|█████▏    | 11/21 [00:56<00:44,  4.46s/batch, samples=1536, sps=27.2, errors=0][A[A[A[A[A
+
+
+
+
+GPU2 Shard2:  52%|█████▏    | 11/21 [00:52<00:44,  4.49s/batch, samples=1408, sps=26.9, errors=0][A[A
+
+GPU2 Shard2:  52%|█████▏    | 11/21 [00:56<00:44,  4.49s/batch, samples=1536, sps=27.0, errors=0][A[A
+
+GPU3 Shard3:  52%|█████▏    | 11/21 [00:53<00:45,  4.50s/batch, samples=1408, sps=26.4, errors=0][A[A[A
+
+
+GPU3 Shard3:  52%|█████▏    | 11/21 [00:57<00:45,  4.50s/batch, samples=1536, sps=26.6, errors=0][A[A[A
+
+
+GPU7 Shard7:  52%|█████▏    | 11/21 [00:52<00:44,  4.45s/batch, samples=1408, sps=27.0, errors=0][A[A[A[A[A[A[A
+
+
+
+
+
+
+GPU7 Shard7:  52%|█████▏    | 11/21 [00:56<00:44,  4.45s/batch, samples=1536, sps=27.2, errors=0][A[A[A[A[A[A[A
+
+
+
+
+
+
+GPU6 Shard6:  52%|█████▏    | 11/21 [00:52<00:45,  4.53s/batch, samples=1408, sps=27.0, errors=0][A[A[A[A[A[A
+
+
+
+
+
+GPU6 Shard6:  52%|█████▏    | 11/21 [00:56<00:45,  4.53s/batch, samples=1536, sps=27.1, errors=0][A[A[A[A[A[A
+
+
+
+
+
+GPU1 Shard1:  57%|█████▋    | 12/21 [00:55<00:40,  4.45s/batch, samples=1536, sps=27.8, errors=0][A
+GPU1 Shard1:  57%|█████▋    | 12/21 [00:59<00:40,  4.45s/batch, samples=1664, sps=27.9, errors=0][A
+GPU4 Shard4:  55%|█████▍    | 12/22 [00:54<00:43,  4.40s/batch, samples=1536, sps=28.2, errors=0][A[A[A[A
+
+
+
+GPU4 Shard4:  55%|█████▍    | 12/22 [00:58<00:43,  4.40s/batch, samples=1664, sps=28.2, errors=0][A[A[A[A
+
+
+
+GPU5 Shard5:  57%|█████▋    | 12/21 [00:56<00:40,  4.45s/batch, samples=1536, sps=27.2, errors=0][A[A[A[A[A
+
+
+
+
+GPU2 Shard2:  57%|█████▋    | 12/21 [00:56<00:40,  4.49s/batch, samples=1536, sps=27.0, errors=0][A[A
+
+GPU3 Shard3:  57%|█████▋    | 12/21 [00:57<00:40,  4.52s/batch, samples=1536, sps=26.6, errors=0][A[A[A
+
+
+GPU7 Shard7:  57%|█████▋    | 12/21 [00:56<00:39,  4.43s/batch, samples=1536, sps=27.2, errors=0][A[A[A[A[A[A[A
+
+
+
+
+
+
+GPU6 Shard6:  57%|█████▋    | 12/21 [00:56<00:40,  4.51s/batch, samples=1536, sps=27.1, errors=0][A[A[A[A[A[A
+
+
+
+
+
+GPU5 Shard5:  57%|█████▋    | 12/21 [01:00<00:40,  4.45s/batch, samples=1664, sps=27.4, errors=0][A[A[A[A[A
+
+
+
+
+GPU2 Shard2:  57%|█████▋    | 12/21 [01:01<00:40,  4.49s/batch, samples=1664, sps=27.2, errors=0][A[A
+
+GPU1 Shard1:  62%|██████▏   | 13/21 [00:59<00:35,  4.43s/batch, samples=1664, sps=27.9, errors=0][A
+GPU4 Shard4:  59%|█████▉    | 13/22 [00:58<00:39,  4.40s/batch, samples=1664, sps=28.2, errors=0][A[A[A[A
+
+
+
+GPU3 Shard3:  57%|█████▋    | 12/21 [01:02<00:40,  4.52s/batch, samples=1664, sps=26.7, errors=0][A[A[A
+
+
+GPU7 Shard7:  57%|█████▋    | 12/21 [01:00<00:39,  4.43s/batch, samples=1664, sps=27.4, errors=0][A[A[A[A[A[A[A
+
+
+
+
+
+
+GPU6 Shard6:  57%|█████▋    | 12/21 [01:01<00:40,  4.51s/batch, samples=1664, sps=27.2, errors=0][A[A[A[A[A[A
+
+
+
+
+
+GPU1 Shard1:  62%|██████▏   | 13/21 [01:04<00:35,  4.43s/batch, samples=1792, sps=28.0, errors=0][A
+GPU2 Shard2:  62%|██████▏   | 13/21 [01:03<00:42,  5.26s/batch, samples=1664, sps=27.2, errors=0][A[A
+
+GPU2 Shard2:  62%|██████▏   | 13/21 [01:07<00:42,  5.26s/batch, samples=1792, sps=26.6, errors=0][A[A
+
+GPU5 Shard5:  62%|██████▏   | 13/21 [01:03<00:41,  5.23s/batch, samples=1664, sps=27.4, errors=0][A[A[A[A[A
+
+
+
+
+GPU5 Shard5:  62%|██████▏   | 13/21 [01:06<00:41,  5.23s/batch, samples=1792, sps=26.8, errors=0][A[A[A[A[A
+
+
+
+
+GPU4 Shard4:  59%|█████▉    | 13/22 [01:03<00:39,  4.40s/batch, samples=1792, sps=28.3, errors=0][A[A[A[A
+
+
+
+GPU3 Shard3:  62%|██████▏   | 13/21 [01:05<00:42,  5.32s/batch, samples=1664, sps=26.7, errors=0][A[A[A
+
+
+GPU3 Shard3:  62%|██████▏   | 13/21 [01:08<00:42,  5.32s/batch, samples=1792, sps=26.2, errors=0][A[A[A
+
+
+GPU7 Shard7:  62%|██████▏   | 13/21 [01:03<00:41,  5.21s/batch, samples=1664, sps=27.4, errors=0][A[A[A[A[A[A[A
+
+
+
+
+
+
+GPU7 Shard7:  62%|██████▏   | 13/21 [01:06<00:41,  5.21s/batch, samples=1792, sps=26.9, errors=0][A[A[A[A[A[A[A
+
+
+
+
+
+
+GPU6 Shard6:  62%|██████▏   | 13/21 [01:03<00:42,  5.29s/batch, samples=1664, sps=27.2, errors=0][A[A[A[A[A[A
+
+
+
+
+
+GPU6 Shard6:  62%|██████▏   | 13/21 [01:07<00:42,  5.29s/batch, samples=1792, sps=26.7, errors=0][A[A[A[A[A[A
+
+
+
+
+
+h, samples=1280, sps=27.4, errors=0]GPU0 Shard0:  48%|████▊     | 10/21 [00:51<00:49,  4.51s/batch, samples=1408, sps=27.5, errors=0]GPU0 Shard0:  52%|█████▏    | 11/21 [00:51<00:45,  4.51s/batch, samples=1408, sps=27.5, errors=0]GPU0 Shard0:  52%|█████▏    | 11/21 [00:55<00:45,  4.51s/batch, samples=1536, sps=27.6, errors=0]GPU0 Shard0:  57%|█████▋    | 12/21 [00:55<00:40,  4.49s/batch, samples=1536, sps=27.6, errors=0]GPU0 Shard0:  57%|█████▋    | 12/21 [01:00<00:40,  4.49s/batch, samples=1664, sps=27.7, errors=0]GPU0 Shard0:  62%|██████▏   | 13/21 [01:02<00:42,  5.28s/batch, samples=1664, sps=27.7, errors=0]GPU0 Shard0:  62%|██████▏   | 13/21 [01:06<00:42,  5.28s/batch, samples=1792, sps=27.1, errors=0]GPU0 Shard0:  67%|██████▋   | 14/21 [01:06<00:33,  4.72s/batch, samples=1792, sps=27.1, errors=0]GPU0 Shard0:  67%|██████▋   | 14/21 [01:10<00:33,  4.72s/batch, samples=1920, sps=27.2, eGPU1 Shard1:  67%|██████▋   | 14/21 [01:06<00:36,  5.22s/batch, samples=1792, sps=28.0, errors=0][A
+GPU1 Shard1:  67%|██████▋   | 14/21 [01:10<00:36,  5.22s/batch, samples=1920, sps=27.4, errors=0][A
+GPU4 Shard4:  64%|██████▎   | 14/22 [01:05<00:41,  5.21s/batch, samples=1792, sps=28.3, errors=0][A[A[A[A
+
+
+
+GPU4 Shard4:  64%|██████▎   | 14/22 [01:09<00:41,  5.21s/batch, samples=1920, sps=27.7, errors=0][A[A[A[A
+
+
+
+GPU2 Shard2:  67%|██████▋   | 14/21 [01:07<00:32,  4.69s/batch, samples=1792, sps=26.6, errors=0][A[A
+
+GPU2 Shard2:  67%|██████▋   | 14/21 [01:11<00:32,  4.69s/batch, samples=1920, sps=26.8, errors=0][A[A
+
+GPU5 Shard5:  67%|██████▋   | 14/21 [01:06<00:32,  4.71s/batch, samples=1792, sps=26.8, errors=0][A[A[A[A[A
+
+
+
+
+GPU5 Shard5:  67%|██████▋   | 14/21 [01:11<00:32,  4.71s/batch, samples=1920, sps=26.9, errors=0][A[A[A[A[A
+
+
+
+
+GPU3 Shard3:  67%|██████▋   | 14/21 [01:08<00:33,  4.72s/batch, samples=1792, sps=26.2, errors=0][A[A[A
+
+
+GPU3 Shard3:  67%|██████▋   | 14/21 [01:12<00:33,  4.72s/batch, samples=1920, sps=26.4, errors=0][A[A[A
+
+
+GPU7 Shard7:  67%|██████▋   | 14/21 [01:06<00:32,  4.63s/batch, samples=1792, sps=26.9, errors=0][A[A[A[A[A[A[A
+
+
+
+
+
+
+GPU7 Shard7:  67%|██████▋   | 14/21 [01:11<00:32,  4.63s/batch, samples=1920, sps=27.0, errors=0][A[A[A[A[A[A[A
+
+
+
+
+
+
+GPU6 Shard6:  67%|██████▋   | 14/21 [01:07<00:32,  4.71s/batch, samples=1792, sps=26.7, errors=0][A[A[A[A[A[A
+
+
+
+
+
+GPU6 Shard6:  67%|██████▋   | 14/21 [01:11<00:32,  4.71s/batch, samples=1920, sps=26.8, errors=0][A[A[A[A[A[A
+
+
+
+
+
+GPU1 Shard1:  71%|███████▏  | 15/21 [01:10<00:28,  4.69s/batch, samples=1920, sps=27.4, errors=0][A
+GPU1 Shard1:  71%|███████▏  | 15/21 [01:14<00:28,  4.69s/batch, samples=2048, sps=27.4, errors=0][A
+GPU4 Shard4:  68%|██████▊   | 15/22 [01:09<00:32,  4.67s/batch, samples=1920, sps=27.7, errors=0][A[A[A[A
+
+
+
+GPU4 Shard4:  68%|██████▊   | 15/22 [01:13<00:32,  4.67s/batch, samples=2048, sps=27.7, errors=0][A[A[A[A
+
+
+
+GPU5 Shard5:  71%|███████▏  | 15/21 [01:11<00:27,  4.63s/batch, samples=1920, sps=26.9, errors=0][A[A[A[A[A
+
+
+
+
+GPU5 Shard5:  71%|███████▏  | 15/21 [01:15<00:27,  4.63s/batch, samples=2048, sps=27.0, errors=0][A[A[A[A[A
+
+
+
+
+GPU2 Shard2:  71%|███████▏  | 15/21 [01:11<00:27,  4.61s/batch, samples=1920, sps=26.8, errors=0][A[A
+
+GPU2 Shard2:  71%|███████▏  | 15/21 [01:16<00:27,  4.61s/batch, samples=2048, sps=26.9, errors=0][A[A
+
+GPU3 Shard3:  71%|███████▏  | 15/21 [01:12<00:27,  4.62s/batch, samples=1920, sps=26.4, errors=0][A[A[A
+
+
+GPU3 Shard3:  71%|███████▏  | 15/21 [01:17<00:27,  4.62s/batch, samples=2048, sps=26.5, errors=0][A[A[A
+
+
+GPU7 Shard7:  71%|███████▏  | 15/21 [01:11<00:27,  4.58s/batch, samples=1920, sps=27.0, errors=0][A[A[A[A[A[A[A
+
+
+
+
+
+
+GPU7 Shard7:  71%|███████▏  | 15/21 [01:15<00:27,  4.58s/batch, samples=2048, sps=27.1, errors=0][A[A[A[A[A[A[A
+
+
+
+
+
+
+GPU6 Shard6:  71%|███████▏  | 15/21 [01:11<00:27,  4.64s/batch, samples=1920, sps=26.8, errors=0][A[A[A[A[A[A
+
+
+
+
+
+GPU6 Shard6:  71%|███████▏  | 15/21 [01:16<00:27,  4.64s/batch, samples=2048, sps=26.9, errors=0][A[A[A[A[A[A
+
+
+
+
+
+GPU1 Shard1:  76%|███████▌  | 16/21 [01:14<00:23,  4.66s/batch, samples=2048, sps=27.4, errors=0][A
+GPU1 Shard1:  76%|███████▌  | 16/21 [01:19<00:23,  4.66s/batch, samples=2176, sps=27.5, errors=0][A
+GPU4 Shard4:  73%|███████▎  | 16/22 [01:13<00:27,  4.61s/batch, samples=2048, sps=27.7, errors=0][A[A[A[A
+
+
+
+GPU4 Shard4:  73%|███████▎  | 16/22 [01:18<00:27,  4.61s/batch, samples=2176, sps=27.8, errors=0][A[A[A[A
+
+
+
+GPU2 Shard2:  76%|███████▌  | 16/21 [01:16<00:22,  4.57s/batch, samples=2048, sps=26.9, errors=0][A[A
+
+GPU2 Shard2:  76%|███████▌  | 16/21 [01:20<00:22,  4.57s/batch, samples=2176, sps=27.0, errors=0][A[A
+
+GPU5 Shard5:  76%|███████▌  | 16/21 [01:15<00:22,  4.55s/batch, samples=2048, sps=27.0, errors=0][A[A[A[A[A
+
+
+
+
+GPU5 Shard5:  76%|███████▌  | 16/21 [01:20<00:22,  4.55s/batch, samples=2176, sps=27.1, errors=0][A[A[A[A[A
+
+
+
+
+GPU3 Shard3:  76%|███████▌  | 16/21 [01:17<00:22,  4.57s/batch, samples=2048, sps=26.5, errors=0][A[A[A
+
+
+GPU3 Shard3:  76%|███████▌  | 16/21 [01:21<00:22,  4.57s/batch, samples=2176, sps=26.7, errors=0][A[A[A
+
+
+GPU7 Shard7:  76%|███████▌  | 16/21 [01:15<00:22,  4.56s/batch, samples=2048, sps=27.1, errors=0][A[A[A[A[A[A[A
+
+
+
+
+
+
+GPU7 Shard7:  76%|███████▌  | 16/21 [01:20<00:22,  4.56s/batch, samples=2176, sps=27.1, errors=0][A[A[A[A[A[A[A
+
+
+
+
+
+
+GPU6 Shard6:  76%|███████▌  | 16/21 [01:16<00:23,  4.61s/batch, samples=2048, sps=26.9, errors=0][A[A[A[A[A[A
+
+
+
+
+
+GPU6 Shard6:  76%|███████▌  | 16/21 [01:20<00:23,  4.61s/batch, samples=2176, sps=27.0, errors=0][A[A[A[A[A[A
+
+
+
+
+
+GPU1 Shard1:  81%|████████  | 17/21 [01:19<00:18,  4.61s/batch, samples=2176, sps=27.5, errors=0][A
+GPU1 Shard1:  81%|████████  | 17/21 [01:23<00:18,  4.61s/batch, samples=2304, sps=27.6, errors=0][A
+GPU4 Shard4:  77%|███████▋  | 17/22 [01:18<00:22,  4.55s/batch, samples=2176, sps=27.8, errors=0][A[A[A[A
+
+
+
+GPU4 Shard4:  77%|███████▋  | 17/22 [01:22<00:22,  4.55s/batch, samples=2304, sps=27.9, errors=0][A[A[A[A
+
+
+
+GPU2 Shard2:  81%|████████  | 17/21 [01:20<00:18,  4.51s/batch, samples=2176, sps=27.0, errors=0][A[A
+
+GPU2 Shard2:  81%|████████  | 17/21 [01:24<00:18,  4.51s/batch, samples=2304, sps=27.1, errors=0][A[A
+
+GPU5 Shard5:  81%|████████  | 17/21 [01:20<00:18,  4.52s/batch, samples=2176, sps=27.1, errors=0][A[A[A[A[A
+
+
+
+
+GPU5 Shard5:  81%|████████  | 17/21 [01:24<00:18,  4.52s/batch, samples=2304, sps=27.2, errors=0][A[A[A[A[A
+
+
+
+
+GPU3 Shard3:  81%|████████  | 17/21 [01:21<00:18,  4.52s/batch, samples=2176, sps=26.7, errors=0][A[A[A
+
+
+GPU3 Shard3:  81%|████████  | 17/21 [01:26<00:18,  4.52s/batch, samples=2304, sps=26.8, errors=0][A[A[A
+
+
+GPU7 Shard7:  81%|████████  | 17/21 [01:20<00:18,  4.54s/batch, samples=2176, sps=27.1, errors=0][A[A[A[A[A[A[A
+
+
+
+
+
+
+GPU7 Shard7:  81%|████████  | 17/21 [01:24<00:18,  4.54s/batch, samples=2304, sps=27.2, errors=0][A[A[A[A[A[A[A
+
+
+
+
+
+
+GPU6 Shard6:  81%|████████  | 17/21 [01:20<00:18,  4.56s/batch, samples=2176, sps=27.0, errors=0][A[A[A[A[A[A
+
+
+
+
+
+GPU6 Shard6:  81%|████████  | 17/21 [01:25<00:18,  4.56s/batch, samples=2304, sps=27.1, errors=0][A[A[A[A[A[A
+
+
+
+
+
+rrors=0]GPU0 Shard0:  71%|███████▏  | 15/21 [01:10<00:27,  4.64s/batch, samples=1920, sps=27.2, errors=0]GPU0 Shard0:  71%|███████▏  | 15/21 [01:15<00:27,  4.64s/batch, samples=2048, sps=27.3, errors=0]GPU0 Shard0:  76%|███████▌  | 16/21 [01:15<00:22,  4.57s/batch, samples=2048, sps=27.3, errors=0]GPU0 Shard0:  76%|███████▌  | 16/21 [01:19<00:22,  4.57s/batch, samples=2176, sps=27.4, errors=0]GPU0 Shard0:  81%|████████  | 17/21 [01:19<00:18,  4.52s/batch, samples=2176, sps=27.4, errors=0]GPU0 Shard0:  81%|████████  | 17/21 [01:23<00:18,  4.52s/batch, samples=2304, sps=27.4, errors=0]GPU0 Shard0:  86%|████████▌ | 18/21 [01:23<00:13,  4.50s/batch, samples=2304, sps=27.4, errors=0]GPU0 Shard0:  86%|████████▌ | 18/21 [01:28<00:13,  4.50s/batch, samples=2432, sps=27.5, errors=0]GPU0 Shard0:  90%|█████████ | 19/21 [01:28<00:08,  4.49s/batch, samples=2432, spsGPU1 Shard1:  86%|████████▌ | 18/21 [01:23<00:13,  4.55s/batch, samples=2304, sps=27.6, errors=0][A
+GPU1 Shard1:  86%|████████▌ | 18/21 [01:28<00:13,  4.55s/batch, samples=2432, sps=27.6, errors=0][A
+GPU4 Shard4:  82%|████████▏ | 18/22 [01:22<00:17,  4.49s/batch, samples=2304, sps=27.9, errors=0][A[A[A[A
+
+
+
+GPU4 Shard4:  82%|████████▏ | 18/22 [01:27<00:17,  4.49s/batch, samples=2432, sps=27.9, errors=0][A[A[A[A
+
+
+
+GPU2 Shard2:  86%|████████▌ | 18/21 [01:24<00:13,  4.48s/batch, samples=2304, sps=27.1, errors=0][A[A
+
+GPU2 Shard2:  86%|████████▌ | 18/21 [01:29<00:13,  4.48s/batch, samples=2432, sps=27.2, errors=0][A[A
+
+GPU5 Shard5:  86%|████████▌ | 18/21 [01:24<00:13,  4.50s/batch, samples=2304, sps=27.2, errors=0][A[A[A[A[A
+
+
+
+
+GPU5 Shard5:  86%|████████▌ | 18/21 [01:29<00:13,  4.50s/batch, samples=2432, sps=27.3, errors=0][A[A[A[A[A
+
+
+
+
+GPU3 Shard3:  86%|████████▌ | 18/21 [01:26<00:13,  4.50s/batch, samples=2304, sps=26.8, errors=0][A[A[A
+
+
+GPU3 Shard3:  86%|████████▌ | 18/21 [01:30<00:13,  4.50s/batch, samples=2432, sps=26.9, errors=0][A[A[A
+
+
+GPU7 Shard7:  86%|████████▌ | 18/21 [01:24<00:13,  4.51s/batch, samples=2304, sps=27.2, errors=0][A[A[A[A[A[A[A
+
+
+
+
+
+
+GPU7 Shard7:  86%|████████▌ | 18/21 [01:29<00:13,  4.51s/batch, samples=2432, sps=27.3, errors=0][A[A[A[A[A[A[A
+
+
+
+
+
+
+GPU6 Shard6:  86%|████████▌ | 18/21 [01:25<00:13,  4.56s/batch, samples=2304, sps=27.1, errors=0][A[A[A[A[A[A
+
+
+
+
+
+GPU6 Shard6:  86%|████████▌ | 18/21 [01:29<00:13,  4.56s/batch, samples=2432, sps=27.1, errors=0][A[A[A[A[A[A
+
+
+
+
+
+GPU1 Shard1:  90%|█████████ | 19/21 [01:28<00:09,  4.51s/batch, samples=2432, sps=27.6, errors=0][A
+GPU1 Shard1:  90%|█████████ | 19/21 [01:32<00:09,  4.51s/batch, samples=2560, sps=27.7, errors=0][A
+GPU4 Shard4:  86%|████████▋ | 19/22 [01:27<00:13,  4.48s/batch, samples=2432, sps=27.9, errors=0][A[A[A[A
+
+
+
+GPU4 Shard4:  86%|████████▋ | 19/22 [01:31<00:13,  4.48s/batch, samples=2560, sps=28.0, errors=0][A[A[A[A
+
+
+
+GPU5 Shard5:  90%|█████████ | 19/21 [01:29<00:08,  4.48s/batch, samples=2432, sps=27.3, errors=0][A[A[A[A[A
+
+
+
+
+GPU5 Shard5:  90%|█████████ | 19/21 [01:33<00:08,  4.48s/batch, samples=2560, sps=27.4, errors=0][A[A[A[A[A
+
+
+
+
+GPU2 Shard2:  90%|█████████ | 19/21 [01:29<00:08,  4.46s/batch, samples=2432, sps=27.2, errors=0][A[A
+
+GPU2 Shard2:  90%|█████████ | 19/21 [01:33<00:08,  4.46s/batch, samples=2560, sps=27.3, errors=0][A[A
+
+GPU3 Shard3:  90%|█████████ | 19/21 [01:30<00:09,  4.51s/batch, samples=2432, sps=26.9, errors=0][A[A[A
+
+
+GPU3 Shard3:  90%|█████████ | 19/21 [01:35<00:09,  4.51s/batch, samples=2560, sps=26.9, errors=0][A[A[A
+
+
+GPU7 Shard7:  90%|█████████ | 19/21 [01:29<00:08,  4.49s/batch, samples=2432, sps=27.3, errors=0][A[A[A[A[A[A[A
+
+
+
+
+
+
+GPU7 Shard7:  90%|█████████ | 19/21 [01:33<00:08,  4.49s/batch, samples=2560, sps=27.4, errors=0][A[A[A[A[A[A[A
+
+
+
+
+
+
+GPU1 Shard1:  95%|█████████▌| 20/21 [01:32<00:04,  4.50s/batch, samples=2560, sps=27.7, errors=0][A
+GPU1 Shard1:  95%|█████████▌| 20/21 [01:35<00:04,  4.50s/batch, samples=2601, sps=27.2, errors=0][A
+GPU1 Shard1: 100%|██████████| 21/21 [01:35<00:00,  4.07s/batch, samples=2601, sps=27.2, errors=0][A
+GPU6 Shard6:  90%|█████████ | 19/21 [01:29<00:09,  4.53s/batch, samples=2432, sps=27.1, errors=0][A[A[A[A[A[A
+
+
+
+
+
+GPU6 Shard6:  90%|█████████ | 19/21 [01:34<00:09,  4.53s/batch, samples=2560, sps=27.2, errors=0][A[A[A[A[A[A
+
+
+
+
+
+GPU2 Shard2:  95%|█████████▌| 20/21 [01:33<00:04,  4.48s/batch, samples=2560, sps=27.3, errors=0][A[A
+
+GPU2 Shard2:  95%|█████████▌| 20/21 [01:36<00:04,  4.48s/batch, samples=2585, sps=26.7, errors=0][A[A
+
+GPU2 Shard2: 100%|██████████| 21/21 [01:36<00:00,  3.99s/batch, samples=2585, sps=26.7, errors=0][A[A
+
+GPU5 Shard5:  95%|█████████▌| 20/21 [01:33<00:04,  4.46s/batch, samples=2560, sps=27.4, errors=0][A[A[A[A[A
+
+
+
+
+GPU5 Shard5:  95%|█████████▌| 20/21 [01:36<00:04,  4.46s/batch, samples=2587, sps=26.9, errors=0][A[A[A[A[A
+
+
+
+
+GPU5 Shard5: 100%|██████████| 21/21 [01:36<00:00,  3.98s/batch, samples=2587, sps=26.9, errors=0][A[A[A[A[A
+
+
+
+
+GPU4 Shard4:  91%|█████████ | 20/22 [01:31<00:08,  4.46s/batch, samples=2560, sps=28.0, errors=0][A[A[A[A
+
+
+
+GPU4 Shard4:  91%|█████████ | 20/22 [01:35<00:08,  4.46s/batch, samples=2688, sps=28.0, errors=0][A[A[A[A
+
+
+
+GPU3 Shard3:  95%|█████████▌| 20/21 [01:35<00:04,  4.51s/batch, samples=2560, sps=26.9, errors=0][A[A[A
+
+
+GPU3 Shard3:  95%|█████████▌| 20/21 [01:38<00:04,  4.51s/batch, samples=2617, sps=26.6, errors=0][A[A[A
+
+
+GPU3 Shard3: 100%|██████████| 21/21 [01:38<00:00,  4.15s/batch, samples=2617, sps=26.6, errors=0][A[A[A
+
+
+GPU6 Shard6:  95%|█████████▌| 20/21 [01:34<00:04,  4.50s/batch, samples=2560, sps=27.2, errors=0][A[A[A[A[A[A
+
+
+
+
+
+GPU7 Shard7:  95%|█████████▌| 20/21 [01:33<00:04,  4.50s/batch, samples=2560, sps=27.4, errors=0][A[A[A[A[A[A[A
+
+
+
+
+
+
+GPU6 Shard6:  95%|█████████▌| 20/21 [01:36<00:04,  4.50s/batch, samples=2573, sps=26.6, errors=0][A[A[A[A[A[A
+
+
+
+
+
+GPU7 Shard7:  95%|█████████▌| 20/21 [01:36<00:04,  4.50s/batch, samples=2603, sps=26.9, errors=0][A[A[A[A[A[A[A
+
+
+
+
+
+
+GPU7 Shard7: 100%|██████████| 21/21 [01:36<00:00,  4.08s/batch, samples=2603, sps=26.9, errors=0][A[A[A[A[A[A[A
+
+
+
+
+
+
+GPU6 Shard6: 100%|██████████| 21/21 [01:36<00:00,  3.95s/batch, samples=2573, sps=26.6, errors=0][A[A[A[A[A[A
+
+
+
+
+
+GPU4 Shard4:  95%|█████████▌| 21/22 [01:35<00:04,  4.44s/batch, samples=2688, sps=28.0, errors=0][A[A[A[A
+
+
+
+GPU4 Shard4:  95%|█████████▌| 21/22 [01:38<00:04,  4.44s/batch, samples=2702, sps=27.4, errors=0][A[A[A[A
+
+
+
+GPU4 Shard4: 100%|██████████| 22/22 [01:38<00:00,  3.91s/batch, samples=2702, sps=27.4, errors=0][A[A[A[A
+
+
+
+[GPU 0] Processed 21 batches, 0 errors, 2646 samples
+[GPU 0] ✅ Shard 0 completed: 2646 samples (13230.1 MB, 25.3 sps)
+[GPU 0] ✅ Shard 0: 2646 samples (25.3 sps)
+[GPU 0] 🔧 STABLE processing shard 8: 00008.tar (batch_size=128)
+[GPU 0] Processing 2607 images from 00008.tar
+[GPU 0] Loaded 2607 valid samples (skipped 0 errors)
+[GPU 0] Dataset size: 2607 samples
+[GPU 1] Processed 21 batches, 0 errors, 2601 samples
+[GPU 1] ✅ Shard 1 completed: 2601 samples (13005.1 MB, 25.2 sps)
+[GPU 1] ✅ Shard 1: 2601 samples (25.2 sps)
+[GPU 1] 🔧 STABLE processing shard 9: 00009.tar (batch_size=128)
+[GPU 1] Processing 2552 images from 00009.tar
+[GPU 1] Loaded 2552 valid samples (skipped 0 errors)
+[GPU 1] Dataset size: 2552 samples
+                                                                                                 [A
+[GPU 2] Processed 21 batches, 0 errors, 2585 samples
+[GPU 2] ✅ Shard 2 completed: 2585 samples (12925.1 MB, 24.8 sps)
+[GPU 2] ✅ Shard 2: 2585 samples (24.8 sps)
+[GPU 2] 🔧 STABLE processing shard 10: 00010.tar (batch_size=128)
+[GPU 2] Processing 2630 images from 00010.tar
+[GPU 2] Loaded 2630 valid samples (skipped 0 errors)
+[GPU 2] Dataset size: 2630 samples
+                                                                                                 [A[A
+
+[GPU 5] Processed 21 batches, 0 errors, 2587 samples
+[GPU 5] ✅ Shard 5 completed: 2587 samples (12935.1 MB, 24.7 sps)
+[GPU 5] ✅ Shard 5: 2587 samples (24.7 sps)
+[GPU 5] 🔧 STABLE processing shard 13: 00013.tar (batch_size=128)
+[GPU 5] Processing 2626 images from 00013.tar
+[GPU 5] Loaded 2626 valid samples (skipped 0 errors)
+[GPU 5] Dataset size: 2626 samples
+                                                                                                 [A[A[A[A[A
+
+
+
+
+[GPU 3] Processed 21 batches, 0 errors, 2617 samples
+[GPU 3] ✅ Shard 3 completed: 2617 samples (13085.1 MB, 24.8 sps)
+[GPU 3] ✅ Shard 3: 2617 samples (24.8 sps)
+[GPU 3] 🔧 STABLE processing shard 11: 00011.tar (batch_size=128)
+[GPU 3] Processing 2664 images from 00011.tar
+[GPU 3] Loaded 2664 valid samples (skipped 0 errors)
+[GPU 3] Dataset size: 2664 samples
+                                                                                                 [A[A[A
+
+
+[GPU 7] Processed 21 batches, 0 errors, 2603 samples
+[GPU 7] ✅ Shard 7 completed: 2603 samples (13015.1 MB, 24.9 sps)
+[GPU 7] ✅ Shard 7: 2603 samples (24.9 sps)
+[GPU 7] 🔧 STABLE processing shard 15: 00015.tar (batch_size=128)
+[GPU 7] Processing 2679 images from 00015.tar
+[GPU 7] Loaded 2679 valid samples (skipped 0 errors)
+[GPU 7] Dataset size: 2679 samples
+                                                                                                 [A[A[A[A[A[A[A
+
+
+
+
+
+
+[GPU 6] Processed 21 batches, 0 errors, 2573 samples
+[GPU 6] ✅ Shard 6 completed: 2573 samples (12865.1 MB, 24.6 sps)
+[GPU 6] ✅ Shard 6: 2573 samples (24.6 sps)
+[GPU 6] 🔧 STABLE processing shard 14: 00014.tar (batch_size=128)
+[GPU 6] Processing 2636 images from 00014.tar
+[GPU 6] Loaded 2636 valid samples (skipped 0 errors)
+[GPU 6] Dataset size: 2636 samples
+                                                                                                 [A[A[A[A[A[A
+
+
+
+
+
+[GPU 4] Processed 22 batches, 0 errors, 2702 samples
+[GPU 4] ✅ Shard 4 completed: 2702 samples (13510.1 MB, 25.5 sps)
+[GPU 4] ✅ Shard 4: 2702 samples (25.5 sps)
+[GPU 4] 🔧 STABLE processing shard 12: 00012.tar (batch_size=128)
+[GPU 4] Processing 2636 images from 00012.tar
+[GPU 4] Loaded 2636 valid samples (skipped 0 errors)
+[GPU 4] Dataset size: 2636 samples
+                                                                                                 [A[A[A[A
+
+
+
+GPU5 Shard13:   0%|          | 0/21 [00:00<?, ?batch/s][A[A[A[A[A
+
+
+
+
+GPU5 Shard13:   0%|          | 0/21 [00:05<?, ?batch/s, samples=128, sps=21.9, errors=0][A[A[A[A[A
+
+
+
+
+GPU6 Shard14:   0%|          | 0/21 [00:00<?, ?batch/s][A[A[A[A[A[A
+
+
+
+
+
+GPU6 Shard14:   0%|          | 0/21 [00:05<?, ?batch/s, samples=128, sps=22.1, errors=0][A[A[A[A[A[A
+
+
+
+
+
+GPU1 Shard9:   0%|          | 0/20 [00:00<?, ?batch/s][A
+GPU1 Shard9:   0%|          | 0/20 [00:08<?, ?batch/s, samples=128, sps=14.8, errors=0][A
+GPU2 Shard10:   0%|          | 0/21 [00:00<?, ?batch/s][A[A
+
+GPU2 Shard10:   0%|          | 0/21 [00:07<?, ?batch/s, samples=128, sps=16.1, errors=0][A[A
+
+GPU7 Shard15:   0%|          | 0/21 [00:00<?, ?batch/s][A[A[A[A[A[A[A
+
+
+
+
+
+
+GPU7 Shard15:   0%|          | 0/21 [00:07<?, ?batch/s, samples=128, sps=18.2, errors=0][A[A[A[A[A[A[A
+
+
+
+
+
+
+GPU3 Shard11:   0%|          | 0/21 [00:00<?, ?batch/s][A[A[A
+
+
+GPU3 Shard11:   0%|          | 0/21 [00:07<?, ?batch/s, samples=128, sps=16.2, errors=0][A[A[A
+
+
+GPU4 Shard12:   0%|          | 0/21 [00:00<?, ?batch/s][A[A[A[A
+
+
+
+GPU4 Shard12:   0%|          | 0/21 [00:08<?, ?batch/s, samples=128, sps=15.9, errors=0][A[A[A[A
+
+
+
+GPU5 Shard13:   5%|▍         | 1/21 [00:05<01:56,  5.84s/batch, samples=128, sps=21.9, errors=0][A[A[A[A[A
+
+
+
+
+GPU5 Shard13:   5%|▍         | 1/21 [00:10<01:56,  5.84s/batch, samples=256, sps=24.0, errors=0][A[A[A[A[A
+
+
+
+
+GPU1 Shard9:   5%|▌         | 1/20 [00:08<02:44,  8.66s/batch, samples=128, sps=14.8, errors=0][A
+GPU1 Shard9:   5%|▌         | 1/20 [00:13<02:44,  8.66s/batch, samples=256, sps=19.6, errors=0][A
+GPU6 Shard14:   5%|▍         | 1/21 [00:05<01:55,  5.78s/batch, samples=128, sps=22.1, errors=0][A[A[A[A[A[A
+
+
+
+
+
+GPU6 Shard14:   5%|▍         | 1/21 [00:10<01:55,  5.78s/batch, samples=256, sps=24.7, errors=0][A[A[A[A[A[A
+
+
+
+
+
+GPU2 Shard10:   5%|▍         | 1/21 [00:07<02:39,  7.97s/batch, samples=128, sps=16.1, errors=0][A[A
+
+GPU2 Shard10:   5%|▍         | 1/21 [00:12<02:39,  7.97s/batch, samples=256, sps=20.8, errors=0][A[A
+
+GPU7 Shard15:   5%|▍         | 1/21 [00:07<02:20,  7.04s/batch, samples=128, sps=18.2, errors=0][A[A[A[A[A[A[A
+
+
+
+
+
+
+GPU7 Shard15:   5%|▍         | 1/21 [00:11<02:20,  7.04s/batch, samples=256, sps=22.4, errors=0][A[A[A[A[A[A[A
+
+
+
+
+
+
+GPU3 Shard11:   5%|▍         | 1/21 [00:07<02:38,  7.92s/batch, samples=128, sps=16.2, errors=0][A[A[A
+
+
+GPU3 Shard11:   5%|▍         | 1/21 [00:12<02:38,  7.92s/batch, samples=256, sps=20.8, errors=0][A[A[A
+
+
+=27.5, errors=0]GPU0 Shard0:  90%|█████████ | 19/21 [01:32<00:08,  4.49s/batch, samples=2560, sps=27.6, errors=0]GPU0 Shard0:  95%|█████████▌| 20/21 [01:32<00:04,  4.46s/batch, samples=2560, sps=27.6, errors=0]GPU0 Shard0:  95%|█████████▌| 20/21 [01:36<00:04,  4.46s/batch, samples=2646, sps=27.4, errors=0]GPU0 Shard0: 100%|██████████| 21/21 [01:36<00:00,  4.27s/batch, samples=2646, sps=27.4, errors=0]                                                                                                 GPU0 Shard8:   0%|          | 0/21 [00:00<?, ?batch/s]GPU0 Shard8:   0%|          | 0/21 [00:06<?, ?batch/s, samples=128, sps=18.3, errors=0]GPU0 Shard8:   5%|▍         | 1/21 [00:06<02:19,  6.98s/batch, samples=128, sps=18.3, errors=0]GPU0 Shard8:   5%|▍         | 1/21 [00:11<02:19,  6.98s/batch, samples=256, sps=22.2, errors=0]GPU0 Shard8:  10%|▉         | 2/21 [00:11<01:45,  5.54s/batch, samples=256, sps=22.2, errors=0]GGPU4 Shard12:   5%|▍         | 1/21 [00:08<02:41,  8.06s/batch, samples=128, sps=15.9, errors=0][A[A[A[A
+
+
+
+GPU4 Shard12:   5%|▍         | 1/21 [00:12<02:41,  8.06s/batch, samples=256, sps=20.6, errors=0][A[A[A[A
+
+
+
+GPU5 Shard13:  10%|▉         | 2/21 [00:10<01:39,  5.24s/batch, samples=256, sps=24.0, errors=0][A[A[A[A[A
+
+
+
+
+GPU5 Shard13:  10%|▉         | 2/21 [00:15<01:39,  5.24s/batch, samples=384, sps=25.4, errors=0][A[A[A[A[A
+
+
+
+
+GPU1 Shard9:  10%|█         | 2/20 [00:13<01:51,  6.17s/batch, samples=256, sps=19.6, errors=0][A
+GPU1 Shard9:  10%|█         | 2/20 [00:17<01:51,  6.17s/batch, samples=384, sps=21.8, errors=0][A
+GPU6 Shard14:  10%|▉         | 2/21 [00:10<01:36,  5.07s/batch, samples=256, sps=24.7, errors=0][A[A[A[A[A[A
+
+
+
+
+
+GPU6 Shard14:  10%|▉         | 2/21 [00:14<01:36,  5.07s/batch, samples=384, sps=26.0, errors=0][A[A[A[A[A[A
+
+
+
+
+
+GPU2 Shard10:  10%|▉         | 2/21 [00:12<01:51,  5.85s/batch, samples=256, sps=20.8, errors=0][A[A
+
+GPU2 Shard10:  10%|▉         | 2/21 [00:16<01:51,  5.85s/batch, samples=384, sps=23.0, errors=0][A[A
+
+GPU7 Shard15:  10%|▉         | 2/21 [00:11<01:44,  5.49s/batch, samples=256, sps=22.4, errors=0][A[A[A[A[A[A[A
+
+
+
+
+
+
+GPU7 Shard15:  10%|▉         | 2/21 [00:15<01:44,  5.49s/batch, samples=384, sps=24.4, errors=0][A[A[A[A[A[A[A
+
+
+
+
+
+
+GPU3 Shard11:  10%|▉         | 2/21 [00:12<01:50,  5.83s/batch, samples=256, sps=20.8, errors=0][A[A[A
+
+
+GPU3 Shard11:  10%|▉         | 2/21 [00:16<01:50,  5.83s/batch, samples=384, sps=23.1, errors=0][A[A[A
+
+
+GPU4 Shard12:  10%|▉         | 2/21 [00:12<01:51,  5.88s/batch, samples=256, sps=20.6, errors=0][A[A[A[A
+
+
+
+GPU4 Shard12:  10%|▉         | 2/21 [00:16<01:51,  5.88s/batch, samples=384, sps=22.9, errors=0][A[A[A[A
+
+
+
+GPU5 Shard13:  14%|█▍        | 3/21 [00:15<01:27,  4.88s/batch, samples=384, sps=25.4, errors=0][A[A[A[A[A
+
+
+
+
+GPU5 Shard13:  14%|█▍        | 3/21 [00:19<01:27,  4.88s/batch, samples=512, sps=26.2, errors=0][A[A[A[A[A
+
+
+
+
+GPU1 Shard9:  15%|█▌        | 3/20 [00:17<01:31,  5.41s/batch, samples=384, sps=21.8, errors=0][A
+GPU1 Shard9:  15%|█▌        | 3/20 [00:21<01:31,  5.41s/batch, samples=512, sps=23.4, errors=0][A
+GPU6 Shard14:  14%|█▍        | 3/21 [00:14<01:25,  4.78s/batch, samples=384, sps=26.0, errors=0][A[A[A[A[A[A
+
+
+
+
+
+GPU6 Shard14:  14%|█▍        | 3/21 [00:19<01:25,  4.78s/batch, samples=512, sps=26.6, errors=0][A[A[A[A[A[A
+
+
+
+
+
+GPU2 Shard10:  14%|█▍        | 3/21 [00:16<01:33,  5.18s/batch, samples=384, sps=23.0, errors=0][A[A
+
+GPU2 Shard10:  14%|█▍        | 3/21 [00:21<01:33,  5.18s/batch, samples=512, sps=24.2, errors=0][A[A
+
+GPU7 Shard15:  14%|█▍        | 3/21 [00:15<01:29,  4.95s/batch, samples=384, sps=24.4, errors=0][A[A[A[A[A[A[A
+
+
+
+
+
+
+GPU7 Shard15:  14%|█▍        | 3/21 [00:20<01:29,  4.95s/batch, samples=512, sps=25.4, errors=0][A[A[A[A[A[A[A
+
+
+
+
+
+
+GPU3 Shard11:  14%|█▍        | 3/21 [00:16<01:32,  5.16s/batch, samples=384, sps=23.1, errors=0][A[A[A
+
+
+GPU3 Shard11:  14%|█▍        | 3/21 [00:21<01:32,  5.16s/batch, samples=512, sps=24.3, errors=0][A[A[A
+
+
+GPU4 Shard12:  14%|█▍        | 3/21 [00:16<01:33,  5.18s/batch, samples=384, sps=22.9, errors=0][A[A[A[A
+
+
+
+GPU4 Shard12:  14%|█▍        | 3/21 [00:21<01:33,  5.18s/batch, samples=512, sps=24.2, errors=0][A[A[A[A
+
+
+
+GPU5 Shard13:  19%|█▉        | 4/21 [00:19<01:19,  4.70s/batch, samples=512, sps=26.2, errors=0][A[A[A[A[A
+
+
+
+
+GPU5 Shard13:  19%|█▉        | 4/21 [00:23<01:19,  4.70s/batch, samples=640, sps=26.8, errors=0][A[A[A[A[A
+
+
+
+
+GPU1 Shard9:  20%|██        | 4/20 [00:21<01:19,  4.98s/batch, samples=512, sps=23.4, errors=0][A
+GPU1 Shard9:  20%|██        | 4/20 [00:26<01:19,  4.98s/batch, samples=640, sps=24.3, errors=0][A
+GPU6 Shard14:  19%|█▉        | 4/21 [00:19<01:18,  4.64s/batch, samples=512, sps=26.6, errors=0][A[A[A[A[A[A
+
+
+
+
+
+GPU6 Shard14:  19%|█▉        | 4/21 [00:23<01:18,  4.64s/batch, samples=640, sps=27.1, errors=0][A[A[A[A[A[A
+
+
+
+
+
+GPU2 Shard10:  19%|█▉        | 4/21 [00:21<01:22,  4.87s/batch, samples=512, sps=24.2, errors=0][A[A
+
+GPU2 Shard10:  19%|█▉        | 4/21 [00:25<01:22,  4.87s/batch, samples=640, sps=25.0, errors=0][A[A
+
+GPU7 Shard15:  19%|█▉        | 4/21 [00:20<01:20,  4.74s/batch, samples=512, sps=25.4, errors=0][A[A[A[A[A[A[A
+
+
+
+
+
+
+GPU7 Shard15:  19%|█▉        | 4/21 [00:24<01:20,  4.74s/batch, samples=640, sps=26.1, errors=0][A[A[A[A[A[A[A
+
+
+
+
+
+
+srun: Job step aborted: Waiting up to 32 seconds for job step to finish.
+[2025-08-06T04:18:30.646] error: *** JOB 13587789 ON gcn33 CANCELLED AT 2025-08-06T04:18:30 DUE to SIGNAL Terminated ***
+PU0 Shard8:  10%|▉         | 2/21 [00:15<01:45,  5.54s/batch, samples=384, sps=24.1, errors=0]GPU0 Shard8:  14%|█▍        | 3/21 [00:15<01:30,  5.02s/batch, samples=384, sps=24.1, errors=0]GPU0 Shard8:  14%|█▍        | 3/21 [00:20<01:30,  5.02s/batch, samples=512, sps=25.2, errors=0]GPU0 Shard8:  19%|█▉        | 4/21 [00:20<01:21,  4.78s/batch, samples=512, sps=25.2, errors=0]GPU0 Shard8:  19%|█▉        | 4/21 [00:24<01:21,  4.78s/batch, samples=640, sps=25.7, errors=0]GPU0 Shard8:  24%|██▍       | 5/21 [00:24<01:15,  4.69s/batch, samples=640, sps=25.7, errors=0][2025-08-06T04:18:30.647] error: *** STEP 13587789.0 ON gcn33 CANCELLED AT 2025-08-06T04:18:30 DUE to SIGNAL Terminated ***
+
+JOB STATISTICS
+==============
+Job ID: 13587789
+Cluster: snellius
+User/Group: azadaianchuk1/azadaianchuk1
+State: CANCELLED (exit code 0)
+Nodes: 2
+Cores per node: 72
+CPU Utilized: 00:00:01
+CPU Efficiency: 0.00% of 11:52:48 core-walltime
+Job Wall-clock time: 00:04:57
+Memory Utilized: 178.99 GB
+Memory Efficiency: 29.83% of 600.00 GB (300.00 GB/node)
+The task which had the largest memory consumption differs by 106.41% from the average task max memory consumption

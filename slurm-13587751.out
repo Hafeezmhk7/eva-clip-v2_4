@@ -1,0 +1,71 @@
+🔍 SLURM Environment Debug:
+SLURM_PROCID: 0
+SLURM_LOCALID: 0
+SLURM_NTASKS: 8
+SLURM_GPUS_ON_NODE: 4
+SLURM_STEP_NODELIST: 
+============================================================================================== 
+Warning! Mixing Conda and module environments may lead to corruption of the
+user environment. 
+We do not recommend users mixing those two environments unless absolutely
+necessary. Note that 
+SURF does not provide any support for Conda environment.
+For more information, please refer to our software policy page:
+https://servicedesk.surf.nl/wiki/display/WIKI/Software+policy+Snellius#SoftwarepolicySnellius-UseofAnacondaandMinicondaenvironmentsonSnellius 
+
+Remember that many packages have already been installed on the system and can
+be loaded using 
+the 'module load <package__name>' command. If you are uncertain if a package is
+already available 
+on the system, please use 'module avail' or 'module spider' to search for it.
+============================================================================================== 
+⚠️ Failed to import model: cannot import name 'BLIP3oCLIPDiTModel' from 'src.modules.models.blip3o_dit' (/gpfs/home4/azadaianchuk1/eva-clip-v2_4/src/modules/models/blip3o_dit.py)
+⚠️ Failed to import model: cannot import name 'BLIP3oCLIPDiTModel' from 'src.modules.models.blip3o_dit' (/gpfs/home4/azadaianchuk1/eva-clip-v2_4/src/modules/models/blip3o_dit.py)
+⚠️ Failed to import loss: cannot import name 'BLIP3oCLIPFlowMatchingLoss' from 'src.modules.losses.blip3o_fm_loss' (/gpfs/home4/azadaianchuk1/eva-clip-v2_4/src/modules/losses/blip3o_fm_loss.py)
+⚠️ Failed to import loss: cannot import name 'BLIP3oCLIPFlowMatchingLoss' from 'src.modules.losses.blip3o_fm_loss' (/gpfs/home4/azadaianchuk1/eva-clip-v2_4/src/modules/losses/blip3o_fm_loss.py)
+⚠️ Failed to import model: cannot import name 'BLIP3oCLIPDiTModel' from 'src.modules.models.blip3o_dit' (/gpfs/home4/azadaianchuk1/eva-clip-v2_4/src/modules/models/blip3o_dit.py)
+⚠️ Failed to import model: cannot import name 'BLIP3oCLIPDiTModel' from 'src.modules.models.blip3o_dit' (/gpfs/home4/azadaianchuk1/eva-clip-v2_4/src/modules/models/blip3o_dit.py)
+⚠️ Failed to import loss: cannot import name 'BLIP3oCLIPFlowMatchingLoss' from 'src.modules.losses.blip3o_fm_loss' (/gpfs/home4/azadaianchuk1/eva-clip-v2_4/src/modules/losses/blip3o_fm_loss.py)
+⚠️ Failed to import loss: cannot import name 'BLIP3oCLIPFlowMatchingLoss' from 'src.modules.losses.blip3o_fm_loss' (/gpfs/home4/azadaianchuk1/eva-clip-v2_4/src/modules/losses/blip3o_fm_loss.py)
+⚠️ Missing components: ['model', 'loss']
+⚠️ Missing components: ['model', 'loss']
+⚠️ Partial initialization. Missing: ['model', 'loss']
+⚠️ Partial initialization. Missing: ['model', 'loss']
+⚠️ Missing components: ['model', 'loss']
+⚠️ Missing components: ['model', 'loss']
+⚠️ Partial initialization. Missing: ['model', 'loss']
+⚠️ Partial initialization. Missing: ['model', 'loss']
+⚠️ Failed to import model: cannot import name 'BLIP3oCLIPDiTModel' from 'src.modules.models.blip3o_dit' (/gpfs/home4/azadaianchuk1/eva-clip-v2_4/src/modules/models/blip3o_dit.py)
+⚠️ Failed to import model: cannot import name 'BLIP3oCLIPDiTModel' from 'src.modules.models.blip3o_dit' (/gpfs/home4/azadaianchuk1/eva-clip-v2_4/src/modules/models/blip3o_dit.py)
+⚠️ Failed to import model: cannot import name 'BLIP3oCLIPDiTModel' from 'src.modules.models.blip3o_dit' (/gpfs/home4/azadaianchuk1/eva-clip-v2_4/src/modules/models/blip3o_dit.py)
+⚠️ Failed to import model: cannot import name 'BLIP3oCLIPDiTModel' from 'src.modules.models.blip3o_dit' (/gpfs/home4/azadaianchuk1/eva-clip-v2_4/src/modules/models/blip3o_dit.py)
+⚠️ Failed to import loss: cannot import name 'BLIP3oCLIPFlowMatchingLoss' from 'src.modules.losses.blip3o_fm_loss' (/gpfs/home4/azadaianchuk1/eva-clip-v2_4/src/modules/losses/blip3o_fm_loss.py)
+⚠️ Failed to import loss: cannot import name 'BLIP3oCLIPFlowMatchingLoss' from 'src.modules.losses.blip3o_fm_loss' (/gpfs/home4/azadaianchuk1/eva-clip-v2_4/src/modules/losses/blip3o_fm_loss.py)
+⚠️ Failed to import loss: cannot import name 'BLIP3oCLIPFlowMatchingLoss' from 'src.modules.losses.blip3o_fm_loss' (/gpfs/home4/azadaianchuk1/eva-clip-v2_4/src/modules/losses/blip3o_fm_loss.py)
+⚠️ Failed to import loss: cannot import name 'BLIP3oCLIPFlowMatchingLoss' from 'src.modules.losses.blip3o_fm_loss' (/gpfs/home4/azadaianchuk1/eva-clip-v2_4/src/modules/losses/blip3o_fm_loss.py)
+⚠️ Missing components: ['model', 'loss']
+⚠️ Missing components: ['model', 'loss']
+⚠️ Missing components: ['model', 'loss']
+⚠️ Missing components: ['model', 'loss']
+⚠️ Partial initialization. Missing: ['model', 'loss']
+⚠️ Partial initialization. Missing: ['model', 'loss']
+⚠️ Partial initialization. Missing: ['model', 'loss']
+⚠️ Partial initialization. Missing: ['model', 'loss']
+srun: Job step aborted: Waiting up to 32 seconds for job step to finish.
+[2025-08-06T04:07:00.782] error: *** JOB 13587751 ON gcn33 CANCELLED AT 2025-08-06T04:07:00 DUE to SIGNAL Terminated ***
+[2025-08-06T04:07:00.783] error: *** STEP 13587751.0 ON gcn33 CANCELLED AT 2025-08-06T04:07:00 DUE to SIGNAL Terminated ***
+
+JOB STATISTICS
+==============
+Job ID: 13587751
+Cluster: snellius
+User/Group: azadaianchuk1/azadaianchuk1
+State: CANCELLED (exit code 0)
+Nodes: 2
+Cores per node: 72
+CPU Utilized: 00:00:01
+CPU Efficiency: 0.03% of 01:04:48 core-walltime
+Job Wall-clock time: 00:00:27
+Memory Utilized: 15.54 MB
+Memory Efficiency: 0.00% of 600.00 GB (300.00 GB/node)
+The task which had the largest memory consumption differs by 100.80% from the average task max memory consumption
