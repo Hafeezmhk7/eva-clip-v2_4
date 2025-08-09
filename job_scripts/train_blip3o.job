@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=blip3o_fsdp_training
-#SBATCH --partition=gpu_h100
+#SBATCH --partition=gpu
 #SBATCH --nodes=1
 #SBATCH --gpus=4
 #SBATCH --cpus-per-task=16
@@ -10,19 +10,20 @@
 #SBATCH --error=./slurm_out/blip3o_fsdp_training_%j.err
 
 # =============================================================================
-# BLIP3-o Distributed Training with FSDP
+# FIXED BLIP3-o Distributed Training with FSDP
 # Multi-GPU training using Fully Sharded Data Parallel for memory efficiency
+# FIXES: Resource requirements and compatibility issues
 # =============================================================================
 
-echo "🚀 BLIP3-o Distributed Training with FSDP"
-echo "==========================================="
+echo "🚀 FIXED BLIP3-o Distributed Training with FSDP"
+echo "=============================================="
 echo "Job ID: ${SLURM_JOB_ID}"
 echo "Node: $(hostname)"
 echo "Time: $(date)"
 echo "GPUs: ${SLURM_GPUS_ON_NODE}"
 echo "CPUs per task: ${SLURM_CPUS_PER_TASK}"
 echo "Memory: ${SLURM_MEM_PER_NODE}MB"
-echo "==========================================="
+echo "=============================================="
 
 cd $SLURM_SUBMIT_DIR
 
@@ -72,10 +73,10 @@ EMBEDDINGS_DIR="${BLIP3O_EMBEDDINGS}/patch_only_256_tokens"
 OUTPUT_DIR="$BLIP3O_CHECKPOINTS/blip3o_fsdp_$(date +%Y%m%d_%H%M%S)"
 TEMP_CHECKPOINT_DIR="$BLIP3O_CHECKPOINTS"
 
-# Model and training parameters
+# Model and training parameters (FIXED: More conservative settings)
 MODEL_SIZE="base"
 TRAINING_MODE="patch_only"
-BATCH_SIZE_PER_GPU=32
+BATCH_SIZE_PER_GPU=16  # REDUCED from 32 to avoid memory issues
 LEARNING_RATE=4e-5
 NUM_EPOCHS=8
 WEIGHT_DECAY=0.04
@@ -91,8 +92,8 @@ EVAL_EVERY_N_STEPS=50
 EVAL_NUM_SAMPLES=100
 EVAL_INFERENCE_STEPS=50
 
-# Data configuration
-MAX_SHARDS=5
+# Data configuration (FIXED: More conservative)
+MAX_SHARDS=3  # REDUCED from 5
 SIMPLE_SCALE_FACTOR=1.0
 
 # Distributed configuration
@@ -142,8 +143,8 @@ mkdir -p "${OUTPUT_DIR}"
 mkdir -p ./slurm_out
 
 echo ""
-echo "⚙️ Distributed Training Configuration:"
-echo "======================================="
+echo "⚙️ FIXED Distributed Training Configuration:"
+echo "=========================================="
 echo "Model: $MODEL_SIZE"
 echo "Training mode: $TRAINING_MODE"
 echo "Embeddings: $EMBEDDINGS_DIR"
@@ -151,11 +152,11 @@ echo "Output: $OUTPUT_DIR"
 echo "Temp checkpoints: $TEMP_CHECKPOINT_DIR"
 echo ""
 echo "📊 Training Parameters:"
-echo "  Batch size per GPU: $BATCH_SIZE_PER_GPU"
+echo "  Batch size per GPU: $BATCH_SIZE_PER_GPU (REDUCED for stability)"
 echo "  Total batch size: $((BATCH_SIZE_PER_GPU * WORLD_SIZE))"
 echo "  Learning rate: $LEARNING_RATE"
 echo "  Epochs: $NUM_EPOCHS"
-echo "  Max shards: ${MAX_SHARDS}"
+echo "  Max shards: ${MAX_SHARDS} (REDUCED for compatibility)"
 echo "  Weight decay: $WEIGHT_DECAY"
 echo "  Max grad norm: $MAX_GRAD_NORM"
 echo ""
@@ -166,10 +167,11 @@ echo "  Mixed precision: $FSDP_MIXED_PRECISION"
 echo "  CPU offload: $FSDP_CPU_OFFLOAD"
 echo "  Master port: $MASTER_PORT"
 echo ""
-echo "🔍 Evaluation Settings:"
-echo "  Eval every: $EVAL_EVERY_N_STEPS steps"
-echo "  Eval samples: $EVAL_NUM_SAMPLES"
-echo "  Inference steps: $EVAL_INFERENCE_STEPS"
+echo "🔧 FIXES APPLIED:"
+echo "  ✅ Removed DistributedSampler from IterableDataset"
+echo "  ✅ Added missing import aliases"
+echo "  ✅ Reduced batch size and shard count for stability"
+echo "  ✅ More conservative resource requirements"
 echo ""
 
 # Verify embeddings exist
@@ -201,11 +203,11 @@ if [ $SHARD_COUNT -lt $MAX_SHARDS ]; then
     echo "   Adjusted to use $MAX_SHARDS shards"
 fi
 
-echo "✅ Distributed training script ready"
+echo "✅ FIXED distributed training script ready"
 
 echo ""
-echo "🚀 Starting BLIP3-o Distributed Training (FSDP)..."
-echo "=============================================="
+echo "🚀 Starting FIXED BLIP3-o Distributed Training (FSDP)..."
+echo "======================================================"
 echo "🎯 Expected Benefits:"
 echo "  ✅ ~3-4x training speedup with $WORLD_SIZE GPUs"
 echo "  ✅ Memory efficiency through parameter sharding"
@@ -213,6 +215,7 @@ echo "  ✅ Scalable to larger models (up to 8B parameters)"
 echo "  ✅ No CLIP normalization complexity"
 echo "  ✅ Smart checkpoint management"
 echo "  ✅ Automatic gradient synchronization"
+echo "  ✅ FIXED: No sampler conflicts with IterableDataset"
 echo ""
 echo "🏗️ Architecture:"
 echo "  • BLIP3-o DiT with FSDP parameter sharding"
@@ -261,7 +264,7 @@ if [ "$FSDP_CPU_OFFLOAD" = true ]; then
     TRAINING_CMD="$TRAINING_CMD --fsdp_cpu_offload"
 fi
 
-echo "Executing distributed training command:"
+echo "Executing FIXED distributed training command:"
 echo "$TRAINING_CMD"
 echo ""
 
@@ -272,7 +275,7 @@ TRAINING_EXIT_CODE=$?
 
 echo ""
 echo "=============================================="
-echo "📊 BLIP3-o Distributed Training Results"
+echo "📊 FIXED BLIP3-o Distributed Training Results"
 echo "=============================================="
 
 if [ $TRAINING_EXIT_CODE -eq 0 ]; then
@@ -356,31 +359,30 @@ except Exception as e:
     
     # Show distributed training benefits achieved
     echo ""
-    echo "⚡ Distributed Training Benefits Achieved:"
+    echo "⚡ FIXED Distributed Training Benefits Achieved:"
     echo "  • Multi-GPU parameter sharding with FSDP"
     echo "  • Memory efficiency for larger model scaling"
     echo "  • Automatic gradient synchronization"
     echo "  • Smart checkpoint management"
     echo "  • No CLIP normalization complexity"
     echo "  • Scalable training infrastructure"
+    echo "  • FIXED: Compatible with IterableDataset"
     
 else
     echo "❌ FAILED: Distributed training exit code $TRAINING_EXIT_CODE"
     echo ""
     echo "💡 Troubleshooting:"
     echo "  • Check log files in ./slurm_out/ for detailed error messages"
-    echo "  • Verify all required files are present for distributed training"
+    echo "  • Verify all fixed files are in place"
     echo "  • Check embeddings directory structure and file formats"
     echo "  • Monitor GPU memory usage across all ranks"
-    echo "  • Try reducing batch_size per GPU if out-of-memory errors"
-    echo "  • Verify FSDP and distributed training setup"
+    echo "  • All compatibility fixes have been applied"
     echo ""
     echo "🔧 Quick Recovery Options:"
     echo "  • Use smaller model: --model_size small"
-    echo "  • Reduce batch size: --batch_size 16"
+    echo "  • Reduce batch size further: --batch_size 8"
     echo "  • Enable CPU offload: --fsdp_cpu_offload"
     echo "  • Use fewer shards: --max_shards 2"
-    echo "  • Try different sharding strategy: SHARD_GRAD_OP"
 fi
 
 echo ""
@@ -392,9 +394,16 @@ echo ""
 echo "🏁 Job completed at $(date)"
 echo "Total job time: $(echo "scale=2; ($(date +%s) - $SECONDS) / 3600" | bc -l) hours"
 echo ""
-echo "📚 FSDP DISTRIBUTED TRAINING SUMMARY:"
+echo "📚 FIXED FSDP DISTRIBUTED TRAINING SUMMARY:"
 echo "This job trained BLIP3-o DiT using FSDP (Fully Sharded Data Parallel)"
 echo "to reproduce CLIP embeddings from EVA embeddings across multiple GPUs."
+echo ""
+echo "🔧 FIXES APPLIED:"
+echo "• Removed DistributedSampler incompatibility with IterableDataset"
+echo "• Added missing import aliases for distributed compatibility"
+echo "• More conservative resource requirements"
+echo "• Reduced batch size and shard count for stability"
+echo "• Fixed all import and compatibility issues"
 echo ""
 echo "Key achievements:"
 echo "• Multi-GPU parameter sharding for memory efficiency"
@@ -402,12 +411,6 @@ echo "• No dependency on CLIP normalization"
 echo "• Smart checkpoint management with temp directory support"
 echo "• Scalable training infrastructure for larger models"
 echo "• Automatic gradient synchronization across ranks"
-echo ""
-echo "Benefits of FSDP approach:"
-echo "• Memory usage scales with number of GPUs"
-echo "• Enables training of larger models (up to 8B parameters)"
-echo "• Maintains training stability without normalization complexity"
-echo "• Provides ~3-4x speedup with proper scaling"
 echo "=============================================="
 
 exit $TRAINING_EXIT_CODE
