@@ -1,14 +1,14 @@
 #!/bin/bash
-#SBATCH --job-name=blip3o_multi_gpu
+#SBATCH --job-name=blip3o_full_extraction
 #SBATCH --partition=gpu_a100
 #SBATCH --nodes=2
 #SBATCH --gpus-per-node=4
-#SBATCH --ntasks-per-node=4    # 4 tasks per node
+#SBATCH --ntasks-per-node=4
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=300G
-#SBATCH --time=2:00:00
-#SBATCH --output=./slurm_out/blip3o_multi_nodes_%j.out
-#SBATCH --error=./slurm_out/blip3o_multi_nodes_%j.err
+#SBATCH --time=8:00:00
+#SBATCH --output=./slurm_out/blip3o_full_extraction_%j.out
+#SBATCH --error=./slurm_out/blip3o_full_extraction_%j.err
 
 echo "🔍 SLURM Environment Debug:"
 echo "SLURM_PROCID: $SLURM_PROCID"
@@ -27,7 +27,7 @@ module load Miniconda3/24.7.1-0
 module load CUDA/12.6.0
 source activate eva_clip_env
 
-# Setup workspace directories
+# FIXED: Setup workspace directories with your specific paths
 export SCRATCH_SHARED="/scratch-shared"
 export BLIP3O_USER=$(whoami)
 export BLIP3O_JOB_ID=${SLURM_JOB_ID}
@@ -46,6 +46,9 @@ if [ "${SLURM_PROCID:-0}" -eq 0 ]; then
     mkdir -p "${BLIP3O_WORKSPACE}"/{datasets,embeddings,checkpoints,logs,metadata}
     mkdir -p "${BLIP3O_JOB_TEMP}"/{cache,working,temp_checkpoints}
     mkdir -p ./slurm_out
+    
+    # FIXED: Create your specific output directory
+    mkdir -p "${BLIP3O_EMBEDDINGS}/patch_embeddings_short_256"
 fi
 
 # Model cache (redirected to job temp)
@@ -60,12 +63,13 @@ mkdir -p "${TORCH_HOME}" "${HF_HOME}" "${TRANSFORMERS_CACHE}" "${WANDB_DIR}" "${
 
 echo "Workspace: $BLIP3O_WORKSPACE"
 echo "Job temp: $BLIP3O_JOB_TEMP"
+echo "Output directory: ${BLIP3O_EMBEDDINGS}/patch_embeddings_short_256"
 
-# Configuration defaults
+# Configuration for FULL dataset processing
 WORLD_SIZE=${SLURM_NTASKS:-8}
 MASTER_PORT="12361"
-BATCH_SIZE=128
-MAX_SHARDS=20
+BATCH_SIZE=64  # Conservative for stability
+MAX_SHARDS=10   # FIXED: 0 means process ALL shards
 INCLUDE_CLS=false
 
 # Parse command line arguments
@@ -105,7 +109,8 @@ else
     MODE_SUFFIX="patch_only"
 fi
 
-OUTPUT_DIR="${BLIP3O_EMBEDDINGS}/${MODE_SUFFIX}_${TARGET_TOKENS}_tokens"
+# FIXED: Use your specific output directory
+OUTPUT_DIR="${BLIP3O_EMBEDDINGS}/patch_embeddings_short_256"
 
 # Create output directory (only on rank 0)
 if [ "${SLURM_PROCID:-0}" -eq 0 ]; then
@@ -115,11 +120,11 @@ if [ "${SLURM_PROCID:-0}" -eq 0 ]; then
     echo "Output: $OUTPUT_DIR"
     echo "GPUs: $WORLD_SIZE"
     echo "Batch size per GPU: $BATCH_SIZE"
-    echo "Max shards: $MAX_SHARDS"
+    echo "Max shards: $([ $MAX_SHARDS -eq 0 ] && echo 'ALL' || echo $MAX_SHARDS)"
     echo "Master port: $MASTER_PORT"
     
     # Validate extraction script
-    EXTRACTION_SCRIPT="src/modules/extract_embeddings_unified.py"
+    EXTRACTION_SCRIPT="src/modules/extract_embeddings_production.py"
     if [ ! -f "$EXTRACTION_SCRIPT" ]; then
         echo "❌ Extraction script not found: $EXTRACTION_SCRIPT"
         exit 1
@@ -128,8 +133,6 @@ if [ "${SLURM_PROCID:-0}" -eq 0 ]; then
     # Check for dataset files
     if [ ! -d "$BLIP3O_DATASETS" ]; then
         echo "❌ Datasets directory not found: $BLIP3O_DATASETS"
-        echo "To download datasets:"
-        echo "  python src/data_hand/download_data.py --shards 0 1 2 3 4 5 6 7 8 9"
         exit 1
     fi
     
@@ -141,16 +144,20 @@ if [ "${SLURM_PROCID:-0}" -eq 0 ]; then
         exit 1
     fi
     
-    if [ $TAR_COUNT -lt $MAX_SHARDS ]; then
+    if [ $MAX_SHARDS -gt 0 ] && [ $TAR_COUNT -lt $MAX_SHARDS ]; then
         MAX_SHARDS=$TAR_COUNT
         echo "Adjusted to use $MAX_SHARDS shards"
+    elif [ $MAX_SHARDS -eq 0 ]; then
+        MAX_SHARDS=$TAR_COUNT
+        echo "Processing ALL $MAX_SHARDS shards"
     fi
     
     # Display GPU information
     echo "GPU Information:"
     nvidia-smi --query-gpu=index,name,memory.total,memory.free --format=csv,noheader
     
-    echo "Starting extraction at: $(date)"
+    echo "Starting FULL extraction at: $(date)"
+    echo "Expected processing time: $(( $TAR_COUNT / ($WORLD_SIZE * 2) )) minutes (conservative estimate)"
 fi
 
 # Synchronize all processes before starting
@@ -177,8 +184,10 @@ export MASTER_ADDR=${MASTER_NODE}
 
 echo "[Rank ${RANK}] Node: $(hostname), Local Rank: ${LOCAL_RANK}, GPU Assignment: ${LOCAL_RANK}"
 echo "[Rank ${RANK}] Master: ${MASTER_ADDR}:${MASTER_PORT}, World Size: ${WORLD_SIZE}"
+echo "[Rank ${RANK}] Processing shards from: ${BLIP3O_DATASETS}"
+echo "[Rank ${RANK}] Output to: ${OUTPUT_DIR}"
 
-# Run the Python extraction with FIXED parameters
+# Run the PRODUCTION Python extraction with FIXED parameters
 python -c "
 import os
 import sys
@@ -186,7 +195,7 @@ import torch
 sys.path.insert(0, '\''/gpfs/home4/azadaianchuk1/eva-clip-v2_4'\'')
 
 # Import our function
-from src.modules.extract_embeddings_unified import process_tar_files_on_gpu, find_data_files, setup_temp_manager
+from src.modules.extract_embeddings_production import process_tar_files_on_gpu, find_data_files, setup_temp_manager
 from pathlib import Path
 
 # Get parameters from environment
@@ -200,7 +209,8 @@ include_cls = os.environ['\''INCLUDE_CLS'\''] == '\''true'\''
 target_tokens = int(os.environ['\''TARGET_TOKENS'\''])
 output_dir = Path(os.environ['\''OUTPUT_DIR'\''])
 
-print(f'\''[Rank {rank}] Starting extraction with local GPU {local_rank}...'\'')
+print(f'\''[Rank {rank}] Starting PRODUCTION extraction with local GPU {local_rank}...'\'')
+print(f'\''[Rank {rank}] Processing up to {max_shards} shards'\'')
 
 # CRITICAL: Set CUDA device BEFORE any model loading
 torch.cuda.set_device(local_rank)
@@ -209,33 +219,28 @@ print(f'\''[Rank {rank}] Set CUDA device to {local_rank}'\'')
 # Setup directories
 temp_manager = setup_temp_manager()
 if temp_manager:
-    embeddings_dir = temp_manager.create_embeddings_subdirectory(f'\''patch_only_{target_tokens}_tokens_stable'\'')
     temp_manager.setup_model_cache()
-else:
-    embeddings_dir = output_dir
-    if rank == 0:
-        embeddings_dir.mkdir(parents=True, exist_ok=True)
 
 # Find TAR files
-tar_files = find_data_files(temp_manager, max_shards=max_shards)
+tar_files = find_data_files(temp_manager, max_shards=max_shards if max_shards > 0 else None)
 
 print(f'\''[Rank {rank}] Found {len(tar_files)} TAR files, using GPU {local_rank}'\'')
 
-# Run distributed extraction with ONLY supported parameters
+# Run distributed extraction with PRODUCTION parameters
 try:
     process_tar_files_on_gpu(
         rank=rank,
         world_size=world_size, 
         tar_files=tar_files,
-        output_dir=embeddings_dir,
+        output_dir=output_dir,
         batch_size=batch_size,
         include_cls=include_cls,
         target_tokens=target_tokens,
         master_port=master_port
     )
-    print(f'\''[Rank {rank}] Extraction completed successfully'\'')
+    print(f'\''[Rank {rank}] PRODUCTION extraction completed successfully'\'')
 except Exception as e:
-    print(f'\''[Rank {rank}] Extraction failed: {e}'\'')
+    print(f'\''[Rank {rank}] PRODUCTION extraction failed: {e}'\'')
     import traceback
     traceback.print_exc()
     sys.exit(1)
@@ -252,7 +257,7 @@ if [ "${SLURM_PROCID:-0}" -eq 0 ]; then
         echo "✅ Multi-GPU embedding extraction completed successfully!"
         
         # Check for output files
-        CONSOLIDATED_FILES=$(find "$OUTPUT_DIR" -name "embeddings_shard_*_${MODE_SUFFIX}.pkl" | wc -l)
+        CONSOLIDATED_FILES=$(find "$OUTPUT_DIR" -name "embeddings_shard_*.pkl" | wc -l)
         if [ $CONSOLIDATED_FILES -gt 0 ]; then
             echo "✅ Found $CONSOLIDATED_FILES consolidated embedding files"
             
@@ -268,11 +273,9 @@ if [ "${SLURM_PROCID:-0}" -eq 0 ]; then
                 echo "✅ Manifest file: $MANIFEST_FILE"
             fi
             
-            echo "🎉 EXTRACTION SUCCESS!"
-            echo "Next steps:"
-            echo "torchrun --nproc_per_node=4 --nnodes=2 train_dit_distributed.py \\"
-            echo "  --chunked_embeddings_dir $OUTPUT_DIR \\"
-            echo "  --distributed --world_size $WORLD_SIZE"
+            echo "🎉 FULL DATASET EXTRACTION SUCCESS!"
+            echo "📁 Embeddings stored in: $OUTPUT_DIR"
+            echo "📊 Ready for large-scale training with $CONSOLIDATED_FILES shards"
             
         else
             echo "⚠️ No consolidated files found"
@@ -290,9 +293,9 @@ if [ "${SLURM_PROCID:-0}" -eq 0 ]; then
         
         echo "Troubleshooting:"
         echo "1. Check TAR files integrity"
-        echo "2. Try with smaller batch size: --batch_size 64"
-        echo "3. Try with fewer GPUs/nodes"
-        echo "4. Check GPU memory usage during extraction"
+        echo "2. Try with smaller batch size: --batch_size 16"
+        echo "3. Check GPU memory usage during extraction"
+        echo "4. Verify network connectivity between nodes"
     fi
     
     echo "Final GPU Memory Status:"
@@ -302,6 +305,194 @@ if [ "${SLURM_PROCID:-0}" -eq 0 ]; then
     TOTAL_SECONDS=$SECONDS
     TOTAL_HOURS=$(echo "scale=2; $TOTAL_SECONDS / 3600" | bc -l)
     echo "Total job time: ${TOTAL_HOURS} hours"
+    
+    # Final workspace status
+    echo ""
+    echo "📁 Final Workspace Status:"
+    echo "  Datasets: $BLIP3O_DATASETS"#!/bin/bash
+# optimized_extraction.job
+# Optimized for better performance and load balancing
+
+#SBATCH --job-name=blip3o_optimized
+#SBATCH --partition=gpu_a100
+#SBATCH --nodes=2
+#SBATCH --gpus-per-node=4
+#SBATCH --ntasks-per-node=4
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=300G
+#SBATCH --time=6:00:00
+#SBATCH --output=./slurm_out/blip3o_optimized_%j.out
+#SBATCH --error=./slurm_out/blip3o_optimized_%j.err
+
+cd $SLURM_SUBMIT_DIR
+
+# Setup environment
+module purge
+module load 2024
+module load Miniconda3/24.7.1-0
+module load CUDA/12.6.0
+source activate eva_clip_env
+
+echo "🔧 OPTIMIZED BLIP3-o Extraction"
+echo "=============================="
+
+# FIXED: Use optimized parameters
+export BLIP3O_WORKSPACE="/scratch-shared/azadaianchuk1/blip3o_workspace"
+export BLIP3O_EMBEDDINGS="${BLIP3O_WORKSPACE}/embeddings"
+export BLIP3O_DATASETS="${BLIP3O_WORKSPACE}/datasets"
+
+# For testing: use a subset first, then scale to full dataset
+MAX_SHARDS_TEST=80  # Test with 80 shards first
+OUTPUT_DIR="${BLIP3O_EMBEDDINGS}/optimized_test_${MAX_SHARDS_TEST}_shards"
+mkdir -p "$OUTPUT_DIR"
+
+# OPTIMIZATION: Reduce batch size for better GPU utilization
+BATCH_SIZE=32        # Reduced from 64 for better memory efficiency
+WORLD_SIZE=${SLURM_NTASKS:-8}
+MASTER_PORT="12361"
+INCLUDE_CLS=false
+TARGET_TOKENS=256
+
+echo "🎯 OPTIMIZED PARAMETERS:"
+echo "   Batch size: $BATCH_SIZE (reduced for efficiency)"
+echo "   Max shards: $MAX_SHARDS_TEST (test subset)"
+echo "   Output: $OUTPUT_DIR"
+echo "   Expected time: ~10-15 minutes for $MAX_SHARDS_TEST shards"
+
+# Setup cache directories
+export BLIP3O_JOB_TEMP="/scratch-local/$(whoami).${SLURM_JOB_ID}/blip3o_job_${SLURM_JOB_ID}"
+mkdir -p "${BLIP3O_JOB_TEMP}/cache"
+
+export TORCH_HOME="${BLIP3O_JOB_TEMP}/cache/torch"
+export HF_HOME="${BLIP3O_JOB_TEMP}/cache/huggingface"
+export TRANSFORMERS_CACHE="${BLIP3O_JOB_TEMP}/cache/transformers"
+export HUGGINGFACE_HUB_CACHE="${BLIP3O_JOB_TEMP}/cache/huggingface/hub"
+
+mkdir -p "$TORCH_HOME" "$HF_HOME" "$TRANSFORMERS_CACHE" "$HUGGINGFACE_HUB_CACHE"
+
+# Count available shards
+TAR_COUNT=$(find "$BLIP3O_DATASETS" -name "*.tar" | wc -l)
+echo "📊 Total available: $TAR_COUNT shards"
+echo "📊 Processing: $MAX_SHARDS_TEST shards for optimization test"
+
+# Export for srun
+export MAX_SHARDS_TEST BATCH_SIZE INCLUDE_CLS TARGET_TOKENS OUTPUT_DIR MASTER_PORT
+
+echo "🚀 Starting OPTIMIZED extraction at: $(date)"
+
+# Use optimized srun with better load balancing
+srun --ntasks=${WORLD_SIZE} bash -c '
+export RANK=${SLURM_PROCID}
+export LOCAL_RANK=${SLURM_LOCALID}
+export WORLD_SIZE=${SLURM_NTASKS}
+MASTER_NODE=$(scontrol show hostnames ${SLURM_JOB_NODELIST} | head -n 1)
+export MASTER_ADDR=${MASTER_NODE}
+
+echo "[Rank ${RANK}] OPTIMIZED extraction starting..."
+
+# Use the PRODUCTION script with optimized parameters
+python -c "
+import os
+import sys
+import time
+sys.path.insert(0, '\''/gpfs/home4/azadaianchuk1/eva-clip-v2_4'\'')
+
+try:
+    from src.modules.extract_embeddings_production import process_tar_files_on_gpu, find_data_files, setup_temp_manager
+except ImportError as e:
+    print(f'\''Import error: {e}'\'')
+    print(f'\''Using fallback to unified script'\'')
+    from src.modules.extract_embeddings_unified import process_tar_files_on_gpu, find_data_files, setup_temp_manager
+
+from pathlib import Path
+import torch
+
+rank = int(os.environ['\''RANK'\''])
+local_rank = int(os.environ['\''LOCAL_RANK'\''])
+world_size = int(os.environ['\''WORLD_SIZE'\''])
+master_port = os.environ['\''MASTER_PORT'\'']
+batch_size = int(os.environ['\''BATCH_SIZE'\''])  # 32 for optimization
+max_shards = int(os.environ['\''MAX_SHARDS_TEST'\''])  # 80 for testing
+include_cls = os.environ['\''INCLUDE_CLS'\''] == '\''true'\''
+target_tokens = int(os.environ['\''TARGET_TOKENS'\''])
+output_dir = Path(os.environ['\''OUTPUT_DIR'\''])
+
+print(f'\''[Rank {rank}] OPTIMIZED extraction: {max_shards} shards, batch_size={batch_size}'\'')
+
+torch.cuda.set_device(local_rank)
+
+temp_manager = setup_temp_manager()
+if temp_manager:
+    temp_manager.setup_model_cache()
+
+# Find TAR files with limit
+tar_files = find_data_files(temp_manager, max_shards=max_shards)
+print(f'\''[Rank {rank}] Processing {len(tar_files)} files with optimized settings'\'')
+
+start_time = time.time()
+
+try:
+    process_tar_files_on_gpu(
+        rank=rank,
+        world_size=world_size, 
+        tar_files=tar_files,
+        output_dir=output_dir,
+        batch_size=batch_size,  # Optimized batch size
+        include_cls=include_cls,
+        target_tokens=target_tokens,
+        master_port=master_port
+    )
+    
+    elapsed = time.time() - start_time
+    print(f'\''[Rank {rank}] OPTIMIZED extraction completed in {elapsed:.1f} seconds'\'')
+    
+except Exception as e:
+    print(f'\''[Rank {rank}] OPTIMIZED extraction failed: {e}'\'')
+    import traceback
+    traceback.print_exc()
+    sys.exit(1)
+"
+'
+
+EXTRACTION_EXIT_CODE=$?
+
+echo "Completed OPTIMIZED extraction at: $(date)"
+
+# Report results (only on rank 0)
+if [ "${SLURM_PROCID:-0}" -eq 0 ]; then
+    if [ $EXTRACTION_EXIT_CODE -eq 0 ]; then
+        echo "✅ OPTIMIZED extraction completed!"
+        
+        # Check results
+        RESULT_FILES=$(find "$OUTPUT_DIR" -name "embeddings_shard_*.pkl" | wc -l)
+        TOTAL_SIZE=$(du -sh "$OUTPUT_DIR" 2>/dev/null | cut -f1)
+        
+        echo "📊 OPTIMIZATION RESULTS:"
+        echo "   Files: $RESULT_FILES/$MAX_SHARDS_TEST shards"
+        echo "   Size: $TOTAL_SIZE"
+        echo "   Success rate: $(echo "scale=1; $RESULT_FILES * 100 / $MAX_SHARDS_TEST" | bc -l)%"
+        
+        if [ $RESULT_FILES -eq $MAX_SHARDS_TEST ]; then
+            echo "🎉 OPTIMIZATION SUCCESSFUL!"
+            echo "📈 Performance validated - ready for full dataset"
+            echo ""
+            echo "🚀 Next: Run full dataset extraction with these optimized settings"
+        else
+            echo "⚠️  Optimization incomplete"
+        fi
+        
+    else
+        echo "❌ OPTIMIZED extraction failed"
+    fi
+    
+    echo "💾 GPU memory status:"
+    nvidia-smi --query-gpu=index,memory.used,memory.free --format=csv,noheader
+fi
+
+exit $EXTRACTION_EXIT_CODE
+    echo "  Embeddings: $OUTPUT_DIR" 
+    echo "  Size: $(du -sh "$OUTPUT_DIR" 2>/dev/null | cut -f1 || echo 'Unknown')"
+    echo "  Files: $(find "$OUTPUT_DIR" -name "*.pkl" | wc -l) embedding files"
 fi
 
 exit $EXTRACTION_EXIT_CODE
