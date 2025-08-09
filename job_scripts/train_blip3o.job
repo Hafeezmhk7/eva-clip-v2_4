@@ -3,7 +3,6 @@
 #SBATCH --partition=gpu_h100
 #SBATCH --nodes=1
 #SBATCH --gpus=4
-#SBATCH --ntasks=4
 #SBATCH --cpus-per-task=16
 #SBATCH --mem=180G
 #SBATCH --time=12:00:00
@@ -93,7 +92,7 @@ EVAL_NUM_SAMPLES=100
 EVAL_INFERENCE_STEPS=50
 
 # Data configuration
-MAX_SHARDS=3
+MAX_SHARDS=5
 SIMPLE_SCALE_FACTOR=1.0
 
 # Distributed configuration

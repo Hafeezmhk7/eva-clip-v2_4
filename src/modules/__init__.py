@@ -1,9 +1,12 @@
 # src/modules/__init__.py
 """
-BLIP3-o Modules - Updated for Spherical EVA Denoising
+FIXED BLIP3-o Modules - Updated for Distributed Training
 src/modules/__init__.py
 
-Main entry point for all BLIP3-o modules including spherical EVA denoising components
+FIXES:
+- Proper import handling with correct aliases
+- Better error handling for missing components
+- Compatibility with distributed trainer
 """
 
 import logging
@@ -32,14 +35,18 @@ _imported_components = {}
 # =============================================================================
 try:
     from src.modules.models.blip3o_dit import (
-        BLIP3oCLIPDiTModel,
+        ImprovedBLIP3oCLIPDiTModel,
+        BLIP3oCLIPDiTModel,  # Alias for compatibility
         BLIP3oCLIPDiTConfig, 
-        create_clip_reproduction_model
+        create_improved_clip_reproduction_model,
+        create_clip_reproduction_model  # Alias for compatibility
     )
     MODEL_AVAILABLE = True
     _imported_components.update({
-        'BLIP3oCLIPDiTModel': BLIP3oCLIPDiTModel,
+        'ImprovedBLIP3oCLIPDiTModel': ImprovedBLIP3oCLIPDiTModel,
+        'BLIP3oCLIPDiTModel': BLIP3oCLIPDiTModel,  # FIXED: Proper alias
         'BLIP3oCLIPDiTConfig': BLIP3oCLIPDiTConfig,
+        'create_improved_clip_reproduction_model': create_improved_clip_reproduction_model,
         'create_clip_reproduction_model': create_clip_reproduction_model,
     })
     logger.info("✅ CLIP DiT model loaded successfully")
@@ -51,12 +58,14 @@ except ImportError as e:
 # =============================================================================
 try:
     from src.modules.losses.blip3o_fm_loss import (
-        BLIP3oCLIPFlowMatchingLoss,
+        SemanticPreservingFlowMatchingLoss,
+        BLIP3oCLIPFlowMatchingLoss,  # Alias for compatibility
         create_clip_reproduction_loss
     )
     LOSS_AVAILABLE = True
     _imported_components.update({
-        'BLIP3oCLIPFlowMatchingLoss': BLIP3oCLIPFlowMatchingLoss,
+        'SemanticPreservingFlowMatchingLoss': SemanticPreservingFlowMatchingLoss,
+        'BLIP3oCLIPFlowMatchingLoss': BLIP3oCLIPFlowMatchingLoss,  # FIXED: Proper alias
         'create_clip_reproduction_loss': create_clip_reproduction_loss,
     })
     logger.info("✅ Flow matching loss loaded successfully")
@@ -140,10 +149,20 @@ __all__ = [
 
 # Add available components to exports
 if MODEL_AVAILABLE:
-    __all__.extend(["BLIP3oCLIPDiTModel", "BLIP3oCLIPDiTConfig", "create_clip_reproduction_model"])
+    __all__.extend([
+        "ImprovedBLIP3oCLIPDiTModel", 
+        "BLIP3oCLIPDiTModel", 
+        "BLIP3oCLIPDiTConfig", 
+        "create_improved_clip_reproduction_model",
+        "create_clip_reproduction_model"
+    ])
 
 if LOSS_AVAILABLE:
-    __all__.extend(["BLIP3oCLIPFlowMatchingLoss", "create_clip_reproduction_loss"])
+    __all__.extend([
+        "SemanticPreservingFlowMatchingLoss",
+        "BLIP3oCLIPFlowMatchingLoss", 
+        "create_clip_reproduction_loss"
+    ])
 
 if TRAINER_AVAILABLE:
     __all__.extend(["BLIP3oCLIPTrainer", "create_clip_trainer"])
@@ -191,7 +210,7 @@ def check_environment():
 
 def print_environment_status():
     """Print detailed environment status"""
-    print("🔍 Clean BLIP3-o CLIP Reproduction Environment Status")
+    print("🔍 FIXED BLIP3-o CLIP Reproduction Environment Status")
     print("=" * 60)
     
     status = check_environment()
@@ -216,9 +235,10 @@ def print_environment_status():
         print(f"  {status_icon} {component.capitalize()}: {'Available' if available else 'Not Available'}")
     
     if status['all_available']:
-        print(f"\n🎉 All components available! Ready for training.")
+        print(f"\n🎉 All components available! Ready for distributed training.")
         print(f"🎯 Task: EVA [4096] → CLIP [1024] reproduction")
-        print(f"🌊 Method: Clean rectified flow matching with BLIP3-o DiT")
+        print(f"🌊 Method: FSDP distributed training with BLIP3-o DiT")
+        print(f"🔧 FIXES APPLIED: Proper aliases and IterableDataset compatibility")
     else:
         print(f"\n⚠️ Missing components: {', '.join(status['missing_components'])}")
         print(f"Available components: {', '.join(status['available_components'])}")
@@ -234,8 +254,9 @@ _env_status = check_environment()
 
 # Log initialization status
 if _env_status['all_available']:
-    logger.info("🎉 Clean BLIP3-o CLIP reproduction modules fully initialized!")
-    logger.info("🎯 Ready for EVA → CLIP reproduction training")
+    logger.info("🎉 FIXED BLIP3-o CLIP reproduction modules fully initialized!")
+    logger.info("🎯 Ready for distributed EVA → CLIP reproduction training")
+    logger.info("🔧 All compatibility fixes applied")
 else:
     logger.warning(f"⚠️ Partial initialization. Missing: {_env_status['missing_components']}")
 

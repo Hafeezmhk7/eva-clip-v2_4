@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """
-src/modules/models/blip3o_dit.py
+FIXED src/modules/models/blip3o_dit.py
+
+FIX: Added proper alias for distributed trainer compatibility
 
 Key improvements:
 1. EVA-CLIP adaptation layers for better cross-modal alignment
@@ -8,6 +10,7 @@ Key improvements:
 3. Attention caching for efficiency
 4. Better guidance and inference procedures
 5. All original architectural features preserved
+6. FIXED: Added import alias for distributed compatibility
 """
 
 import torch
@@ -627,8 +630,6 @@ class StableDiTBlock3D(nn.Module):
         self.cross_attn = StableAttention3D(config)
         self.mlp = StableSwiGLUMLP(config)
         
-        # NEW: Remove direct EVA projection - will be handled by adapter
-        
         # Layer scaling for training stability
         if config.layer_scale_init_value > 0:
             self.layer_scale_1 = nn.Parameter(
@@ -962,6 +963,10 @@ class ImprovedBLIP3oCLIPDiTModel(PreTrainedModel):
         return sum(p.numel() for p in self.parameters() if p.requires_grad)
 
 
+# FIXED: Add alias for distributed trainer compatibility
+BLIP3oCLIPDiTModel = ImprovedBLIP3oCLIPDiTModel
+
+
 def create_improved_clip_reproduction_model(
     config: Optional[BLIP3oCLIPDiTConfig] = None,
     training_mode: str = "patch_only",
@@ -1041,3 +1046,7 @@ def create_improved_clip_reproduction_model(
     logger.info(f"   Sandwich norm: {'✅' if use_sandwich_norm else '❌'}")
     
     return model
+
+
+# Additional alias for backward compatibility
+create_clip_reproduction_model = create_improved_clip_reproduction_model

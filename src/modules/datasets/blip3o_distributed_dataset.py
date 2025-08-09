@@ -1,14 +1,12 @@
 """
-Distributed Dataset Implementation for BLIP3-o
+FIXED Distributed Dataset Implementation for BLIP3-o
 src/modules/datasets/blip3o_distributed_dataset.py
 
-Extends the base dataset with distributed sampling support for FSDP training.
-Ensures proper data sharding across multiple GPUs while maintaining all existing functionality.
+FIX: Removed incompatible sampler usage with IterableDataset
 """
 
 import torch
-from torch.utils.data import Dataset, DataLoader, DistributedSampler
-from torch.utils.data.distributed import DistributedSampler
+from torch.utils.data import DataLoader
 import pickle
 import numpy as np
 from typing import Dict, Any, Optional, List, Tuple, Union, Iterator
@@ -167,41 +165,6 @@ class DistributedBLIP3oCLIPReproductionDataset(BLIP3oCLIPReproductionDataset):
         logger.info(f"Prepared {len(self.shard_files)} shard files for distributed processing")
 
 
-class DistributedSamplerWithSeed(DistributedSampler):
-    """
-    Distributed sampler with deterministic seeding for reproducible training
-    """
-    
-    def __init__(
-        self,
-        dataset,
-        num_replicas: Optional[int] = None,
-        rank: Optional[int] = None,
-        shuffle: bool = True,
-        seed: int = 0,
-        drop_last: bool = False,
-    ):
-        super().__init__(
-            dataset=dataset,
-            num_replicas=num_replicas,
-            rank=rank,
-            shuffle=shuffle,
-            seed=seed,
-            drop_last=drop_last
-        )
-        
-        # Store original seed for logging
-        self.base_seed = seed
-    
-    def set_epoch(self, epoch: int) -> None:
-        """Set epoch for deterministic shuffling"""
-        self.epoch = epoch
-        
-        # Log epoch setting for debugging
-        if hasattr(self.dataset, 'rank') and self.dataset.rank == 0:
-            logger.debug(f"Distributed sampler epoch set to {epoch}")
-
-
 def create_distributed_dataloaders(
     chunked_embeddings_dir: Union[str, Path],
     world_size: int,
@@ -218,25 +181,10 @@ def create_distributed_dataloaders(
     **kwargs
 ) -> Tuple[DataLoader, Optional[DataLoader]]:
     """
-    Create distributed dataloaders for FSDP training
+    FIXED: Create distributed dataloaders for FSDP training
     
-    Args:
-        chunked_embeddings_dir: Path to chunked embeddings
-        world_size: Number of GPUs
-        rank: Current GPU rank
-        batch_size: Batch size per GPU
-        eval_batch_size: Evaluation batch size per GPU
-        training_mode: Training mode (patch_only or cls_patch)
-        max_shards: Maximum number of shards to use
-        num_workers: Number of dataloader workers
-        pin_memory: Whether to pin memory
-        simple_scale_factor: Simple scaling factor for embeddings
-        distributed_seed: Seed for distributed operations
-        drop_last: Whether to drop last incomplete batch
-        **kwargs: Additional arguments for dataset
-    
-    Returns:
-        Tuple of (train_dataloader, eval_dataloader)
+    IMPORTANT: IterableDataset cannot use external samplers.
+    Distribution is handled internally by the dataset.
     """
     
     if eval_batch_size is None:
@@ -279,30 +227,12 @@ def create_distributed_dataloaders(
         **dataset_kwargs
     )
     
-    # Create distributed samplers
-    train_sampler = DistributedSamplerWithSeed(
-        train_dataset,
-        num_replicas=world_size,
-        rank=rank,
-        shuffle=True,
-        seed=distributed_seed,
-        drop_last=drop_last
-    )
-    
-    eval_sampler = DistributedSamplerWithSeed(
-        eval_dataset,
-        num_replicas=world_size,
-        rank=rank,
-        shuffle=False,
-        seed=distributed_seed,
-        drop_last=False
-    )
-    
-    # Create dataloaders
+    # FIXED: No samplers for IterableDataset - distribution handled internally
     train_dataloader = DataLoader(
         train_dataset,
         batch_size=batch_size,
-        sampler=train_sampler,
+        shuffle=False,  # Shuffling handled by dataset
+        sampler=None,   # CRITICAL: No sampler for IterableDataset
         num_workers=num_workers,
         collate_fn=clip_reproduction_collate_fn,
         pin_memory=pin_memory,
@@ -313,7 +243,8 @@ def create_distributed_dataloaders(
     eval_dataloader = DataLoader(
         eval_dataset,
         batch_size=eval_batch_size,
-        sampler=eval_sampler,
+        shuffle=False,  # No shuffling for eval
+        sampler=None,   # CRITICAL: No sampler for IterableDataset
         num_workers=min(num_workers, 1),
         collate_fn=clip_reproduction_collate_fn,
         pin_memory=pin_memory,
@@ -329,6 +260,7 @@ def create_distributed_dataloaders(
         logger.info(f"  Evaluation batches (per rank): {len(eval_dataloader):,}")
         logger.info(f"  Total effective batch size: {batch_size * world_size}")
         logger.info(f"  CLIP normalization: DISABLED")
+        logger.info(f"  🔧 FIX APPLIED: No samplers used with IterableDataset")
         
         # Test dataloader
         try:
