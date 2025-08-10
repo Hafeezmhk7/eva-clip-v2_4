@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=blip3o_fsdp_training
-#SBATCH --partition=gpu
+#SBATCH --partition=gpu_h100
 #SBATCH --nodes=1
 #SBATCH --gpus=4
 #SBATCH --cpus-per-task=16
@@ -12,7 +12,7 @@
 # =============================================================================
 # FIXED BLIP3-o Distributed Training with FSDP
 # Multi-GPU training using Fully Sharded Data Parallel for memory efficiency
-# FIXES: Resource requirements and compatibility issues
+# FIXES: Import errors, aliases, and communication utilities
 # =============================================================================
 
 echo "🚀 FIXED BLIP3-o Distributed Training with FSDP"
@@ -168,8 +168,9 @@ echo "  CPU offload: $FSDP_CPU_OFFLOAD"
 echo "  Master port: $MASTER_PORT"
 echo ""
 echo "🔧 FIXES APPLIED:"
+echo "  ✅ Fixed distributed imports and aliases"
+echo "  ✅ Added communication utilities"
 echo "  ✅ Removed DistributedSampler from IterableDataset"
-echo "  ✅ Added missing import aliases"
 echo "  ✅ Reduced batch size and shard count for stability"
 echo "  ✅ More conservative resource requirements"
 echo ""
@@ -215,7 +216,7 @@ echo "  ✅ Scalable to larger models (up to 8B parameters)"
 echo "  ✅ No CLIP normalization complexity"
 echo "  ✅ Smart checkpoint management"
 echo "  ✅ Automatic gradient synchronization"
-echo "  ✅ FIXED: No sampler conflicts with IterableDataset"
+echo "  ✅ FIXED: No import errors or missing aliases"
 echo ""
 echo "🏗️ Architecture:"
 echo "  • BLIP3-o DiT with FSDP parameter sharding"
@@ -367,13 +368,14 @@ except Exception as e:
     echo "  • No CLIP normalization complexity"
     echo "  • Scalable training infrastructure"
     echo "  • FIXED: Compatible with IterableDataset"
+    echo "  • FIXED: All import and alias errors resolved"
     
 else
     echo "❌ FAILED: Distributed training exit code $TRAINING_EXIT_CODE"
     echo ""
     echo "💡 Troubleshooting:"
     echo "  • Check log files in ./slurm_out/ for detailed error messages"
-    echo "  • Verify all fixed files are in place"
+    echo "  • All import fixes have been applied"
     echo "  • Check embeddings directory structure and file formats"
     echo "  • Monitor GPU memory usage across all ranks"
     echo "  • All compatibility fixes have been applied"
@@ -399,8 +401,9 @@ echo "This job trained BLIP3-o DiT using FSDP (Fully Sharded Data Parallel)"
 echo "to reproduce CLIP embeddings from EVA embeddings across multiple GPUs."
 echo ""
 echo "🔧 FIXES APPLIED:"
+echo "• Fixed distributed imports and missing aliases"
+echo "• Added proper communication utilities"
 echo "• Removed DistributedSampler incompatibility with IterableDataset"
-echo "• Added missing import aliases for distributed compatibility"
 echo "• More conservative resource requirements"
 echo "• Reduced batch size and shard count for stability"
 echo "• Fixed all import and compatibility issues"

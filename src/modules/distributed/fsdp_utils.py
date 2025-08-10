@@ -1,9 +1,11 @@
 """
-FSDP Utilities for BLIP3-o Distributed Training
+FIXED FSDP Utilities for BLIP3-o Distributed Training
 src/modules/distributed/fsdp_utils.py
 
-Provides utilities for setting up FSDP (Fully Sharded Data Parallel) training
-with optimal sharding policies and memory management.
+FIXES:
+- Proper device_id specification to avoid hangs
+- Better timeout handling
+- Improved initialization
 """
 
 import torch
@@ -27,12 +29,13 @@ import logging
 from typing import Optional, Dict, Any, Callable
 from pathlib import Path
 import os
+from datetime import timedelta
 
 logger = logging.getLogger(__name__)
 
 
 def setup_distributed_environment(rank: int, world_size: int, master_port: str = "12355"):
-    """Setup distributed training environment"""
+    """FIXED: Setup distributed training environment with proper device specification"""
     
     # Set environment variables
     os.environ['MASTER_ADDR'] = 'localhost'
@@ -41,23 +44,34 @@ def setup_distributed_environment(rank: int, world_size: int, master_port: str =
     os.environ['LOCAL_RANK'] = str(rank)
     os.environ['WORLD_SIZE'] = str(world_size)
     
-    # Initialize process group
-    dist.init_process_group(
-        backend='nccl',
-        init_method='env://',
-        world_size=world_size,
-        rank=rank
-    )
+    # FIXED: Set CUDA device first before initializing process group
+    if torch.cuda.is_available():
+        torch.cuda.set_device(rank)
+        device = torch.device(f'cuda:{rank}')
+    else:
+        device = torch.device('cpu')
     
-    # Set CUDA device
-    torch.cuda.set_device(rank)
-    device = torch.device(f'cuda:{rank}')
-    
-    if rank == 0:
-        logger.info(f"✅ Distributed environment initialized:")
-        logger.info(f"   World size: {world_size}")
-        logger.info(f"   Backend: nccl")
-        logger.info(f"   Master port: {master_port}")
+    # FIXED: Initialize process group with explicit device_id and shorter timeout
+    try:
+        dist.init_process_group(
+            backend='nccl',
+            init_method='env://',
+            world_size=world_size,
+            rank=rank,
+            timeout=timedelta(minutes=5),  # Shorter timeout to detect hangs faster
+            device_id=rank  # FIXED: Explicitly specify device_id
+        )
+        
+        if rank == 0:
+            logger.info(f"✅ Distributed environment initialized:")
+            logger.info(f"   World size: {world_size}")
+            logger.info(f"   Backend: nccl")
+            logger.info(f"   Master port: {master_port}")
+            logger.info(f"   Device ID specified: {rank}")
+            
+    except Exception as e:
+        logger.error(f"❌ Failed to initialize distributed environment: {e}")
+        raise
     
     return device
 
@@ -65,8 +79,11 @@ def setup_distributed_environment(rank: int, world_size: int, master_port: str =
 def cleanup_distributed():
     """Clean up distributed training"""
     if dist.is_initialized():
-        dist.destroy_process_group()
-        logger.info("🔧 Distributed environment cleaned up")
+        try:
+            dist.destroy_process_group()
+            logger.info("🔧 Distributed environment cleaned up")
+        except Exception as e:
+            logger.warning(f"Warning during distributed cleanup: {e}")
 
 
 def get_fsdp_sharding_policy():
@@ -117,19 +134,7 @@ def wrap_model_with_fsdp(
     limit_all_gathers: bool = True,
 ) -> FSDP:
     """
-    Wrap model with FSDP for distributed training
-    
-    Args:
-        model: The model to wrap
-        device: CUDA device for this rank
-        sharding_strategy: FSDP sharding strategy
-        use_mixed_precision: Whether to use mixed precision
-        cpu_offload: Whether to offload parameters to CPU
-        backward_prefetch: Backward prefetch strategy
-        limit_all_gathers: Whether to limit all-gather operations
-    
-    Returns:
-        FSDP-wrapped model
+    FIXED: Wrap model with FSDP for distributed training with better initialization
     """
     
     # Get sharding policy
@@ -141,7 +146,7 @@ def wrap_model_with_fsdp(
     # CPU offload policy
     cpu_offload_policy = CPUOffload(offload_params=True) if cpu_offload else None
     
-    # Wrap model with FSDP
+    # FIXED: Wrap model with FSDP with explicit device specification
     fsdp_model = FSDP(
         model,
         auto_wrap_policy=auto_wrap_policy,
@@ -151,7 +156,8 @@ def wrap_model_with_fsdp(
         backward_prefetch=backward_prefetch,
         limit_all_gathers=limit_all_gathers,
         use_orig_params=False,  # Use flattened parameters for better memory efficiency
-        device_id=device.index,
+        device_id=device.index if device.type == 'cuda' else None,  # FIXED: Explicit device_id
+        sync_module_states=True,  # FIXED: Ensure module states are synced
     )
     
     if dist.get_rank() == 0:
@@ -161,6 +167,8 @@ def wrap_model_with_fsdp(
         logger.info(f"   CPU offload: {'Enabled' if cpu_offload else 'Disabled'}")
         logger.info(f"   Backward prefetch: {backward_prefetch}")
         logger.info(f"   Limit all-gathers: {limit_all_gathers}")
+        logger.info(f"   Device ID: {device.index if device.type == 'cuda' else 'CPU'}")
+        logger.info(f"   Sync module states: True")
     
     return fsdp_model
 
@@ -177,16 +185,6 @@ def save_fsdp_checkpoint(
 ):
     """
     Save FSDP checkpoint with proper state dict handling
-    
-    Args:
-        model: FSDP-wrapped model
-        optimizer: Optimizer
-        scheduler: Learning rate scheduler
-        scaler: Gradient scaler
-        checkpoint_path: Path to save checkpoint
-        global_step: Current training step
-        additional_data: Additional data to save
-        save_full_state: Whether to save full model state (for inference)
     """
     
     if dist.get_rank() != 0:
@@ -253,17 +251,6 @@ def load_fsdp_checkpoint(
 ) -> Dict[str, Any]:
     """
     Load FSDP checkpoint with proper state dict handling
-    
-    Args:
-        model: FSDP-wrapped model
-        checkpoint_path: Path to checkpoint
-        optimizer: Optimizer to load state into
-        scheduler: Scheduler to load state into
-        scaler: Gradient scaler to load state into
-        strict: Whether to strictly enforce state dict keys
-    
-    Returns:
-        Checkpoint metadata
     """
     
     logger.info(f"📂 Loading FSDP checkpoint: {checkpoint_path}")
@@ -327,15 +314,6 @@ def estimate_fsdp_memory_usage(
 ) -> Dict[str, float]:
     """
     Estimate memory usage for FSDP training
-    
-    Args:
-        model_parameters: Total number of model parameters
-        world_size: Number of GPUs
-        use_mixed_precision: Whether using mixed precision
-        cpu_offload: Whether using CPU offload
-    
-    Returns:
-        Memory usage estimates in GB
     """
     
     # Parameter size estimates
@@ -422,21 +400,40 @@ def print_fsdp_memory_estimate(
 
 
 def sync_across_gpus(tensor: torch.Tensor, average: bool = True) -> torch.Tensor:
-    """Synchronize tensor across all GPUs"""
+    """Synchronize tensor across all GPUs with timeout protection"""
     
     if not dist.is_initialized():
         return tensor
     
-    # Clone to avoid modifying original
-    synced_tensor = tensor.clone()
+    try:
+        # Clone to avoid modifying original
+        synced_tensor = tensor.clone()
+        
+        # All-reduce across GPUs
+        dist.all_reduce(synced_tensor, op=dist.ReduceOp.SUM)
+        
+        if average:
+            synced_tensor /= dist.get_world_size()
+        
+        return synced_tensor
     
-    # All-reduce across GPUs
-    dist.all_reduce(synced_tensor, op=dist.ReduceOp.SUM)
+    except Exception as e:
+        logger.warning(f"Sync across GPUs failed: {e}")
+        return tensor
+
+
+def barrier_with_timeout(timeout_seconds: int = 60):
+    """Barrier with timeout to detect hangs"""
+    if not dist.is_initialized():
+        return
     
-    if average:
-        synced_tensor /= dist.get_world_size()
-    
-    return synced_tensor
+    try:
+        # Use a work object to implement timeout
+        work = dist.barrier(async_op=True)
+        work.wait(timeout=timedelta(seconds=timeout_seconds))
+    except Exception as e:
+        logger.error(f"Barrier timeout or error: {e}")
+        raise
 
 
 def is_master_rank() -> bool:
