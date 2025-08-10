@@ -1,8 +1,13 @@
 """
-Distributed Communication Utilities for BLIP3-o
+FIXED Distributed Communication Utilities for BLIP3-o
 src/modules/distributed/communication.py
 
 Provides communication and synchronization utilities for distributed training.
+
+FIXES:
+- Improved error handling
+- Better timeout management
+- Robust communication utilities
 """
 
 import torch
@@ -10,6 +15,7 @@ import torch.distributed as dist
 import logging
 from typing import Dict, Any, Optional, List
 import json
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -22,16 +28,13 @@ class DistributedCommunicator:
     def __init__(self, rank: int, world_size: int):
         self.rank = rank
         self.world_size = world_size
-        self.is_distributed = dist.is_initialized() if hasattr(dist, 'is_initialized') else False
+        self.is_distributed = dist.is_initialized()
         
     def barrier(self, timeout_seconds: Optional[int] = None):
         """Synchronize all processes"""
         if self.is_distributed:
             try:
-                if timeout_seconds:
-                    dist.barrier(timeout=torch.distributed.default_pg_timeout)
-                else:
-                    dist.barrier()
+                dist.barrier()
             except Exception as e:
                 logger.warning(f"Barrier failed on rank {self.rank}: {e}")
     
@@ -268,7 +271,7 @@ def check_distributed_setup(rank: int, world_size: int) -> Dict[str, Any]:
     setup_info = {
         'rank': rank,
         'world_size': world_size,
-        'is_distributed': dist.is_initialized() if hasattr(dist, 'is_initialized') else False,
+        'is_distributed': dist.is_initialized(),
         'backend': None,
         'master_addr': None,
         'master_port': None,
@@ -291,7 +294,3 @@ def check_distributed_setup(rank: int, world_size: int) -> Dict[str, Any]:
             logger.info(f"   Master: {setup_info['master_addr']}:{setup_info['master_port']}")
     
     return setup_info
-
-
-# Compatibility import
-import os

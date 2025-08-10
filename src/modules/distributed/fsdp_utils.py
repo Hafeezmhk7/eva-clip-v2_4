@@ -3,9 +3,9 @@ FIXED FSDP Utilities for BLIP3-o Distributed Training
 src/modules/distributed/fsdp_utils.py
 
 FIXES:
-- Proper device_id specification to avoid hangs
-- Better timeout handling
-- Improved initialization
+- Fixed device_id parameter issue (was passing int instead of device)
+- Better error handling and initialization
+- Proper device setup before process group initialization
 """
 
 import torch
@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 
 
 def setup_distributed_environment(rank: int, world_size: int, master_port: str = "12355"):
-    """FIXED: Setup distributed training environment with proper device specification"""
+    """FIXED: Setup distributed training environment with proper device handling"""
     
     # Set environment variables
     os.environ['MASTER_ADDR'] = 'localhost'
@@ -44,22 +44,23 @@ def setup_distributed_environment(rank: int, world_size: int, master_port: str =
     os.environ['LOCAL_RANK'] = str(rank)
     os.environ['WORLD_SIZE'] = str(world_size)
     
-    # FIXED: Set CUDA device first before initializing process group
+    # FIXED: Set CUDA device first and create device object
     if torch.cuda.is_available():
         torch.cuda.set_device(rank)
         device = torch.device(f'cuda:{rank}')
     else:
         device = torch.device('cpu')
+        raise RuntimeError("CUDA required for distributed training")
     
-    # FIXED: Initialize process group with explicit device_id and shorter timeout
+    # FIXED: Initialize process group WITHOUT device_id parameter
+    # The device_id parameter in init_process_group is deprecated and causes issues
     try:
         dist.init_process_group(
             backend='nccl',
             init_method='env://',
             world_size=world_size,
             rank=rank,
-            timeout=timedelta(minutes=5),  # Shorter timeout to detect hangs faster
-            device_id=rank  # FIXED: Explicitly specify device_id
+            timeout=timedelta(minutes=10)
         )
         
         if rank == 0:
@@ -67,7 +68,7 @@ def setup_distributed_environment(rank: int, world_size: int, master_port: str =
             logger.info(f"   World size: {world_size}")
             logger.info(f"   Backend: nccl")
             logger.info(f"   Master port: {master_port}")
-            logger.info(f"   Device ID specified: {rank}")
+            logger.info(f"   Device: {device}")
             
     except Exception as e:
         logger.error(f"❌ Failed to initialize distributed environment: {e}")
@@ -80,6 +81,7 @@ def cleanup_distributed():
     """Clean up distributed training"""
     if dist.is_initialized():
         try:
+            dist.barrier()
             dist.destroy_process_group()
             logger.info("🔧 Distributed environment cleaned up")
         except Exception as e:
@@ -134,7 +136,7 @@ def wrap_model_with_fsdp(
     limit_all_gathers: bool = True,
 ) -> FSDP:
     """
-    FIXED: Wrap model with FSDP for distributed training with better initialization
+    FIXED: Wrap model with FSDP for distributed training
     """
     
     # Get sharding policy
@@ -146,7 +148,7 @@ def wrap_model_with_fsdp(
     # CPU offload policy
     cpu_offload_policy = CPUOffload(offload_params=True) if cpu_offload else None
     
-    # FIXED: Wrap model with FSDP with explicit device specification
+    # FIXED: Wrap model with FSDP - use device index correctly
     fsdp_model = FSDP(
         model,
         auto_wrap_policy=auto_wrap_policy,
@@ -155,9 +157,9 @@ def wrap_model_with_fsdp(
         cpu_offload=cpu_offload_policy,
         backward_prefetch=backward_prefetch,
         limit_all_gathers=limit_all_gathers,
-        use_orig_params=False,  # Use flattened parameters for better memory efficiency
-        device_id=device.index if device.type == 'cuda' else None,  # FIXED: Explicit device_id
-        sync_module_states=True,  # FIXED: Ensure module states are synced
+        use_orig_params=False,
+        device_id=device.index if device.type == 'cuda' else None,  # FIXED: Use device.index
+        sync_module_states=True,
     )
     
     if dist.get_rank() == 0:

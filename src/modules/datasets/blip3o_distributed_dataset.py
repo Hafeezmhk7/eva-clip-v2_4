@@ -2,7 +2,10 @@
 FIXED Distributed Dataset Implementation for BLIP3-o
 src/modules/datasets/blip3o_distributed_dataset.py
 
-FIX: Removed incompatible sampler usage with IterableDataset
+FIXES:
+- Proper IterableDataset compatibility (no external samplers)
+- Better distributed data sharding
+- Improved error handling
 """
 
 import torch
@@ -30,10 +33,15 @@ logger = logging.getLogger(__name__)
 
 class DistributedBLIP3oCLIPReproductionDataset(BLIP3oCLIPReproductionDataset):
     """
-    Distributed version of BLIP3-o dataset with proper shard distribution
+    FIXED: Distributed version of BLIP3-o dataset with proper shard distribution
     
     Ensures that data is properly distributed across GPUs for FSDP training
     while maintaining all existing functionality from the base dataset.
+    
+    CRITICAL FIXES:
+    - Properly distributes shards across ranks
+    - No external samplers needed (IterableDataset handles distribution internally)
+    - Deterministic shuffling across ranks
     """
     
     def __init__(
@@ -68,7 +76,7 @@ class DistributedBLIP3oCLIPReproductionDataset(BLIP3oCLIPReproductionDataset):
         
         self.distributed_seed = distributed_seed
         
-        # Initialize base dataset
+        # Initialize base dataset first
         super().__init__(
             chunked_embeddings_dir=chunked_embeddings_dir,
             split=split,
@@ -95,7 +103,7 @@ class DistributedBLIP3oCLIPReproductionDataset(BLIP3oCLIPReproductionDataset):
             logger.info(f"  Is distributed: {self.is_distributed}")
 
     def _setup_distributed_shards(self):
-        """Distribute shards across ranks for balanced loading"""
+        """FIXED: Distribute shards across ranks for balanced loading"""
         
         if not self.is_distributed or self.world_size == 1:
             return
@@ -124,7 +132,7 @@ class DistributedBLIP3oCLIPReproductionDataset(BLIP3oCLIPReproductionDataset):
         logger.info(f"[Rank {self.rank}] Estimated length: {self.estimated_length:,} samples")
 
     def _prepare_shard_list(self):
-        """Prepare list of shard files with distributed-aware shuffling"""
+        """FIXED: Prepare list of shard files with distributed-aware shuffling"""
         
         mode_suffix = "cls_patch" if self.training_mode == "cls_patch" else "patch_only"
         patterns = [
@@ -154,7 +162,7 @@ class DistributedBLIP3oCLIPReproductionDataset(BLIP3oCLIPReproductionDataset):
         # Filter existing files
         shard_files = [f for f in shard_files if f.exists()]
         
-        # Shuffle consistently across ranks if requested
+        # FIXED: Shuffle consistently across ranks if requested
         if self.shuffle_shards:
             # Use same random seed across all ranks for consistent shuffling
             shuffle_rng = random.Random(self.distributed_seed)

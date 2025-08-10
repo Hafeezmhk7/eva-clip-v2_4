@@ -1,0 +1,206 @@
+[Rank 0] 2025-08-10 23:27:39,870 - INFO - ✅ CLIP DiT model loaded successfully
+[Rank 0] 2025-08-10 23:27:39,873 - INFO - ✅ Flow matching loss loaded successfully
+[Rank 0] 2025-08-10 23:27:41,296 - INFO - ✅ CLIP trainer loaded successfully
+[Rank 0] 2025-08-10 23:27:41,300 - INFO - ✅ CLIP datasets loaded successfully
+[Rank 0] 2025-08-10 23:27:41,306 - INFO - ✅ Configuration loaded successfully
+[Rank 0] 2025-08-10 23:27:41,306 - INFO - 🎉 All CLIP reproduction components loaded successfully!
+[Rank 0] 2025-08-10 23:27:41,307 - INFO - 🎉 FIXED BLIP3-o CLIP reproduction modules fully initialized!
+[Rank 0] 2025-08-10 23:27:41,307 - INFO - 🎯 Ready for distributed EVA → CLIP reproduction training
+[Rank 0] 2025-08-10 23:27:41,307 - INFO - 🔧 All compatibility fixes applied
+[Rank 0] 2025-08-10 23:27:41,319 - INFO - ✅ FSDP utilities loaded successfully
+[Rank 0] 2025-08-10 23:27:41,330 - INFO - ✅ Distributed trainer loaded successfully
+[Rank 0] 2025-08-10 23:27:41,331 - WARNING - ⚠️ Failed to import distributed extraction utilities: No module named 'src.modules.extract_embeddings_distributed'
+[Rank 0] 2025-08-10 23:27:41,340 - INFO - ✅ Distributed dataset utilities loaded successfully
+[Rank 0] 2025-08-10 23:27:41,340 - INFO - ✅ Communication utilities loaded successfully
+[Rank 0] 2025-08-10 23:27:46,186 - WARNING - ⚠️ Partial distributed environment initialization
+[Rank 0] 2025-08-10 23:27:46,186 - WARNING -    Issues: missing components: ['distributed_extraction']
+[Rank 0] 2025-08-10 23:27:46,227 - INFO - ✅ Distributed environment initialized:
+[Rank 0] 2025-08-10 23:27:46,227 - INFO -    World size: 4
+[Rank 0] 2025-08-10 23:27:46,227 - INFO -    Backend: nccl
+[Rank 0] 2025-08-10 23:27:46,227 - INFO -    Master port: 12355
+[Rank 0] 2025-08-10 23:27:46,227 - INFO -    Device: cuda:0
+[Rank 0] 2025-08-10 23:27:46,227 - INFO - 🚀 FIXED BLIP3-o Distributed CLIP Reproduction Training (FSDP + NO NORMALIZATION)
+[Rank 0] 2025-08-10 23:27:46,227 - INFO - ================================================================================
+[Rank 0] 2025-08-10 23:27:46,227 - INFO - 📋 Task: Reproduce CLIP embeddings from EVA embeddings
+[Rank 0] 2025-08-10 23:27:46,227 - INFO - 🧠 Model: BLIP3-o DiT WITHOUT CLIP normalization
+[Rank 0] 2025-08-10 23:27:46,227 - INFO - ⚡ Training: FSDP (Fully Sharded Data Parallel)
+[Rank 0] 2025-08-10 23:27:46,227 - INFO - 🌊 Method: Rectified Flow Matching with raw embeddings
+[Rank 0] 2025-08-10 23:27:46,227 - INFO - 🎯 Target: CLIP embeddings [B, N, 1024] (RAW)
+[Rank 0] 2025-08-10 23:27:46,227 - INFO - 🎮 Conditioning: EVA embeddings [B, N, 4096]
+[Rank 0] 2025-08-10 23:27:46,227 - INFO - 🔑 Focus: Distributed training without data-dependent normalization
+[Rank 0] 2025-08-10 23:27:46,227 - INFO - 🔧 FIXES: Device parameter issue + IterableDataset compatibility
+[Rank 0] 2025-08-10 23:27:46,227 - INFO - ================================================================================
+[Rank 0] 2025-08-10 23:27:46,228 - INFO - Found 50 embedding files
+[Rank 0] 2025-08-10 23:27:46,228 - INFO - Available GPUs: 4
+[Rank 0] 2025-08-10 23:27:46,228 - INFO -   GPU 0: NVIDIA H100 (100.0 GB)
+[Rank 0] 2025-08-10 23:27:46,228 - INFO -   GPU 1: NVIDIA H100 (100.0 GB)
+[Rank 0] 2025-08-10 23:27:46,228 - INFO -   GPU 2: NVIDIA H100 (100.0 GB)
+[Rank 0] 2025-08-10 23:27:46,228 - INFO -   GPU 3: NVIDIA H100 (100.0 GB)
+[Rank 0] 2025-08-10 23:27:46,228 - INFO - PyTorch version: 2.7.1+cu126
+[Rank 0] 2025-08-10 23:27:46,228 - INFO - ✅ Distributed dataset module loaded
+[Rank 0] 2025-08-10 23:27:46,228 - INFO - ✅ Model module loaded
+[Rank 0] 2025-08-10 23:27:46,228 - INFO - ✅ Loss module loaded
+[Rank 0] 2025-08-10 23:27:46,228 - INFO - ✅ Distributed trainer module loaded
+[Rank 0] 2025-08-10 23:27:46,228 - INFO - ✅ FSDP utilities loaded
+[Rank 0] 2025-08-10 23:27:46,228 - INFO - ✅ All distributed modules loaded successfully
+[Rank 0] 2025-08-10 23:27:46,229 - INFO - ✅ Temp checkpoint directory ready: /scratch-shared/azadaianchuk1/blip3o_workspace/checkpoints
+[Rank 0] 2025-08-10 23:27:46,229 - INFO - FIXED Configuration (FSDP + NO NORMALIZATION):
+[Rank 0] 2025-08-10 23:27:46,229 - INFO -   World size: 4
+[Rank 0] 2025-08-10 23:27:46,229 - INFO -   Model size: base
+[Rank 0] 2025-08-10 23:27:46,229 - INFO -   Training mode: patch_only
+[Rank 0] 2025-08-10 23:27:46,229 - INFO -   Embeddings dir: /scratch-shared/azadaianchuk1/blip3o_workspace/embeddings/patch_only_256_tokens
+[Rank 0] 2025-08-10 23:27:46,229 - INFO -   Output dir: /scratch-shared/azadaianchuk1/blip3o_workspace/checkpoints/blip3o_fsdp_20250810_232728
+[Rank 0] 2025-08-10 23:27:46,229 - INFO -   Temp checkpoint dir: /scratch-shared/azadaianchuk1/blip3o_workspace/checkpoints
+[Rank 0] 2025-08-10 23:27:46,229 - INFO -   Batch size per GPU: 16
+[Rank 0] 2025-08-10 23:27:46,229 - INFO -   Total batch size: 64
+[Rank 0] 2025-08-10 23:27:46,229 - INFO -   Learning rate: 4e-05
+[Rank 0] 2025-08-10 23:27:46,229 - INFO -   Epochs: 8
+[Rank 0] 2025-08-10 23:27:46,229 - INFO -   FSDP sharding: FULL_SHARD
+[Rank 0] 2025-08-10 23:27:46,229 - INFO -   Mixed precision: BF16
+[Rank 0] 2025-08-10 23:27:46,229 - INFO -   CPU offload: Disabled
+[Rank 0] 2025-08-10 23:27:46,229 - INFO - 🏗️ Creating model...
+[Rank 0] 2025-08-10 23:27:46,230 - INFO - ✅ Configuration validation passed
+[Rank 0] 2025-08-10 23:27:46,661 - INFO - ✅ EVA-CLIP Adapter initialized: 4096 → 768
+[Rank 0] 2025-08-10 23:27:46,662 - INFO -    Layers: 6, Dropout: 0.1, Residual: True
+[Rank 0] 2025-08-10 23:27:48,137 - INFO - ✅ Stable initialization applied with depth scale: 0.2887
+[Rank 0] 2025-08-10 23:27:48,139 - INFO - ✅ IMPROVED BLIP3-o CLIP DiT model initialized: 227,474,014 parameters
+[Rank 0] 2025-08-10 23:27:48,139 - INFO -   🔥 EVA adapter: ENABLED
+[Rank 0] 2025-08-10 23:27:48,139 - INFO -   🚀 Heun solver: ENABLED
+[Rank 0] 2025-08-10 23:27:48,139 - INFO -   ⚡ Attention caching: Available
+[Rank 0] 2025-08-10 23:27:48,139 - INFO - ✅ IMPROVED BLIP3-o model created:
+[Rank 0] 2025-08-10 23:27:48,139 - INFO -    Size: base
+[Rank 0] 2025-08-10 23:27:48,140 - INFO -    Parameters: 227,474,014
+[Rank 0] 2025-08-10 23:27:48,140 - INFO -    EVA adapter: ✅
+[Rank 0] 2025-08-10 23:27:48,140 - INFO -    Heun solver: ✅
+[Rank 0] 2025-08-10 23:27:48,140 - INFO -    3D RoPE: ✅
+[Rank 0] 2025-08-10 23:27:48,140 - INFO -    Sandwich norm: ✅
+[Rank 0] 2025-08-10 23:27:48,141 - INFO - ✅ Model created with 227,474,014 parameters
+[Rank 0] 2025-08-10 23:27:48,141 - INFO -   Model size: base
+[Rank 0] 2025-08-10 23:27:48,141 - INFO -   Training mode: patch_only
+[Rank 0] 2025-08-10 23:27:48,141 - INFO -   EVA Adapter: ✅ ENABLED
+[Rank 0] 2025-08-10 23:27:48,141 - INFO -   Will be wrapped with FSDP: ✅
+[Rank 0] 2025-08-10 23:27:48,141 - INFO - 🌊 Creating loss function...
+[Rank 0] 2025-08-10 23:27:48,141 - INFO - ✅ Flow Matching Loss initialized (NO NORMALIZATION):
+[Rank 0] 2025-08-10 23:27:48,141 - INFO -   Prediction type: velocity
+[Rank 0] 2025-08-10 23:27:48,141 - INFO -   Flow type: rectified
+[Rank 0] 2025-08-10 23:27:48,142 - INFO -   Weights - Velocity: 1.0
+[Rank 0] 2025-08-10 23:27:48,142 - INFO - 📊 Creating distributed dataloaders...
+[Rank 0] 2025-08-10 23:27:48,142 - INFO - Loading embeddings from: /scratch-shared/azadaianchuk1/blip3o_workspace/embeddings/patch_only_256_tokens
+[Rank 0] 2025-08-10 23:27:48,142 - INFO - Found 50 .pkl files in embeddings directory
+[Rank 0] 2025-08-10 23:27:48,142 - INFO - Creating distributed CLIP reproduction dataloaders:
+[Rank 0] 2025-08-10 23:27:48,142 - INFO -   World size: 4
+[Rank 0] 2025-08-10 23:27:48,142 - INFO -   Rank: 0
+[Rank 0] 2025-08-10 23:27:48,142 - INFO -   Batch size per GPU: 16
+[Rank 0] 2025-08-10 23:27:48,142 - INFO -   Target: CLIP embeddings [B, N, 1024] (RAW)
+[Rank 0] 2025-08-10 23:27:48,142 - INFO -   Conditioning: EVA embeddings [B, N, 4096]
+[Rank 0] 2025-08-10 23:27:48,142 - INFO -   Simple scale factor: 1.0
+[Rank 0] 2025-08-10 23:27:48,142 - INFO -   Distributed seed: 42
+[Rank 0] 2025-08-10 23:27:48,143 - INFO - Loaded manifest: 0 shards, 0 samples
+[Rank 0] 2025-08-10 23:27:48,143 - INFO - Found 20 files with pattern: embeddings_shard_*_patch_only.pkl
+[Rank 0] 2025-08-10 23:27:48,144 - INFO - Prepared 3 shard files for distributed processing
+[Rank 0] 2025-08-10 23:27:53,596 - INFO - Estimated length from first shard: 7,803 samples
+[Rank 0] 2025-08-10 23:27:53,615 - INFO - BLIP3-o CLIP Reproduction Dataset initialized (NO NORMALIZATION):
+[Rank 0] 2025-08-10 23:27:53,615 - INFO -   Directory: /scratch-shared/azadaianchuk1/blip3o_workspace/embeddings/patch_only_256_tokens
+[Rank 0] 2025-08-10 23:27:53,615 - INFO -   Mode: patch_only (256 tokens)
+[Rank 0] 2025-08-10 23:27:53,616 - INFO -   TARGET: CLIP embeddings [B, N, 1024] (RAW - NO NORMALIZATION)
+[Rank 0] 2025-08-10 23:27:53,616 - INFO -   CONDITIONING: EVA embeddings [B, N, 4096]
+[Rank 0] 2025-08-10 23:27:53,616 - INFO -   Shards: 3
+[Rank 0] 2025-08-10 23:27:53,616 - INFO -   Simple scale factor: 1.0
+[Rank 0] 2025-08-10 23:27:53,616 - INFO -   ✅ CLIP normalization: DISABLED
+[Rank 0] 2025-08-10 23:27:53,616 - INFO - [Rank 0] Assigned 1/3 shards
+[Rank 0] 2025-08-10 23:27:53,616 - INFO - [Rank 0] Estimated length: 2,601 samples
+[Rank 0] 2025-08-10 23:27:53,616 - INFO - Distributed BLIP3-o dataset initialized:
+[Rank 0] 2025-08-10 23:27:53,616 - INFO -   World size: 4
+[Rank 0] 2025-08-10 23:27:53,616 - INFO -   Rank: 0
+[Rank 0] 2025-08-10 23:27:53,616 - INFO -   Shards per rank: 1
+[Rank 0] 2025-08-10 23:27:53,616 - INFO -   Is distributed: True
+[Rank 0] 2025-08-10 23:27:53,616 - INFO - Loaded manifest: 0 shards, 0 samples
+[Rank 0] 2025-08-10 23:27:53,616 - INFO - Found 20 files with pattern: embeddings_shard_*_patch_only.pkl
+[Rank 0] 2025-08-10 23:27:53,617 - INFO - Prepared 3 shard files for distributed processing
+[Rank 0] 2025-08-10 23:27:58,884 - INFO - Estimated length from first shard: 7,938 samples
+[Rank 0] 2025-08-10 23:27:58,910 - INFO - BLIP3-o CLIP Reproduction Dataset initialized (NO NORMALIZATION):
+[Rank 0] 2025-08-10 23:27:58,910 - INFO -   Directory: /scratch-shared/azadaianchuk1/blip3o_workspace/embeddings/patch_only_256_tokens
+[Rank 0] 2025-08-10 23:27:58,910 - INFO -   Mode: patch_only (256 tokens)
+[Rank 0] 2025-08-10 23:27:58,910 - INFO -   TARGET: CLIP embeddings [B, N, 1024] (RAW - NO NORMALIZATION)
+[Rank 0] 2025-08-10 23:27:58,910 - INFO -   CONDITIONING: EVA embeddings [B, N, 4096]
+[Rank 0] 2025-08-10 23:27:58,910 - INFO -   Shards: 3
+[Rank 0] 2025-08-10 23:27:58,910 - INFO -   Simple scale factor: 1.0
+[Rank 0] 2025-08-10 23:27:58,911 - INFO -   ✅ CLIP normalization: DISABLED
+[Rank 0] 2025-08-10 23:27:58,911 - INFO - [Rank 0] Assigned 1/3 shards
+[Rank 0] 2025-08-10 23:27:58,911 - INFO - [Rank 0] Estimated length: 2,646 samples
+[Rank 0] 2025-08-10 23:27:58,911 - INFO - Distributed BLIP3-o dataset initialized:
+[Rank 0] 2025-08-10 23:27:58,911 - INFO -   World size: 4
+[Rank 0] 2025-08-10 23:27:58,911 - INFO -   Rank: 0
+[Rank 0] 2025-08-10 23:27:58,911 - INFO -   Shards per rank: 1
+[Rank 0] 2025-08-10 23:27:58,911 - INFO -   Is distributed: True
+[Rank 0] 2025-08-10 23:27:58,911 - INFO - ✅ Distributed dataloaders created:
+[Rank 0] 2025-08-10 23:27:58,911 - INFO -   Training dataset length (per rank): 2,601
+[Rank 0] 2025-08-10 23:27:58,911 - INFO -   Evaluation dataset length (per rank): 2,646
+[Rank 0] 2025-08-10 23:27:58,911 - INFO -   Training batches (per rank): 162
+[Rank 0] 2025-08-10 23:27:58,911 - INFO -   Evaluation batches (per rank): 166
+[Rank 0] 2025-08-10 23:27:58,911 - INFO -   Total effective batch size: 64
+[Rank 0] 2025-08-10 23:27:58,911 - INFO -   CLIP normalization: DISABLED
+[Rank 0] 2025-08-10 23:27:58,911 - INFO -   🔧 FIX APPLIED: No samplers used with IterableDataset
+[Rank 0] 2025-08-10 23:28:03,117 - INFO - ✅ Distributed dataloader test successful:
+[Rank 0] 2025-08-10 23:28:03,118 - INFO -   Batch size: 16
+[Rank 0] 2025-08-10 23:28:03,119 - INFO -   CLIP embeddings shape: torch.Size([16, 256, 1024])
+[Rank 0] 2025-08-10 23:28:03,119 - INFO -   EVA embeddings shape: torch.Size([16, 256, 4096])
+[Rank 0] 2025-08-10 23:28:03,120 - INFO -   Raw CLIP range: [-34.125, 220.375]
+[Rank 0] 2025-08-10 23:28:03,120 - INFO - ✅ Distributed dataloaders created:
+[Rank 0] 2025-08-10 23:28:03,120 - INFO -   Training mode: patch_only
+[Rank 0] 2025-08-10 23:28:03,121 - INFO -   Batch size per GPU: 16
+[Rank 0] 2025-08-10 23:28:03,121 - INFO -   Total effective batch size: 64
+[Rank 0] 2025-08-10 23:28:03,121 - INFO -   Max shards: 3
+[Rank 0] 2025-08-10 23:28:03,121 - INFO -   Simple scale factor: 1.0
+[Rank 0] 2025-08-10 23:28:03,121 - INFO -   CLIP normalization: DISABLED
+[Rank 0] 2025-08-10 23:28:03,121 - INFO - 🏃 Creating distributed trainer...
+[Rank 0] 2025-08-10 23:28:03,121 - INFO - 🗂️ Temp checkpoint directory: /scratch-shared/azadaianchuk1/blip3o_workspace/checkpoints
+[Rank 0] 2025-08-10 23:28:03,121 - INFO - ✅ FSDP Mixed precision policy created (BF16)
+[Rank 0] 2025-08-10 23:28:06,029 - INFO - ✅ Model wrapped with FSDP:
+[Rank 0] 2025-08-10 23:28:06,030 - INFO -    Sharding strategy: ShardingStrategy.FULL_SHARD
+[Rank 0] 2025-08-10 23:28:06,030 - INFO -    Mixed precision: BF16
+[Rank 0] 2025-08-10 23:28:06,030 - INFO -    CPU offload: Disabled
+[Rank 0] 2025-08-10 23:28:06,030 - INFO -    Backward prefetch: BackwardPrefetch.BACKWARD_PRE
+[Rank 0] 2025-08-10 23:28:06,030 - INFO -    Limit all-gathers: True
+[Rank 0] 2025-08-10 23:28:06,030 - INFO -    Device ID: 0
+[Rank 0] 2025-08-10 23:28:06,030 - INFO -    Sync module states: True
+[Rank 0] 2025-08-10 23:28:06,030 - INFO - Got exact dataloader length: 162
+[Rank 0] 2025-08-10 23:28:06,031 - INFO - ✅ Distributed optimizer setup complete
+[Rank 0] 2025-08-10 23:28:06,031 - INFO - ✅ BLIP3-o Distributed Trainer initialized
+[Rank 0] 2025-08-10 23:28:06,031 - INFO -   World size: 4
+[Rank 0] 2025-08-10 23:28:06,031 - INFO -   FSDP enabled: True
+[Rank 0] 2025-08-10 23:28:06,031 - INFO -   Sharding strategy: ShardingStrategy.FULL_SHARD
+[Rank 0] 2025-08-10 23:28:06,031 - INFO -   Mixed precision: BF16
+[Rank 0] 2025-08-10 23:28:06,031 - INFO -   CPU offload: Disabled
+[Rank 0] 2025-08-10 23:28:06,031 - INFO - ✅ Distributed trainer created successfully:
+[Rank 0] 2025-08-10 23:28:06,031 - INFO -   FSDP enabled: True
+[Rank 0] 2025-08-10 23:28:06,031 - INFO -   Sharding strategy: FULL_SHARD
+[Rank 0] 2025-08-10 23:28:06,031 - INFO -   Mixed precision: BF16
+[Rank 0] 2025-08-10 23:28:06,031 - INFO -   CPU offload: Disabled
+[Rank 0] 2025-08-10 23:28:06,031 - INFO -   Evaluation: Every 50 steps
+[Rank 0] 2025-08-10 23:28:06,031 - INFO -   WandB enabled: False
+[Rank 0] 2025-08-10 23:28:06,031 - INFO -   Heun inference: ✅ ENABLED
+[Rank 0] 2025-08-10 23:28:06,031 - INFO -   Normalization: DISABLED
+[Rank 0] 2025-08-10 23:28:06,031 - INFO -   Local checkpoints: 3
+[Rank 0] 2025-08-10 23:28:06,031 - INFO -   Temp checkpoints: ✅ ENABLED
+[Rank 0] 2025-08-10 23:28:06,031 - INFO -     Temp directory: /scratch-shared/azadaianchuk1/blip3o_workspace/checkpoints
+[Rank 0] 2025-08-10 23:28:06,031 - INFO -     Save to temp every: 1000 steps
+[Rank 0] 2025-08-10 23:28:06,032 - INFO - 💾 Saving experiment configuration...
+[Rank 0] 2025-08-10 23:28:06,061 - INFO - ✅ Distributed configuration saved to /scratch-shared/azadaianchuk1/blip3o_workspace/checkpoints/blip3o_fsdp_20250810_232728/distributed_experiment_config.json
+[Rank 0] 2025-08-10 23:28:06,079 - INFO - ✅ Configuration also saved to temp: /scratch-shared/azadaianchuk1/blip3o_workspace/checkpoints/distributed_experiment_config.json
+[Rank 0] 2025-08-10 23:28:06,079 - INFO - 
+🚀 Starting FIXED FSDP distributed training...
+[Rank 0] 2025-08-10 23:28:06,079 - INFO - ================================================================================
+[Rank 0] 2025-08-10 23:28:06,079 - INFO - 🎯 Expected Results:
+[Rank 0] 2025-08-10 23:28:06,079 - INFO -    • Distributed training across multiple GPUs
+[Rank 0] 2025-08-10 23:28:06,079 - INFO -    • Memory efficiency through parameter sharding
+[Rank 0] 2025-08-10 23:28:06,080 - INFO -    • Simplified training without normalization concerns
+[Rank 0] 2025-08-10 23:28:06,080 - INFO -    • Smart checkpoint management for large-scale training
+[Rank 0] 2025-08-10 23:28:06,080 - INFO -    • ~3-4x training speedup with proper scaling
+[Rank 0] 2025-08-10 23:28:06,080 - INFO -    • FIXED: No device_id parameter issues
+[Rank 0] 2025-08-10 23:28:06,080 - INFO - ================================================================================
+[Rank 0] 2025-08-10 23:28:06,080 - INFO - 🚀 Starting BLIP3-o distributed training with FSDP...
+[Rank 0] 2025-08-10 23:28:06,080 - INFO -   World size: 4
+[Rank 0] 2025-08-10 23:28:06,080 - INFO -   FSDP sharding: ShardingStrategy.FULL_SHARD
+[Rank 0] 2025-08-10 23:28:06,080 - INFO -   Mixed precision: BF16
+[Rank 0] 2025-08-10 23:28:06,085 - INFO - Starting distributed epoch 1/8
