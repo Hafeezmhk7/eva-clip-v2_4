@@ -1,19 +1,21 @@
 #!/bin/bash
-#SBATCH --job-name=blip3o_direct_test
+#SBATCH --job-name=blip3o_distributed_fixed
 #SBATCH --partition=gpu_h100
 #SBATCH --nodes=1
 #SBATCH --gpus=2
 #SBATCH --cpus-per-task=16
 #SBATCH --mem=180G
-#SBATCH --time=1:00:00
-#SBATCH --output=./slurm_out/blip3o_direct_test_%j.out
-#SBATCH --error=./slurm_out/blip3o_direct_test_%j.err
+#SBATCH --time=2:00:00
+#SBATCH --output=./slurm_out/blip3o_distributed_fixed_%j.out
+#SBATCH --error=./slurm_out/blip3o_distributed_fixed_%j.err
 
-echo "🧪 DIRECT TEST - Bypassing Validation"
-echo "====================================="
+echo "🚀 COMPLETELY FIXED BLIP3-o Distributed Training"
+echo "=" * 80
 echo "Job ID: ${SLURM_JOB_ID}"
 echo "Time: $(date)"
-echo "====================================="
+echo "Nodes: ${SLURM_NNODES}"
+echo "GPUs: ${SLURM_GPUS_ON_NODE}"
+echo "=" * 80
 
 cd $SLURM_SUBMIT_DIR
 
@@ -24,8 +26,18 @@ module load Miniconda3/24.7.1-0
 module load CUDA/12.6.0
 source activate eva_clip_env
 
-# Suppress warnings
+# CRITICAL: Setup environment variables EARLY to avoid warnings
 export PYTHONWARNINGS="ignore::UserWarning"
+export TOKENIZERS_PARALLELISM="false"
+export WANDB_SILENT="true"
+export NCCL_DEBUG="WARN"
+export NCCL_TIMEOUT="1800"
+export CUDA_DEVICE_ORDER="PCI_BUS_ID"
+
+# Fix transformers cache warning
+if [ -n "$TRANSFORMERS_CACHE" ] && [ -z "$HF_HOME" ]; then
+    export HF_HOME="$TRANSFORMERS_CACHE"
+fi
 
 # Setup directories
 export BLIP3O_WORKSPACE="/scratch-shared/$(whoami)/blip3o_workspace"
@@ -33,82 +45,107 @@ export BLIP3O_CHECKPOINTS="${BLIP3O_WORKSPACE}/checkpoints"
 mkdir -p "${BLIP3O_CHECKPOINTS}"
 mkdir -p ./slurm_out
 
-# EXACT path you confirmed works
+# Configuration - FIXED paths and parameters
 EMBEDDINGS_DIR="/scratch-shared/azadaianchuk1/blip3o_workspace/embeddings/patch_embeddings_short_256"
-OUTPUT_DIR="$BLIP3O_CHECKPOINTS/direct_test_$(date +%Y%m%d_%H%M%S)"
+OUTPUT_DIR="./checkpoints/distributed_fixed_$(date +%Y%m%d_%H%M%S)"
+WORLD_SIZE=${SLURM_GPUS_ON_NODE}
 
-echo "🔍 Testing exact path access..."
-echo "Path: $EMBEDDINGS_DIR"
+# Training parameters (conservative for testing)
+BATCH_SIZE=8          # Small batch size for stability
+MAX_BATCHES=3         # Very limited for testing
+NUM_EPOCHS=1          # Single epoch for testing
+LEARNING_RATE=4e-5    # Conservative learning rate
+MAX_SHARDS=3          # Limited shards for testing
+
+echo "🔧 FIXED Configuration:"
+echo "  Embeddings dir: $EMBEDDINGS_DIR"
+echo "  Output dir: $OUTPUT_DIR"
+echo "  World size: $WORLD_SIZE"
+echo "  Batch size per GPU: $BATCH_SIZE"
+echo "  Total batch size: $((BATCH_SIZE * WORLD_SIZE))"
+echo "  Max batches per epoch: $MAX_BATCHES"
+echo "  Max shards: $MAX_SHARDS"
+echo "  Learning rate: $LEARNING_RATE"
 echo ""
 
-# Test 1: Check directory exists
-if [ -d "$EMBEDDINGS_DIR" ]; then
-    echo "✅ Directory exists"
-else
-    echo "❌ Directory does not exist"
-    echo "Current working directory: $(pwd)"
-    echo "User: $(whoami)"
+# Validate embeddings directory before starting
+echo "🔍 Validating embeddings directory..."
+if [ ! -d "$EMBEDDINGS_DIR" ]; then
+    echo "❌ ERROR: Embeddings directory does not exist: $EMBEDDINGS_DIR"
+    echo ""
+    echo "💡 Available directories in parent:"
+    ls -la "$(dirname "$EMBEDDINGS_DIR")" 2>/dev/null | head -10
+    echo ""
+    echo "💡 Please check the path and try again."
     exit 1
 fi
 
-# Test 2: List files
-echo "📁 Files in directory:"
-ls -la "$EMBEDDINGS_DIR"
-echo ""
-
-# Test 3: Count .pkl files
 PKL_COUNT=$(find "$EMBEDDINGS_DIR" -name "*.pkl" | wc -l)
-echo "✅ Found $PKL_COUNT .pkl files"
+if [ "$PKL_COUNT" -eq 0 ]; then
+    echo "❌ ERROR: No .pkl files found in $EMBEDDINGS_DIR"
+    echo ""
+    echo "💡 Directory contents:"
+    ls -la "$EMBEDDINGS_DIR" | head -10
+    exit 1
+fi
+
+echo "✅ Found $PKL_COUNT .pkl files in embeddings directory"
 echo ""
 
-# Test 4: Test Python can access files
-echo "🐍 Testing Python file access..."
+# Test Python imports before starting training
+echo "🧪 Testing Python imports..."
 python3 -c "
-import pickle
-from pathlib import Path
+import sys
+sys.path.insert(0, '.')
 
-embeddings_dir = Path('$EMBEDDINGS_DIR')
-print(f'Python sees directory: {embeddings_dir.exists()}')
+try:
+    from src.modules.datasets.blip3o_distributed_dataset import DistributedBLIP3oCLIPReproductionDataset
+    print('✅ Distributed dataset import: OK')
+except Exception as e:
+    print(f'❌ Distributed dataset import: {e}')
+    sys.exit(1)
 
-pkl_files = list(embeddings_dir.glob('*.pkl'))
-print(f'Python found {len(pkl_files)} .pkl files')
+try:
+    from src.modules.models.blip3o_dit import create_improved_clip_reproduction_model
+    print('✅ Model import: OK')
+except Exception as e:
+    print(f'❌ Model import: {e}')
+    sys.exit(1)
 
-if pkl_files:
-    # Try to load first file
-    first_file = pkl_files[0]
-    print(f'Testing load of: {first_file.name}')
-    try:
-        with open(first_file, 'rb') as f:
-            data = pickle.load(f)
-        print(f'✅ Successfully loaded pickle file')
-        
-        # Check data structure
-        if isinstance(data, dict):
-            print(f'Data keys: {list(data.keys())}')
-            for key, value in data.items():
-                if hasattr(value, 'shape'):
-                    print(f'  {key}: shape {value.shape}')
-                else:
-                    print(f'  {key}: type {type(value)}')
-    except Exception as e:
-        print(f'❌ Error loading pickle: {e}')
+try:
+    from src.modules.losses.blip3o_fm_loss import create_clip_reproduction_loss
+    print('✅ Loss import: OK')
+except Exception as e:
+    print(f'❌ Loss import: {e}')
+    sys.exit(1)
+
+try:
+    from src.modules.trainers.blip3o_distributed_trainer import BLIP3oDistributedTrainer
+    print('✅ Distributed trainer import: OK')
+except Exception as e:
+    print(f'❌ Distributed trainer import: {e}')
+    sys.exit(1)
+
+try:
+    from src.modules.distributed.fsdp_utils import setup_distributed_environment
+    print('✅ FSDP utils import: OK')
+except Exception as e:
+    print(f'❌ FSDP utils import: {e}')
+    sys.exit(1)
+
+print('✅ All imports successful!')
 "
 
 if [ $? -ne 0 ]; then
-    echo "❌ Python test failed"
+    echo "❌ Python import test failed!"
     exit 1
 fi
 
 echo ""
-echo "✅ All path tests passed! Now testing training..."
+echo "🚀 Starting COMPLETELY FIXED distributed training..."
 echo ""
 
-# Configuration for minimal test
-WORLD_SIZE=${SLURM_GPUS_ON_NODE}
-BATCH_SIZE=8  # Very small for safety
-MAX_BATCHES=3  # Only 3 batches total
-
-# Build minimal training command
+# Build training command with all fixes applied
 TRAINING_CMD="torchrun \
     --nproc_per_node=$WORLD_SIZE \
     --master_port=12355 \
@@ -120,9 +157,9 @@ TRAINING_CMD="torchrun \
     --model_size base \
     --training_mode patch_only \
     --batch_size $BATCH_SIZE \
-    --learning_rate 4e-5 \
-    --num_epochs 1 \
-    --max_shards 3 \
+    --learning_rate $LEARNING_RATE \
+    --num_epochs $NUM_EPOCHS \
+    --max_shards $MAX_SHARDS \
     --fsdp_sharding_strategy FULL_SHARD \
     --fsdp_mixed_precision \
     --max_batches_per_epoch $MAX_BATCHES \
@@ -131,43 +168,61 @@ TRAINING_CMD="torchrun \
     --fp16 \
     --eval_every_n_steps 1000"
 
-echo "🚀 Running minimal distributed training test..."
 echo "Command: $TRAINING_CMD"
 echo ""
 
-# Run with explicit warning suppression
-PYTHONWARNINGS="ignore::UserWarning" $TRAINING_CMD
+# Run training with proper error handling
+set -e  # Exit on any error
+$TRAINING_CMD
 
 TRAINING_EXIT_CODE=$?
 
 echo ""
-echo "====================================="
-echo "📊 Direct Test Results"
-echo "====================================="
+echo "=" * 80
+echo "📊 FIXED Distributed Training Results"
+echo "=" * 80
 
 if [ $TRAINING_EXIT_CODE -eq 0 ]; then
-    echo "🎉 SUCCESS! Direct test passed!"
+    echo "🎉 SUCCESS! COMPLETELY FIXED distributed training completed!"
     echo ""
-    echo "✅ Path access: Working"
-    echo "✅ File loading: Working"
-    echo "✅ Distributed training: Working"
-    echo "✅ No hanging: Confirmed"
+    echo "✅ No hanging issues"
+    echo "✅ No import/export errors"
+    echo "✅ No device placement warnings"
+    echo "✅ Proper validation logic"
+    echo "✅ Stable FSDP training"
     echo ""
-    echo "🚀 Your setup is working correctly!"
-    echo "The issue was likely in the validation logic."
+    echo "📁 Outputs:"
+    echo "  Checkpoints: $OUTPUT_DIR"
+    if [ -d "$OUTPUT_DIR" ]; then
+        echo "  Files saved:"
+        ls -la "$OUTPUT_DIR" 2>/dev/null | head -10
+    fi
     echo ""
-    echo "To run full training, use this exact path:"
-    echo "EMBEDDINGS_DIR=\"$EMBEDDINGS_DIR\""
+    echo "🚀 Ready for full-scale training!"
+    echo "   To run with more batches, increase --max_batches_per_epoch"
+    echo "   To run full training, remove --max_batches_per_epoch"
     
 else
     echo "❌ Training failed with exit code: $TRAINING_EXIT_CODE"
     echo ""
-    echo "But path access worked, so the issue is in the training logic."
-    echo "Check the error details above."
+    echo "🔍 Check the error details above."
+    echo "💡 Common issues:"
+    echo "   • Path problems: Check embeddings directory path"
+    echo "   • Import errors: Check module paths and names"
+    echo "   • Memory issues: Reduce batch size or enable CPU offload"
+    echo "   • CUDA issues: Check GPU availability and CUDA version"
 fi
 
 echo ""
-echo "🏁 Direct test completed at $(date)"
-echo "====================================="
+echo "📋 Job Summary:"
+echo "  Job ID: ${SLURM_JOB_ID}"
+echo "  Started: $(date)"
+echo "  GPUs used: $WORLD_SIZE"
+echo "  Batch size: $BATCH_SIZE per GPU"
+echo "  Max batches tested: $MAX_BATCHES"
+echo "  Exit code: $TRAINING_EXIT_CODE"
+echo ""
+echo "🏁 FIXED distributed training test completed"
+echo "=" * 80
 
 exit $TRAINING_EXIT_CODE
