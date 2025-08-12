@@ -3,12 +3,13 @@ COMPLETELY FIXED BLIP3-o Distributed Trainer with FSDP
 src/modules/trainers/blip3o_distributed_trainer.py
 
 MAJOR FIXES:
-- Fixed hanging issues in training loop completely
+- Fixed all import/export name mismatches
+- Added proper aliases for backward compatibility
+- Fixed hanging issues completely
 - Better timeout handling and error recovery
 - Improved progress tracking and logging
 - Fixed device placement and initialization order
 - Added robust batch processing with fallbacks
-- Better resource management and cleanup
 """
 
 import torch
@@ -82,7 +83,7 @@ class TimeoutHandler:
         return False
 
 
-class FixedBLIP3oDistributedTrainer:
+class BLIP3oDistributedTrainer:
     """
     COMPLETELY FIXED BLIP3-o Distributed Trainer with FSDP Support
     
@@ -91,6 +92,7 @@ class FixedBLIP3oDistributedTrainer:
     - Robust timeout handling
     - Better error recovery
     - Improved progress tracking
+    - Fixed all import/export names
     """
     
     def __init__(
@@ -414,7 +416,8 @@ class FixedBLIP3oDistributedTrainer:
                     'timeout_protection_added',
                     'robust_error_recovery',
                     'better_progress_tracking',
-                    'device_placement_fixed'
+                    'device_placement_fixed',
+                    'import_export_names_fixed'
                 ],
                 **self.wandb_config,
             }
@@ -766,7 +769,8 @@ class FixedBLIP3oDistributedTrainer:
                     'no_hanging_completely_fixed',
                     'timeout_protection',
                     'robust_error_recovery',
-                    'better_progress_tracking'
+                    'better_progress_tracking',
+                    'import_export_names_fixed'
                 ]
             }
             
@@ -831,7 +835,12 @@ class FixedBLIP3oDistributedTrainer:
             logger.error(f"[Rank {self.rank}] Recovery failed: {e}")
 
 
-def create_fixed_distributed_clip_trainer(
+# FIXED: Add proper aliases for backward compatibility
+BLIP3oDistributedTrainer = BLIP3oDistributedTrainer  # Main class
+FixedBLIP3oDistributedTrainer = BLIP3oDistributedTrainer  # Alias for old name
+
+
+def create_distributed_clip_trainer(
     model,
     loss_fn,
     train_dataloader,
@@ -851,10 +860,10 @@ def create_fixed_distributed_clip_trainer(
     batch_timeout_seconds: int = 60,
     enable_recovery_mode: bool = True,
     **kwargs
-) -> FixedBLIP3oDistributedTrainer:
+) -> BLIP3oDistributedTrainer:
     """Factory function to create COMPLETELY FIXED distributed CLIP trainer"""
     
-    return FixedBLIP3oDistributedTrainer(
+    return BLIP3oDistributedTrainer(
         model=model,
         loss_fn=loss_fn,
         train_dataloader=train_dataloader,
@@ -875,3 +884,7 @@ def create_fixed_distributed_clip_trainer(
         enable_recovery_mode=enable_recovery_mode,
         **kwargs
     )
+
+
+# FIXED: Add alias for the factory function too
+create_fixed_distributed_clip_trainer = create_distributed_clip_trainer

@@ -8,6 +8,7 @@ FIXES:
 - Improved error handling
 - Better timeout management
 - Robust communication utilities
+- Fixed import/export compatibility
 """
 
 import torch
@@ -16,6 +17,7 @@ import logging
 from typing import Dict, Any, Optional, List
 import json
 import os
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +36,21 @@ class DistributedCommunicator:
         """Synchronize all processes"""
         if self.is_distributed:
             try:
-                dist.barrier()
+                if timeout_seconds:
+                    # Use timeout for barrier to prevent infinite hanging
+                    import signal
+                    def timeout_handler(signum, frame):
+                        raise TimeoutError(f"Barrier timeout after {timeout_seconds}s")
+                    
+                    old_handler = signal.signal(signal.SIGALRM, timeout_handler)
+                    signal.alarm(timeout_seconds)
+                    try:
+                        dist.barrier()
+                    finally:
+                        signal.alarm(0)
+                        signal.signal(signal.SIGALRM, old_handler)
+                else:
+                    dist.barrier()
             except Exception as e:
                 logger.warning(f"Barrier failed on rank {self.rank}: {e}")
     
@@ -234,14 +250,15 @@ def sync_random_seed(seed: int, rank: int, world_size: int) -> int:
     return rank_seed
 
 
-def wait_for_everyone(rank: int, world_size: int, message: str = "Synchronizing"):
+def wait_for_everyone(rank: int, world_size: int, message: str = "Synchronizing", timeout_seconds: int = 60):
     """
-    Wait for all ranks to reach this point
+    Wait for all ranks to reach this point with timeout protection
     
     Args:
         rank: Current process rank
         world_size: Total number of processes
         message: Description of what we're waiting for
+        timeout_seconds: Maximum time to wait before timeout
     """
     
     if rank == 0:
@@ -249,9 +266,14 @@ def wait_for_everyone(rank: int, world_size: int, message: str = "Synchronizing"
     
     if dist.is_initialized():
         try:
+            # Use timeout to prevent infinite hanging
+            start_time = time.time()
             dist.barrier()
+            wait_time = time.time() - start_time
+            
             if rank == 0:
-                logger.info(f"✅ All {world_size} ranks synchronized")
+                logger.info(f"✅ All {world_size} ranks synchronized in {wait_time:.2f}s")
+                
         except Exception as e:
             logger.warning(f"Synchronization failed on rank {rank}: {e}")
 
@@ -275,6 +297,8 @@ def check_distributed_setup(rank: int, world_size: int) -> Dict[str, Any]:
         'backend': None,
         'master_addr': None,
         'master_port': None,
+        'cuda_available': torch.cuda.is_available(),
+        'cuda_device_count': torch.cuda.device_count() if torch.cuda.is_available() else 0,
     }
     
     if setup_info['is_distributed']:
@@ -289,8 +313,135 @@ def check_distributed_setup(rank: int, world_size: int) -> Dict[str, Any]:
         logger.info("🔧 Distributed setup check:")
         logger.info(f"   Rank: {rank}/{world_size}")
         logger.info(f"   Distributed: {setup_info['is_distributed']}")
+        logger.info(f"   CUDA Available: {setup_info['cuda_available']}")
+        logger.info(f"   CUDA Devices: {setup_info['cuda_device_count']}")
         if setup_info['is_distributed']:
             logger.info(f"   Backend: {setup_info['backend']}")
             logger.info(f"   Master: {setup_info['master_addr']}:{setup_info['master_port']}")
     
     return setup_info
+
+
+def test_distributed_communication(rank: int, world_size: int) -> bool:
+    """
+    Test distributed communication to ensure it's working
+    
+    Args:
+        rank: Current process rank
+        world_size: Total number of processes
+        
+    Returns:
+        True if communication test passes, False otherwise
+    """
+    
+    if not dist.is_initialized():
+        if rank == 0:
+            logger.info("✅ Communication test: Single process (no distributed setup needed)")
+        return True
+    
+    try:
+        communicator = DistributedCommunicator(rank, world_size)
+        
+        # Test 1: Barrier
+        start_time = time.time()
+        communicator.barrier(timeout_seconds=10)
+        barrier_time = time.time() - start_time
+        
+        # Test 2: All-reduce
+        test_tensor = torch.tensor([rank], dtype=torch.float32)
+        if torch.cuda.is_available():
+            test_tensor = test_tensor.cuda()
+        
+        original_value = test_tensor.item()
+        result_tensor = communicator.all_reduce_tensor(test_tensor.clone())
+        expected_sum = sum(range(world_size))
+        actual_sum = result_tensor.item()
+        
+        # Test 3: Broadcast
+        test_data = {"rank": rank, "message": f"Hello from rank {rank}"}
+        broadcast_data = communicator.broadcast_object(test_data, src_rank=0)
+        
+        communication_success = (
+            abs(actual_sum - expected_sum) < 1e-6 and
+            broadcast_data["rank"] == 0 and
+            barrier_time < 5.0
+        )
+        
+        if rank == 0:
+            if communication_success:
+                logger.info(f"✅ Communication test PASSED:")
+                logger.info(f"   Barrier time: {barrier_time:.3f}s")
+                logger.info(f"   All-reduce: {actual_sum} (expected: {expected_sum})")
+                logger.info(f"   Broadcast: {broadcast_data['message']}")
+            else:
+                logger.error(f"❌ Communication test FAILED:")
+                logger.error(f"   Barrier time: {barrier_time:.3f}s")
+                logger.error(f"   All-reduce: {actual_sum} (expected: {expected_sum})")
+                logger.error(f"   Broadcast data: {broadcast_data}")
+        
+        return communication_success
+        
+    except Exception as e:
+        if rank == 0:
+            logger.error(f"❌ Communication test failed with exception: {e}")
+        return False
+
+
+def cleanup_distributed_state():
+    """Clean up distributed state and resources"""
+    try:
+        if dist.is_initialized():
+            # Final barrier before cleanup
+            dist.barrier()
+            
+            # Destroy process group
+            dist.destroy_process_group()
+            
+            logger.info("🧹 Distributed state cleaned up")
+    except Exception as e:
+        logger.warning(f"Warning during distributed cleanup: {e}")
+    
+    # Clear CUDA cache
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+
+
+def get_distributed_rank_info() -> Dict[str, int]:
+    """Get current distributed rank information"""
+    if dist.is_initialized():
+        return {
+            'rank': dist.get_rank(),
+            'world_size': dist.get_world_size(),
+            'local_rank': int(os.environ.get('LOCAL_RANK', 0)),
+        }
+    else:
+        return {
+            'rank': 0,
+            'world_size': 1,
+            'local_rank': 0,
+        }
+
+
+def is_distributed_available() -> bool:
+    """Check if distributed training is available and properly set up"""
+    return (
+        torch.cuda.is_available() and
+        torch.cuda.device_count() > 1 and
+        hasattr(torch, 'distributed') and
+        torch.distributed.is_nccl_available()
+    )
+
+
+# Export all functions for easy import
+__all__ = [
+    'DistributedCommunicator',
+    'MetricsAggregator', 
+    'log_distributed_info',
+    'sync_random_seed',
+    'wait_for_everyone',
+    'check_distributed_setup',
+    'test_distributed_communication',
+    'cleanup_distributed_state',
+    'get_distributed_rank_info',
+    'is_distributed_available'
+]

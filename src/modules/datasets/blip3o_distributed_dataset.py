@@ -3,6 +3,8 @@ FIXED Distributed Dataset Implementation for BLIP3-o
 src/modules/datasets/blip3o_distributed_dataset.py
 
 MAJOR FIXES:
+- Fixed import/export name mismatches
+- Added proper aliases for backward compatibility
 - Fixed shard assignment to ensure all ranks get data
 - Added robust iteration with timeout handling
 - Fixed hanging issues in dataloader
@@ -82,7 +84,7 @@ class DistributedDataLoaderMetrics:
         }
 
 
-class FixedDistributedBLIP3oCLIPReproductionDataset(BLIP3oCLIPReproductionDataset):
+class DistributedBLIP3oCLIPReproductionDataset(BLIP3oCLIPReproductionDataset):
     """
     FIXED: Distributed version of BLIP3-o dataset with proper shard distribution
     
@@ -91,6 +93,7 @@ class FixedDistributedBLIP3oCLIPReproductionDataset(BLIP3oCLIPReproductionDatase
     - Fixed iteration to prevent hanging
     - Better progress tracking and error handling
     - Proper load balancing across GPUs
+    - Fixed import/export names
     """
     
     def __init__(
@@ -426,10 +429,9 @@ class FixedDistributedBLIP3oCLIPReproductionDataset(BLIP3oCLIPReproductionDatase
         
         if self.progress_tracking and self.rank == 0:
             logger.info(f"[Rank {self.rank}] Iteration completed: {self.total_samples_processed} samples processed")
-            self.metrics.log_stats(logger, "Final: ")
 
 
-def create_fixed_distributed_dataloaders(
+def create_distributed_clip_reproduction_dataloaders(
     chunked_embeddings_dir: Union[str, Path],
     world_size: int,
     rank: int,
@@ -454,6 +456,7 @@ def create_fixed_distributed_dataloaders(
     - Timeout protection
     - Better error handling
     - Load balancing
+    - Fixed import/export names
     """
     
     if eval_batch_size is None:
@@ -488,7 +491,7 @@ def create_fixed_distributed_dataloaders(
     }
     
     # Create distributed training dataset
-    train_dataset = FixedDistributedBLIP3oCLIPReproductionDataset(
+    train_dataset = DistributedBLIP3oCLIPReproductionDataset(
         split="train",
         shuffle_shards=True,
         shuffle_within_shard=True,
@@ -500,7 +503,7 @@ def create_fixed_distributed_dataloaders(
     if max_samples_per_epoch:
         eval_dataset_kwargs['max_samples_per_epoch'] = min(max_samples_per_epoch // 4, 50)
     
-    eval_dataset = FixedDistributedBLIP3oCLIPReproductionDataset(
+    eval_dataset = DistributedBLIP3oCLIPReproductionDataset(
         split="eval",
         shuffle_shards=False,
         shuffle_within_shard=False,
@@ -567,5 +570,6 @@ def create_fixed_distributed_dataloaders(
     return train_dataloader, eval_dataloader
 
 
-# Alias for backward compatibility
-create_distributed_clip_reproduction_dataloaders = create_fixed_distributed_dataloaders
+# FIXED: Add proper aliases for backward compatibility
+create_distributed_dataloaders = create_distributed_clip_reproduction_dataloaders
+create_fixed_distributed_dataloaders = create_distributed_clip_reproduction_dataloaders
