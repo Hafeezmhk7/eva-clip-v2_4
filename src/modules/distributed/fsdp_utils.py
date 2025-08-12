@@ -1,12 +1,12 @@
 """
-FIXED FSDP Utilities for BLIP3-o Distributed Training
+COMPLETELY FIXED FSDP Utilities for BLIP3-o Distributed Training
 src/modules/distributed/fsdp_utils.py
 
 MAJOR FIXES:
-- Fixed device_id parameter issue completely
-- Better error handling for distributed initialization
-- Proper timeout handling for barriers
-- Fixed environment variable setup
+- Fixed model device placement before FSDP wrapping
+- Added missing estimate_fsdp_memory_usage function
+- Proper parameter initialization on correct device
+- Better error handling and device management
 """
 
 import torch
@@ -34,16 +34,16 @@ logger = logging.getLogger(__name__)
 
 
 def setup_distributed_environment(rank: int, world_size: int, master_port: str = "12355", timeout_minutes: int = 30):
-    """COMPLETELY FIXED: Setup distributed training environment without device_id issues"""
+    """COMPLETELY FIXED: Setup distributed training environment"""
     
-    # FIXED: Set environment variables properly
+    # Set environment variables properly
     os.environ['MASTER_ADDR'] = 'localhost'
     os.environ['MASTER_PORT'] = master_port
     os.environ['RANK'] = str(rank)
     os.environ['LOCAL_RANK'] = str(rank)
     os.environ['WORLD_SIZE'] = str(world_size)
     
-    # FIXED: Set CUDA device BEFORE any distributed operations
+    # Set CUDA device BEFORE any distributed operations
     if torch.cuda.is_available():
         torch.cuda.set_device(rank)
         device = torch.device(f'cuda:{rank}')
@@ -56,8 +56,7 @@ def setup_distributed_environment(rank: int, world_size: int, master_port: str =
         device = torch.device('cpu')
         raise RuntimeError("CUDA required for distributed training")
     
-    # FIXED: Initialize process group WITHOUT device_id parameter
-    # The device_id parameter is deprecated and causes the warnings
+    # Initialize process group
     try:
         dist.init_process_group(
             backend='nccl',
@@ -85,10 +84,9 @@ def setup_distributed_environment(rank: int, world_size: int, master_port: str =
 
 
 def cleanup_distributed():
-    """Clean up distributed training with proper error handling"""
+    """Clean up distributed training"""
     if dist.is_initialized():
         try:
-            # Simple barrier without timeout parameter for compatibility
             dist.barrier()
             dist.destroy_process_group()
             logger.info("🔧 Distributed environment cleaned up")
@@ -99,15 +97,13 @@ def cleanup_distributed():
 def get_fsdp_sharding_policy():
     """Get optimal FSDP sharding policy for BLIP3-o DiT"""
     
-    # Import the specific DiT block class
     try:
         from src.modules.models.blip3o_dit import StableDiTBlock3D
         dit_block_class = StableDiTBlock3D
     except ImportError:
         logger.warning("Could not import StableDiTBlock3D, using generic transformer policy")
-        dit_block_class = torch.nn.TransformerEncoderLayer  # Fallback
+        dit_block_class = torch.nn.TransformerEncoderLayer
     
-    # Create auto-wrap policy for DiT blocks
     auto_wrap_policy = partial(
         transformer_auto_wrap_policy,
         transformer_layer_cls={dit_block_class},
@@ -122,7 +118,6 @@ def create_fsdp_mixed_precision_policy(use_fp16: bool = True) -> Optional[MixedP
     if not use_fp16:
         return None
     
-    # Use BF16 for parameters and gradients, FP32 for loss computation
     mixed_precision_policy = MixedPrecision(
         param_dtype=torch.bfloat16,
         reduce_dtype=torch.bfloat16,
@@ -145,7 +140,27 @@ def wrap_model_with_fsdp(
 ) -> FSDP:
     """
     COMPLETELY FIXED: Wrap model with FSDP for distributed training
+    
+    KEY FIX: Move model to device BEFORE FSDP wrapping
     """
+    
+    # CRITICAL FIX: Move model to correct device FIRST
+    logger.info(f"Moving model to device {device} before FSDP wrapping...")
+    model = model.to(device)
+    
+    # Ensure all parameters are on the correct device
+    for param in model.parameters():
+        if param.device != device:
+            param.data = param.data.to(device)
+            if param.grad is not None:
+                param.grad = param.grad.to(device)
+    
+    # Ensure all buffers are on the correct device
+    for buffer in model.buffers():
+        if buffer.device != device:
+            buffer.data = buffer.data.to(device)
+    
+    logger.info(f"✅ Model moved to {device}, all parameters and buffers on GPU")
     
     # Get sharding policy
     auto_wrap_policy = get_fsdp_sharding_policy()
@@ -156,7 +171,8 @@ def wrap_model_with_fsdp(
     # CPU offload policy
     cpu_offload_policy = CPUOffload(offload_params=True) if cpu_offload else None
     
-    # COMPLETELY FIXED: Wrap model with FSDP without problematic device_id
+    # FIXED: Wrap model with FSDP (model is already on correct device)
+    logger.info("Wrapping model with FSDP...")
     fsdp_model = FSDP(
         model,
         auto_wrap_policy=auto_wrap_policy,
@@ -166,12 +182,9 @@ def wrap_model_with_fsdp(
         backward_prefetch=backward_prefetch,
         limit_all_gathers=limit_all_gathers,
         use_orig_params=False,
-        # FIXED: Removed device_id parameter completely - FSDP will use current device
-        sync_module_states=True,
+        sync_module_states=True,  # Now safe because model is on GPU
+        # NOTE: No device_id parameter - FSDP will use current device
     )
-    
-    # Move to device after FSDP wrapping
-    fsdp_model = fsdp_model.to(device)
     
     if dist.get_rank() == 0:
         logger.info("✅ Model wrapped with FSDP:")
@@ -196,9 +209,7 @@ def save_fsdp_checkpoint(
     additional_data: Optional[Dict[str, Any]] = None,
     save_full_state: bool = True
 ):
-    """
-    Save FSDP checkpoint with proper state dict handling
-    """
+    """Save FSDP checkpoint with proper state dict handling"""
     
     if dist.get_rank() != 0:
         return  # Only rank 0 saves checkpoints
@@ -262,9 +273,7 @@ def load_fsdp_checkpoint(
     scaler: Optional[torch.amp.GradScaler] = None,
     strict: bool = True
 ) -> Dict[str, Any]:
-    """
-    Load FSDP checkpoint with proper state dict handling
-    """
+    """Load FSDP checkpoint with proper state dict handling"""
     
     logger.info(f"📂 Loading FSDP checkpoint: {checkpoint_path}")
     
@@ -320,7 +329,7 @@ def load_fsdp_checkpoint(
 
 
 def sync_across_gpus(tensor: torch.Tensor, average: bool = True) -> torch.Tensor:
-    """Synchronize tensor across all GPUs with timeout protection"""
+    """Synchronize tensor across all GPUs"""
     
     if not dist.is_initialized():
         return tensor
@@ -346,13 +355,140 @@ def sync_across_gpus(tensor: torch.Tensor, average: bool = True) -> torch.Tensor
         return tensor
 
 
+def estimate_fsdp_memory_usage(
+    model_parameters: int,
+    world_size: int,
+    use_mixed_precision: bool = True,
+    cpu_offload: bool = False,
+    sharding_strategy: str = "FULL_SHARD"
+) -> Dict[str, Any]:
+    """
+    Estimate memory usage for FSDP training
+    
+    Args:
+        model_parameters: Number of model parameters
+        world_size: Number of GPUs
+        use_mixed_precision: Whether using mixed precision
+        cpu_offload: Whether using CPU offload
+        sharding_strategy: FSDP sharding strategy
+        
+    Returns:
+        Dictionary with memory estimates
+    """
+    
+    # Parameter size estimation
+    if use_mixed_precision:
+        param_bytes_per_element = 2  # BF16
+        grad_bytes_per_element = 2   # BF16
+    else:
+        param_bytes_per_element = 4  # FP32
+        grad_bytes_per_element = 4   # FP32
+    
+    # Base memory calculations
+    base_param_memory = model_parameters * param_bytes_per_element
+    base_grad_memory = model_parameters * grad_bytes_per_element
+    
+    # Sharding factor based on strategy
+    if sharding_strategy == "FULL_SHARD":
+        param_sharding_factor = world_size
+        grad_sharding_factor = world_size
+    elif sharding_strategy == "SHARD_GRAD_OP":
+        param_sharding_factor = 1
+        grad_sharding_factor = world_size
+    else:  # NO_SHARD
+        param_sharding_factor = 1
+        grad_sharding_factor = 1
+    
+    # Memory per GPU
+    param_memory_per_gpu = base_param_memory / param_sharding_factor
+    grad_memory_per_gpu = base_grad_memory / grad_sharding_factor
+    
+    # Optimizer states (AdamW: 2 states per parameter)
+    optimizer_states = 2
+    optimizer_memory_per_gpu = model_parameters * param_bytes_per_element * optimizer_states / param_sharding_factor
+    
+    # CPU offload adjustment
+    if cpu_offload:
+        param_memory_per_gpu *= 0.1  # Most parameters offloaded
+        optimizer_memory_per_gpu *= 0.1
+    
+    # Additional overheads
+    activation_memory_estimate = param_memory_per_gpu * 0.5  # Rough estimate
+    communication_overhead = base_param_memory * 0.1 / world_size  # For all-gather/reduce-scatter
+    
+    total_memory_per_gpu = (
+        param_memory_per_gpu + 
+        grad_memory_per_gpu + 
+        optimizer_memory_per_gpu + 
+        activation_memory_estimate + 
+        communication_overhead
+    )
+    
+    return {
+        'model_parameters': model_parameters,
+        'world_size': world_size,
+        'sharding_strategy': sharding_strategy,
+        'use_mixed_precision': use_mixed_precision,
+        'cpu_offload': cpu_offload,
+        
+        # Memory breakdown (bytes)
+        'param_memory_per_gpu': int(param_memory_per_gpu),
+        'grad_memory_per_gpu': int(grad_memory_per_gpu),
+        'optimizer_memory_per_gpu': int(optimizer_memory_per_gpu),
+        'activation_memory_estimate': int(activation_memory_estimate),
+        'communication_overhead': int(communication_overhead),
+        'total_memory_per_gpu': int(total_memory_per_gpu),
+        
+        # Memory breakdown (GB)
+        'param_memory_gb': param_memory_per_gpu / (1024**3),
+        'grad_memory_gb': grad_memory_per_gpu / (1024**3),
+        'optimizer_memory_gb': optimizer_memory_per_gpu / (1024**3),
+        'total_memory_gb': total_memory_per_gpu / (1024**3),
+        
+        # Reduction factors
+        'memory_reduction_factor': world_size if sharding_strategy == "FULL_SHARD" else 1,
+        'param_sharding_factor': param_sharding_factor,
+        'grad_sharding_factor': grad_sharding_factor,
+    }
+
+
+def print_fsdp_memory_estimate(
+    model_parameters: int,
+    world_size: int,
+    use_mixed_precision: bool = True,
+    cpu_offload: bool = False,
+    sharding_strategy: str = "FULL_SHARD"
+):
+    """Print formatted memory estimate for FSDP training"""
+    
+    estimate = estimate_fsdp_memory_usage(
+        model_parameters, world_size, use_mixed_precision, cpu_offload, sharding_strategy
+    )
+    
+    print(f"\n🧮 FSDP Memory Estimate")
+    print("=" * 50)
+    print(f"Model Parameters: {model_parameters:,}")
+    print(f"World Size: {world_size}")
+    print(f"Sharding Strategy: {sharding_strategy}")
+    print(f"Mixed Precision: {'BF16' if use_mixed_precision else 'FP32'}")
+    print(f"CPU Offload: {'Enabled' if cpu_offload else 'Disabled'}")
+    print()
+    print(f"Memory per GPU:")
+    print(f"  Parameters: {estimate['param_memory_gb']:.2f} GB")
+    print(f"  Gradients: {estimate['grad_memory_gb']:.2f} GB")
+    print(f"  Optimizer States: {estimate['optimizer_memory_gb']:.2f} GB")
+    print(f"  Total Estimated: {estimate['total_memory_gb']:.2f} GB")
+    print()
+    print(f"Memory Reduction: {estimate['memory_reduction_factor']:.1f}x compared to single GPU")
+    print("=" * 50)
+
+
 def barrier_with_timeout(timeout_seconds: int = 60):
     """Barrier with timeout to detect hangs"""
     if not dist.is_initialized():
         return
     
     try:
-        # Simple barrier call
         dist.barrier()
     except Exception as e:
         logger.error(f"Barrier failed: {e}")
@@ -377,16 +513,16 @@ def get_rank() -> int:
 def setup_environment_variables():
     """Setup environment variables to avoid warnings"""
     
-    # FIXED: Use HF_HOME instead of deprecated TRANSFORMERS_CACHE
+    # Use HF_HOME instead of deprecated TRANSFORMERS_CACHE
     if 'TRANSFORMERS_CACHE' in os.environ and 'HF_HOME' not in os.environ:
         os.environ['HF_HOME'] = os.environ['TRANSFORMERS_CACHE']
         logger.info(f"Set HF_HOME to: {os.environ['HF_HOME']}")
     
     # Set other useful environment variables
-    os.environ['TOKENIZERS_PARALLELISM'] = 'false'  # Avoid tokenizer warnings
-    os.environ['WANDB_SILENT'] = 'true'  # Reduce wandb output
+    os.environ['TOKENIZERS_PARALLELISM'] = 'false'
+    os.environ['WANDB_SILENT'] = 'true'
     
-    # NCCL optimizations for better distributed training
+    # NCCL optimizations
     os.environ['NCCL_DEBUG'] = 'WARN'
     os.environ['NCCL_TIMEOUT'] = '1800'  # 30 minutes
     

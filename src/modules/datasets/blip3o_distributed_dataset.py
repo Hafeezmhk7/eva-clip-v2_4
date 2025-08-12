@@ -1,8 +1,9 @@
 """
-FIXED Distributed Dataset Implementation for BLIP3-o
+COMPLETELY FIXED Distributed Dataset Implementation for BLIP3-o
 src/modules/datasets/blip3o_distributed_dataset.py
 
 MAJOR FIXES:
+- Added missing DistributedDataLoaderMetrics class
 - Fixed iteration to prevent hanging
 - Better distributed data sharding
 - Improved error handling and progress tracking
@@ -31,6 +32,65 @@ from .blip3o_dataset import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+class DistributedDataLoaderMetrics:
+    """
+    FIXED: Added missing DistributedDataLoaderMetrics class
+    Tracks metrics for distributed dataloader performance
+    """
+    
+    def __init__(self, rank: int, world_size: int):
+        self.rank = rank
+        self.world_size = world_size
+        self.reset()
+    
+    def reset(self):
+        """Reset all metrics"""
+        self.samples_processed = 0
+        self.batches_processed = 0
+        self.total_time = 0.0
+        self.data_loading_time = 0.0
+        self.start_time = time.time()
+        self.last_batch_time = self.start_time
+    
+    def update_batch(self, batch_size: int, data_loading_time: float = 0.0):
+        """Update metrics after processing a batch"""
+        current_time = time.time()
+        self.samples_processed += batch_size
+        self.batches_processed += 1
+        self.data_loading_time += data_loading_time
+        self.total_time = current_time - self.start_time
+        self.last_batch_time = current_time
+    
+    def get_stats(self) -> Dict[str, float]:
+        """Get current statistics"""
+        if self.total_time > 0:
+            samples_per_sec = self.samples_processed / self.total_time
+            batches_per_sec = self.batches_processed / self.total_time
+        else:
+            samples_per_sec = 0.0
+            batches_per_sec = 0.0
+        
+        return {
+            'rank': self.rank,
+            'world_size': self.world_size,
+            'samples_processed': self.samples_processed,
+            'batches_processed': self.batches_processed,
+            'total_time': self.total_time,
+            'samples_per_sec': samples_per_sec,
+            'batches_per_sec': batches_per_sec,
+            'data_loading_time': self.data_loading_time,
+            'data_loading_ratio': self.data_loading_time / max(self.total_time, 1e-6),
+        }
+    
+    def log_stats(self, logger, prefix: str = ""):
+        """Log current statistics"""
+        stats = self.get_stats()
+        logger.info(f"{prefix}[Rank {self.rank}] Dataloader Stats:")
+        logger.info(f"  Samples: {stats['samples_processed']:,} ({stats['samples_per_sec']:.1f}/s)")
+        logger.info(f"  Batches: {stats['batches_processed']:,} ({stats['batches_per_sec']:.2f}/s)")
+        logger.info(f"  Data loading: {stats['data_loading_ratio']*100:.1f}% of total time")
 
 
 class DistributedBLIP3oCLIPReproductionDataset(BLIP3oCLIPReproductionDataset):
@@ -62,7 +122,8 @@ class DistributedBLIP3oCLIPReproductionDataset(BLIP3oCLIPReproductionDataset):
         world_size: Optional[int] = None,
         rank: Optional[int] = None,
         distributed_seed: int = 42,
-        progress_tracking: bool = True,  # NEW: Enable progress tracking
+        progress_tracking: bool = True,
+        max_samples_per_epoch: Optional[int] = None,  # NEW: Limit for testing
     ):
         
         # Set distributed parameters
@@ -77,6 +138,7 @@ class DistributedBLIP3oCLIPReproductionDataset(BLIP3oCLIPReproductionDataset):
         
         self.distributed_seed = distributed_seed
         self.progress_tracking = progress_tracking
+        self.max_samples_per_epoch = max_samples_per_epoch
         
         # Initialize base dataset first
         super().__init__(
@@ -93,9 +155,12 @@ class DistributedBLIP3oCLIPReproductionDataset(BLIP3oCLIPReproductionDataset):
             simple_scale_factor=simple_scale_factor,
         )
         
-        # FIXED: Setup distributed shards properly
+        # Setup distributed shards
         if self.is_distributed:
             self._setup_distributed_shards()
+        
+        # Initialize metrics
+        self.metrics = DistributedDataLoaderMetrics(self.rank, self.world_size)
         
         # Track iteration state
         self._iteration_count = 0
@@ -108,6 +173,7 @@ class DistributedBLIP3oCLIPReproductionDataset(BLIP3oCLIPReproductionDataset):
             logger.info(f"  Shards per rank: {len(self.shard_files)}")
             logger.info(f"  Is distributed: {self.is_distributed}")
             logger.info(f"  Progress tracking: {self.progress_tracking}")
+            logger.info(f"  Max samples per epoch: {self.max_samples_per_epoch or 'Unlimited'}")
 
     def _setup_distributed_shards(self):
         """FIXED: Distribute shards across ranks for balanced loading"""
@@ -135,9 +201,15 @@ class DistributedBLIP3oCLIPReproductionDataset(BLIP3oCLIPReproductionDataset):
                 # Adjust estimated length proportionally
                 original_length = self.estimated_length
                 self.estimated_length = max(1, int(original_length * shards_per_rank / total_shards))
+                
+                # Apply max_samples_per_epoch limit if set
+                if self.max_samples_per_epoch:
+                    self.estimated_length = min(self.estimated_length, self.max_samples_per_epoch)
             else:
                 # Fallback estimation
                 self.estimated_length = max(1, shards_per_rank * 1000)
+                if self.max_samples_per_epoch:
+                    self.estimated_length = min(self.estimated_length, self.max_samples_per_epoch)
         
         logger.info(f"[Rank {self.rank}] Assigned {len(rank_shard_files)}/{len(all_shard_files)} shards")
         logger.info(f"[Rank {self.rank}] Estimated length: {self.estimated_length:,} samples")
@@ -186,7 +258,7 @@ class DistributedBLIP3oCLIPReproductionDataset(BLIP3oCLIPReproductionDataset):
             logger.info(f"Prepared {len(self.shard_files)} shard files for distributed processing")
 
     def __iter__(self) -> Iterator[Dict[str, Any]]:
-        """FIXED: Iterate through all samples with progress tracking"""
+        """FIXED: Iterate through all samples with progress tracking and limits"""
         # Reset iteration state
         self.current_shard_idx = 0
         self.current_shard_data = None
@@ -194,6 +266,9 @@ class DistributedBLIP3oCLIPReproductionDataset(BLIP3oCLIPReproductionDataset):
         self.total_samples_processed = 0
         self._iteration_count = 0
         self._last_progress_time = time.time()
+        
+        # Reset metrics
+        self.metrics.reset()
         
         # Initialize progress tracking
         if self.progress_tracking and self.rank == 0:
@@ -205,11 +280,13 @@ class DistributedBLIP3oCLIPReproductionDataset(BLIP3oCLIPReproductionDataset):
             return
         
         samples_yielded = 0
-        max_samples = getattr(self, 'max_samples_per_epoch', None) or float('inf')
+        max_samples = self.max_samples_per_epoch or float('inf')
         
         while self.current_shard_data is not None and samples_yielded < max_samples:
             while self.current_sample_idx < len(self.current_samples) and samples_yielded < max_samples:
                 try:
+                    batch_start_time = time.time()
+                    
                     sample_idx = self.current_samples[self.current_sample_idx]
                     
                     clip_emb = self.current_shard_data['clip_blip3o_embeddings'][sample_idx]
@@ -252,6 +329,10 @@ class DistributedBLIP3oCLIPReproductionDataset(BLIP3oCLIPReproductionDataset):
                     self._iteration_count += 1
                     samples_yielded += 1
                     
+                    # Update metrics
+                    data_loading_time = time.time() - batch_start_time
+                    self.metrics.update_batch(1, data_loading_time)
+                    
                     # FIXED: Progress tracking without flooding logs
                     if self.progress_tracking and self._iteration_count % 100 == 0:
                         current_time = time.time()
@@ -274,8 +355,13 @@ class DistributedBLIP3oCLIPReproductionDataset(BLIP3oCLIPReproductionDataset):
             if not self._load_next_shard():
                 break
         
-        if self.progress_tracking:
+        if self.progress_tracking and self.rank == 0:
             logger.info(f"[Rank {self.rank}] Iteration completed: {self.total_samples_processed} samples processed")
+            self.metrics.log_stats(logger, "Final: ")
+
+    def get_metrics(self) -> Dict[str, Any]:
+        """Get current dataloader metrics"""
+        return self.metrics.get_stats()
 
 
 def create_distributed_dataloaders(
@@ -292,6 +378,7 @@ def create_distributed_dataloaders(
     distributed_seed: int = 42,
     drop_last: bool = True,
     progress_tracking: bool = True,
+    max_samples_per_epoch: Optional[int] = None,  # NEW: For testing
     **kwargs
 ) -> Tuple[DataLoader, Optional[DataLoader]]:
     """
@@ -314,6 +401,7 @@ def create_distributed_dataloaders(
         logger.info(f"  Simple scale factor: {simple_scale_factor}")
         logger.info(f"  Distributed seed: {distributed_seed}")
         logger.info(f"  Progress tracking: {progress_tracking}")
+        logger.info(f"  Max samples per epoch: {max_samples_per_epoch or 'Unlimited'}")
     
     dataset_kwargs = {
         'chunked_embeddings_dir': chunked_embeddings_dir,
@@ -324,6 +412,7 @@ def create_distributed_dataloaders(
         'rank': rank,
         'distributed_seed': distributed_seed,
         'progress_tracking': progress_tracking,
+        'max_samples_per_epoch': max_samples_per_epoch,
         **kwargs
     }
     
@@ -335,12 +424,16 @@ def create_distributed_dataloaders(
         **dataset_kwargs
     )
     
-    # Create distributed evaluation dataset
+    # Create distributed evaluation dataset (smaller for faster eval)
+    eval_dataset_kwargs = dataset_kwargs.copy()
+    if max_samples_per_epoch:
+        eval_dataset_kwargs['max_samples_per_epoch'] = min(max_samples_per_epoch // 4, 100)  # Smaller eval set
+    
     eval_dataset = DistributedBLIP3oCLIPReproductionDataset(
         split="eval",
         shuffle_shards=False,
         shuffle_within_shard=False,
-        **dataset_kwargs
+        **eval_dataset_kwargs
     )
     
     # FIXED: No samplers for IterableDataset - distribution handled internally
@@ -417,6 +510,7 @@ def create_distributed_clip_reproduction_dataloaders(
     num_workers: int = 0,
     pin_memory: bool = False,
     simple_scale_factor: float = 1.0,
+    max_samples_per_epoch: Optional[int] = None,  # NEW: For testing
     **kwargs
 ) -> Tuple[DataLoader, Optional[DataLoader]]:
     """
@@ -438,5 +532,6 @@ def create_distributed_clip_reproduction_dataloaders(
         num_workers=num_workers,
         pin_memory=pin_memory,
         simple_scale_factor=simple_scale_factor,
+        max_samples_per_epoch=max_samples_per_epoch,
         **kwargs
     )
